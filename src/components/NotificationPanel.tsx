@@ -39,8 +39,8 @@ export default function NotificationPanel({
   const unreadCount = notifications.filter((n) => !n.read).length;
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md animate-[modalIn_0.2s_ease-out] max-h-[85vh] flex flex-col">
+    <div className="fixed inset-0 bg-black/30 z-50" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="bg-white rounded-b-2xl shadow-xl w-full max-w-md mx-auto max-h-[70vh] flex flex-col animate-[slideDown_0.25s_ease-out]">
         <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <h3 className="text-base font-bold text-gray-800">알림</h3>
