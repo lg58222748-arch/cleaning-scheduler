@@ -221,15 +221,20 @@ export default function Home() {
     setTimeout(() => loadData(undefined, true), 500);
   }
 
-  // Derived
+  // Derived - 관리자는 전체, 일반회원은 자기에게 배정된 것만
+  const visibleSchedules = isAdmin
+    ? schedules
+    : schedules.filter((s) =>
+        s.status !== "unassigned" && (
+          s.memberName === currentUser.name ||
+          s.assignedToName === currentUser.name ||
+          s.assignedTo === currentUser.id
+        )
+      );
   const dateStr = format(selectedDate, "yyyy-MM-dd");
-  const daySchedules = schedules
+  const daySchedules = visibleSchedules
     .filter((s) => s.date === dateStr)
     .sort((a, b) => a.startTime.localeCompare(b.startTime));
-  const allSchedulesSorted = [...schedules].sort((a, b) => {
-    const dateComp = a.date.localeCompare(b.date);
-    return dateComp !== 0 ? dateComp : a.startTime.localeCompare(b.startTime);
-  });
   const pendingSwapCount = swapRequests.filter((r) => r.status === "pending").length;
 
   return (
@@ -337,7 +342,7 @@ export default function Home() {
         {activeTab === "calendar" && (
           <div className="h-full">
             <Calendar
-              schedules={schedules}
+              schedules={visibleSchedules}
               members={members}
               selectedDate={selectedDate}
               onSelectDate={(d) => { setSelectedDate(d); setShowDayPopup(true); }}
