@@ -30,14 +30,37 @@ body {
   will-change: scroll-position;
 }
 
-/* 하드웨어 가속 */
+/* 하드웨어 가속 + 부드러운 스크롤 */
+html, body {
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+}
+
 .min-h-screen {
   transform: translateZ(0);
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+}
+
+/* 모바일 터치 스크롤 최적화 */
+main, .divide-y, .space-y-3 {
+  contain: layout style;
 }
 
 /* 스크롤 성능 향상 */
 * {
   -webkit-font-smoothing: antialiased;
+}
+
+/* 터치 지연 제거 */
+button, a, [role="button"] {
+  touch-action: manipulation;
+}
+
+/* 리스트 스크롤 최적화 */
+.max-h-\\[calc\\(100vh-200px\\)\\] {
+  will-change: scroll-position;
+  contain: strict;
 }
 
 /* Remove input zoom on iOS */
