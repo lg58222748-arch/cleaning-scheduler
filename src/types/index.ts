@@ -5,6 +5,7 @@ export interface Member {
   phone?: string;
   availableDays: number[]; // 0=일, 1=월, ..., 6=토
   active: boolean;
+  linkedUsername?: string; // 연결된 로그인 아이디
 }
 
 export interface Schedule {

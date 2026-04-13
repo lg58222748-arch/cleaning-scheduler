@@ -222,13 +222,15 @@ export default function Home() {
   }
 
   // Derived - 관리자는 전체, 일반회원은 자기에게 배정된 것만
+  const myLinkedMember = members.find((m) => m.linkedUsername === currentUser.username);
   const visibleSchedules = isAdmin
     ? schedules
     : schedules.filter((s) =>
         s.status !== "unassigned" && (
           s.memberName === currentUser.name ||
           s.assignedToName === currentUser.name ||
-          s.assignedTo === currentUser.id
+          s.assignedTo === currentUser.id ||
+          (myLinkedMember && s.memberId === myLinkedMember.id)
         )
       );
   const dateStr = format(selectedDate, "yyyy-MM-dd");
@@ -388,7 +390,10 @@ export default function Home() {
                         <span className="text-sm font-medium text-gray-800">{m.name}</span>
                         {!m.active && <span className="text-[10px] px-1.5 py-0.5 bg-gray-100 text-gray-500 rounded-full">비활성</span>}
                       </div>
-                      <div className="text-xs text-gray-400">{m.phone || "연락처 없음"}</div>
+                      <div className="text-xs text-gray-400">
+                        {m.phone || "연락처 없음"}
+                        {m.linkedUsername && <span className="ml-1 text-blue-500">@{m.linkedUsername}</span>}
+                      </div>
                     </div>
                     <div className="flex gap-0.5">
                       {["일","월","화","수","목","금","토"].map((name, i) => (

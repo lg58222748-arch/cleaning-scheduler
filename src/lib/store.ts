@@ -9,7 +9,7 @@ const MEMBER_COLORS = [
 
 // ===== Helper: DB row → App type 변환 =====
 function rowToMember(r: Record<string, unknown>): Member {
-  return { id: String(r.id), name: String(r.name), color: String(r.color), phone: String(r.phone || ""), availableDays: (r.available_days as number[]) || [1,2,3,4,5], active: Boolean(r.active) };
+  return { id: String(r.id), name: String(r.name), color: String(r.color), phone: String(r.phone || ""), availableDays: (r.available_days as number[]) || [1,2,3,4,5], active: Boolean(r.active), linkedUsername: r.linked_username ? String(r.linked_username) : undefined };
 }
 function rowToSchedule(r: Record<string, unknown>): Schedule {
   return { id: String(r.id), memberId: String(r.member_id || ""), memberName: String(r.member_name || "미배정"), title: String(r.title), location: String(r.location || ""), date: String(r.date), startTime: String(r.start_time), endTime: String(r.end_time), status: String(r.status) as Schedule["status"], assignedTo: r.assigned_to ? String(r.assigned_to) : undefined, assignedToName: r.assigned_to_name ? String(r.assigned_to_name) : undefined, googleEventId: r.google_event_id ? String(r.google_event_id) : undefined, note: String(r.note || ""), color: r.color ? String(r.color) : undefined };
@@ -55,6 +55,7 @@ export async function updateMember(id: string, input: Partial<Member>): Promise<
   if (input.availableDays !== undefined) update.available_days = input.availableDays;
   if (input.active !== undefined) update.active = input.active;
   if (input.color !== undefined) update.color = input.color;
+  if (input.linkedUsername !== undefined) update.linked_username = input.linkedUsername;
   const { data } = await supabase.from("members").update(update).eq("id", id).select().single();
   return data ? rowToMember(data) : null;
 }

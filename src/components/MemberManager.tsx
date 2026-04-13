@@ -28,6 +28,7 @@ export default function MemberManager({
   const [editName, setEditName] = useState("");
   const [editPhone, setEditPhone] = useState("");
   const [editDays, setEditDays] = useState<number[]>([]);
+  const [editLinkedUsername, setEditLinkedUsername] = useState("");
 
   function handleAdd() {
     if (!newName.trim()) return;
@@ -43,6 +44,7 @@ export default function MemberManager({
     setEditName(m.name);
     setEditPhone(m.phone || "");
     setEditDays([...m.availableDays]);
+    setEditLinkedUsername(m.linkedUsername || "");
   }
 
   function saveEdit() {
@@ -51,6 +53,7 @@ export default function MemberManager({
       name: editName.trim(),
       phone: editPhone.trim(),
       availableDays: editDays,
+      linkedUsername: editLinkedUsername.trim() || undefined,
     });
     setEditingId(null);
   }
@@ -97,6 +100,12 @@ export default function MemberManager({
                     onChange={(e) => setEditPhone(e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-400 focus:border-transparent outline-none"
                     placeholder="전화번호"
+                  />
+                  <input
+                    value={editLinkedUsername}
+                    onChange={(e) => setEditLinkedUsername(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-400 focus:border-transparent outline-none"
+                    placeholder="연결 로그인 아이디 (선택)"
                   />
                   <div>
                     <label className="text-xs text-gray-500 mb-1 block">근무 가능 요일</label>
