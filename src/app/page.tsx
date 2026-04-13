@@ -78,6 +78,23 @@ export default function Home() {
     if (currentUser) loadData();
   }, [currentUser]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // PWA 서비스워커 등록 + 설치 배너
+  const [installPrompt, setInstallPrompt] = useState<Event | null>(null);
+  const [showInstallBanner, setShowInstallBanner] = useState(false);
+
+  useEffect(() => {
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.register("/sw.js");
+    }
+    const handler = (e: Event) => {
+      e.preventDefault();
+      setInstallPrompt(e);
+      setShowInstallBanner(true);
+    };
+    window.addEventListener("beforeinstallprompt", handler);
+    return () => window.removeEventListener("beforeinstallprompt", handler);
+  }, []);
+
   // Login gate - must be AFTER all hooks
   if (!currentUser) {
     return <LoginPage onLogin={(user) => setCurrentUser(user)} />;
@@ -191,6 +208,34 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-gray-50 pb-20">
+      {/* PWA 설치 배너 */}
+      {showInstallBanner && (
+        <div className="bg-blue-600 text-white px-4 py-3 flex items-center justify-between z-50 relative">
+          <div className="flex items-center gap-2">
+            <span className="text-lg">🏠</span>
+            <span className="text-sm font-medium">앱으로 설치하면 더 편해요!</span>
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={async () => {
+                if (installPrompt && "prompt" in installPrompt) {
+                  (installPrompt as unknown as { prompt: () => void }).prompt();
+                }
+                setShowInstallBanner(false);
+              }}
+              className="bg-white text-blue-600 px-3 py-1 rounded-lg text-xs font-bold"
+            >
+              설치
+            </button>
+            <button
+              onClick={() => setShowInstallBanner(false)}
+              className="text-blue-200 text-xs"
+            >
+              닫기
+            </button>
+          </div>
+        </div>
+      )}
       {/* Compact mobile header */}
       <header className="bg-white border-b border-gray-200 sticky top-0 z-40">
         <div className="px-4 flex items-center justify-between h-14">
