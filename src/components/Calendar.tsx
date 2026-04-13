@@ -204,7 +204,7 @@ export default function Calendar({
                   >
                     {format(d, "d")}
                   </span>
-                  {/* 이벤트 바 - 셀 꽉 채움, 2줄 표시 */}
+                  {/* 이벤트 바 - 셀 꽉 채움, 잘림 없이 */}
                   <div className="mt-0.5 overflow-hidden flex-1">
                     {daySchedules.slice(0, 1).map((s) => {
                       const fullName = s.title.replace(/^\[.+?\]\s*/, "");
@@ -212,15 +212,15 @@ export default function Calendar({
                       return (
                         <div
                           key={s.id}
-                          className="text-[9px] leading-[1.3] px-0.5 py-0.5 rounded font-medium overflow-hidden"
-                          style={{ backgroundColor: schedColor, color: "#555", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const }}
+                          className="text-[8px] leading-[1.2] px-0.5 py-0.5 rounded font-medium overflow-hidden break-all"
+                          style={{ backgroundColor: schedColor, color: "#555", maxHeight: "2.4em" }}
                         >
                           {fullName}
                         </div>
                       );
                     })}
                     {daySchedules.length > 1 && (
-                      <div className="text-[8px] text-gray-400 px-0.5 mt-0.5">+{daySchedules.length - 1}</div>
+                      <div className="text-[7px] text-gray-400 px-0.5 mt-0.5">+{daySchedules.length - 1}</div>
                     )}
                   </div>
                 </button>

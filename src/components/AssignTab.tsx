@@ -157,8 +157,8 @@ export default function AssignTab({ members, onAssigned }: AssignTabProps) {
                         return (
                           <div
                             key={s.id}
-                            className="text-[9px] leading-[1.3] px-0.5 py-0.5 rounded font-medium bg-orange-100 text-orange-700 overflow-hidden"
-                            style={{ display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const }}
+                            className="text-[8px] leading-[1.2] px-0.5 py-0.5 rounded font-medium bg-orange-100 text-orange-700 overflow-hidden break-all"
+                            style={{ maxHeight: "2.4em" }}
                           >
                             {fullName}
                           </div>
