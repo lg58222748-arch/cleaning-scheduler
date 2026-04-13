@@ -72,7 +72,8 @@ export async function getSchedules(): Promise<Schedule[]> {
 }
 
 export async function getSchedulesByRange(start: string, end: string): Promise<Schedule[]> {
-  const { data } = await supabase.from("schedules").select("*").gte("date", start).lte("date", end).neq("status", "deleted").order("date");
+  // 배정된 일정만 (unassigned, deleted 제외)
+  const { data } = await supabase.from("schedules").select("*").gte("date", start).lte("date", end).not("status", "in", '("deleted","unassigned")').order("date");
   return (data || []).map(rowToSchedule);
 }
 
