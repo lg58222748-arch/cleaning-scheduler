@@ -311,8 +311,28 @@ export async function registerUser(input: { username: string; password: string; 
 }
 
 export async function approveUser(id: string): Promise<boolean> {
+  // 유저 승인
+  const { data: user } = await supabase.from("users").select("*").eq("id", id).single();
+  if (!user) return false;
   const { error } = await supabase.from("users").update({ status: "approved", role: "manager" }).eq("id", id);
-  return !error;
+  if (error) return false;
+
+  // 팀원 목록에 자동 추가 (이미 있으면 스킵)
+  const { data: existing } = await supabase.from("members").select("id").eq("linked_username", String(user.username)).limit(1);
+  if (!existing || existing.length === 0) {
+    const colors = ["#3B82F6", "#EF4444", "#10B981", "#F59E0B", "#8B5CF6", "#EC4899", "#06B6D4", "#F97316"];
+    const { data: allMembers } = await supabase.from("members").select("id");
+    const color = colors[(allMembers?.length || 0) % colors.length];
+    await supabase.from("members").insert({
+      name: String(user.name),
+      phone: String(user.phone || ""),
+      available_days: [1, 2, 3, 4, 5],
+      active: true,
+      color,
+      linked_username: String(user.username),
+    });
+  }
+  return true;
 }
 
 export async function rejectUser(id: string): Promise<boolean> {
