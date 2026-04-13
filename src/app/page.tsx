@@ -567,16 +567,15 @@ export default function Home() {
               </button>
             </div>
 
-            {/* 일정 목록 - 항상 4개분 공간 */}
+            {/* 일정 목록 */}
             <div className="px-4 pb-6 pt-1 space-y-3 overflow-y-auto" style={{ minHeight: "340px", maxHeight: "480px" }}>
-            {daySchedules.length === 0 ? (
-              <div className="flex items-center justify-center h-full text-gray-400 text-sm" style={{ minHeight: "300px" }}>
-                일정이 없습니다
-              </div>
-            ) : (
-              <>
-                {daySchedules.map((s) => {
-                  const titleDisplay = s.title.replace(/^\[.+?\]\s*/, "").split("/")[0].replace(/^U/, "") || s.title;
+              {daySchedules.length === 0 ? (
+                <div className="flex items-center justify-center h-full text-gray-400 text-sm" style={{ minHeight: "300px" }}>
+                  일정이 없습니다
+                </div>
+              ) : (
+                daySchedules.map((s) => {
+                  const titleDisplay = s.title.replace(/^\[.+?\]\s*/, "").replace(/^U/, "") || s.title;
                   const schedColor = s.color || "#FDDCCC";
                   return (
                     <div
@@ -597,9 +596,8 @@ export default function Home() {
                       </div>
                     </div>
                   );
-                })}
-              </>
-            )}
+                })
+              )}
             </div>
           </div>
         </div>
