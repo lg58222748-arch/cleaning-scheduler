@@ -96,9 +96,9 @@ export default function AssignTab({ members, onAssigned }: AssignTabProps) {
   if (loading) return <div className="py-12 text-center text-gray-400 text-sm">로딩 중...</div>;
 
   return (
-    <div className="space-y-3">
+    <div className="h-full flex flex-col">
       {/* 미배정 캘린더 */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200">
+      <div className="bg-white flex-1 flex flex-col">
         {/* 헤더 */}
         <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100">
           <button onClick={() => animateMonth("right", subMonths(currentMonth, 1))} className="p-2 active:bg-gray-100 rounded-lg">
@@ -123,11 +123,11 @@ export default function AssignTab({ members, onAssigned }: AssignTabProps) {
         </div>
 
         {/* 달력 그리드 */}
-        <div className={`divide-y divide-gray-50 transition-all duration-150 ease-in-out ${
+        <div className={`flex-1 divide-y divide-gray-50 transition-all duration-150 ease-in-out flex flex-col ${
           slideDir === "left" ? "-translate-x-4 opacity-0" : slideDir === "right" ? "translate-x-4 opacity-0" : "translate-x-0 opacity-100"
         }`}>
           {weeks.map((week, wi) => (
-            <div key={wi} className="grid grid-cols-7 divide-x divide-gray-50">
+            <div key={wi} className="grid grid-cols-7 divide-x divide-gray-50 flex-1">
               {week.map((d) => {
                 const dateStr = format(d, "yyyy-MM-dd");
                 const dayScheds = scheduleMap.get(dateStr) || [];
@@ -139,7 +139,7 @@ export default function AssignTab({ members, onAssigned }: AssignTabProps) {
                   <button
                     key={dateStr}
                     onClick={() => { setSelectedDate(d); if (dayScheds.length > 0) setShowDayPopup(true); }}
-                    className={`min-h-[90px] px-0.5 pt-0.5 pb-0 text-left relative flex flex-col ${
+                    className={`px-0.5 pt-0.5 pb-0 text-left relative flex flex-col ${
                       isSelected ? "bg-orange-50 ring-2 ring-orange-400 ring-inset" : "active:bg-gray-50"
                     } ${!isCurrentMonth ? "opacity-40" : ""}`}
                   >

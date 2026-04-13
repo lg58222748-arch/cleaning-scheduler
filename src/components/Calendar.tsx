@@ -130,7 +130,7 @@ export default function Calendar({
   const dayNames = ["일", "월", "화", "수", "목", "금", "토"];
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-200 transform-gpu" onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
+    <div className="bg-white transform-gpu h-full flex flex-col" onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
       {/* Header */}
       <div className="flex items-center justify-between px-6 py-3 border-b border-gray-100">
         <button onClick={handlePrev} className="p-2 active:bg-gray-100 rounded-lg">
@@ -167,13 +167,13 @@ export default function Calendar({
       </div>
 
       {/* Calendar grid */}
-      <div className={`divide-y divide-gray-50 transition-all duration-200 ease-in-out overflow-hidden ${
+      <div className={`flex-1 divide-y divide-gray-50 transition-all duration-200 ease-in-out overflow-hidden flex flex-col ${
         slideDirection === "left" ? "-translate-x-8 opacity-0" :
         slideDirection === "right" ? "translate-x-8 opacity-0" :
         "translate-x-0 opacity-100"
       }`}>
         {weeks.map((week, wi) => (
-          <div key={wi} className="grid grid-cols-7 divide-x divide-gray-50">
+          <div key={wi} className="grid grid-cols-7 divide-x divide-gray-50 flex-1">
             {week.map((d) => {
               const dateStr = format(d, "yyyy-MM-dd");
               const daySchedules = scheduleMap.get(dateStr) || [];
@@ -185,7 +185,7 @@ export default function Calendar({
                 <button
                   key={dateStr}
                   onClick={() => onSelectDate(d)}
-                  className={`min-h-[90px] px-0.5 pt-0.5 pb-0 text-left relative flex flex-col ${
+                  className={`px-0.5 pt-0.5 pb-0 text-left relative flex flex-col ${
                     isSelected
                       ? "bg-blue-50 ring-2 ring-blue-400 ring-inset"
                       : "active:bg-gray-50"

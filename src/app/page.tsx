@@ -221,7 +221,7 @@ export default function Home() {
   const pendingSwapCount = swapRequests.filter((r) => r.status === "pending").length;
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-20">
+    <div className="h-screen bg-white pb-16 flex flex-col overflow-hidden">
       {/* PWA 설치 배너 */}
       {showInstallBanner && (
         <div className="bg-blue-600 text-white px-4 py-3 flex items-center justify-between z-50 relative">
@@ -320,10 +320,10 @@ export default function Home() {
       )}
 
       {/* Main content area */}
-      <main className="px-3 pt-2 pb-2">
+      <main className="flex-1 overflow-hidden">
         {/* Calendar tab - 삼성 캘린더 스타일 */}
         {activeTab === "calendar" && (
-          <div>
+          <div className="h-full">
             <Calendar
               schedules={schedules}
               members={members}
@@ -336,7 +336,7 @@ export default function Home() {
 
         {/* List tab */}
         {activeTab === "list" && (
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200">
+          <div className="bg-white h-full overflow-y-auto">
             <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
               <div>
                 <h3 className="text-sm font-bold text-gray-800">전체 일정</h3>
@@ -388,12 +388,12 @@ export default function Home() {
 
         {/* Assign tab */}
         {activeTab === "assign" && (
-          <AssignTab members={members} onAssigned={() => loadData()} />
+          <div className="h-full"><AssignTab members={members} onAssigned={() => loadData()} /></div>
         )}
 
         {/* Members tab */}
         {activeTab === "members" && (
-          <div className="space-y-3">
+          <div className="space-y-3 p-3 h-full overflow-y-auto">
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
               <div className="flex items-center justify-between mb-3">
                 <h3 className="text-sm font-bold text-gray-800">팀원 목록</h3>
