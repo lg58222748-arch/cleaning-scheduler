@@ -8,12 +8,11 @@ import {
 } from "@/lib/store";
 
 export async function GET() {
-  // 해피콜 리마인더 자동 체크
-  checkHappyCallReminders();
+  await checkHappyCallReminders();
 
   return Response.json({
-    notifications: getNotifications(),
-    unreadCount: getUnreadCount(),
+    notifications: await getNotifications(),
+    unreadCount: await getUnreadCount(),
   });
 }
 
@@ -21,12 +20,12 @@ export async function POST(req: NextRequest) {
   const body = await req.json();
 
   if (body.action === "markRead" && body.id) {
-    markNotificationRead(body.id);
+    await markNotificationRead(body.id);
     return Response.json({ success: true });
   }
 
   if (body.action === "markAllRead") {
-    markAllNotificationsRead();
+    await markAllNotificationsRead();
     return Response.json({ success: true });
   }
 

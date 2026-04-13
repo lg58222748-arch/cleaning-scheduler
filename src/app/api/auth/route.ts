@@ -5,9 +5,9 @@ export async function POST(req: NextRequest) {
   const body = await req.json();
 
   if (body.action === "login") {
-    const user = loginUser(body.username, body.password);
+    const user = await loginUser(body.username, body.password);
     if (!user) {
-      const existing = findUserForLogin(body.username);
+      const existing = await findUserForLogin(body.username);
       if (existing && existing.password !== body.password) {
         return Response.json({ error: "비밀번호가 일치하지 않습니다." }, { status: 401 });
       }
@@ -23,11 +23,11 @@ export async function POST(req: NextRequest) {
   }
 
   if (body.action === "register") {
-    const existing = getUserByUsername(body.username);
+    const existing = await getUserByUsername(body.username);
     if (existing) {
       return Response.json({ error: "이미 사용 중인 아이디입니다." }, { status: 400 });
     }
-    const user = registerUser({
+    const user = await registerUser({
       username: body.username,
       password: body.password,
       name: body.name,

@@ -1,239 +1,209 @@
-// 서버 사이드 인메모리 스토어 (프로토타입용)
-// 프로덕션에서는 DB로 교체
-
-import { Member, Schedule, SwapRequest, Notification, NotificationType, Comment, User, UserRole, UserStatus, ScheduleChecklist, ChecklistCategory, Settlement, PaymentMethod } from "@/types";
+// Supabase DB 스토어 (인메모리 → DB 교체)
+import { supabase } from "./supabase";
+import { Member, Schedule, SwapRequest, Notification, NotificationType, Comment, User, ScheduleChecklist, ChecklistCategory, Settlement, PaymentMethod } from "@/types";
 
 const MEMBER_COLORS = [
   "#3B82F6", "#EF4444", "#10B981", "#F59E0B",
   "#8B5CF6", "#EC4899", "#06B6D4", "#F97316",
 ];
 
-let members: Member[] = [
-  { id: "1", name: "김민수", color: MEMBER_COLORS[0], phone: "010-1234-5678", availableDays: [1, 2, 3, 4, 5], active: true },
-  { id: "2", name: "이영희", color: MEMBER_COLORS[1], phone: "010-2345-6789", availableDays: [1, 2, 3, 4, 5], active: true },
-  { id: "3", name: "박지훈", color: MEMBER_COLORS[2], phone: "010-3456-7890", availableDays: [1, 3, 5], active: true },
-  { id: "4", name: "최수진", color: MEMBER_COLORS[3], phone: "010-4567-8901", availableDays: [2, 4, 6], active: true },
-];
-
-let schedules: Schedule[] = [];
-let swapRequests: SwapRequest[] = [];
-let nextId = 100;
-
-export function genId(): string {
-  return String(++nextId);
+// ===== Helper: DB row → App type 변환 =====
+function rowToMember(r: Record<string, unknown>): Member {
+  return { id: String(r.id), name: String(r.name), color: String(r.color), phone: String(r.phone || ""), availableDays: (r.available_days as number[]) || [1,2,3,4,5], active: Boolean(r.active) };
+}
+function rowToSchedule(r: Record<string, unknown>): Schedule {
+  return { id: String(r.id), memberId: String(r.member_id || ""), memberName: String(r.member_name || "미배정"), title: String(r.title), location: String(r.location || ""), date: String(r.date), startTime: String(r.start_time), endTime: String(r.end_time), status: String(r.status) as Schedule["status"], assignedTo: r.assigned_to ? String(r.assigned_to) : undefined, assignedToName: r.assigned_to_name ? String(r.assigned_to_name) : undefined, googleEventId: r.google_event_id ? String(r.google_event_id) : undefined, note: String(r.note || "") };
+}
+function rowToSwapRequest(r: Record<string, unknown>): SwapRequest {
+  return { id: String(r.id), fromScheduleId: String(r.from_schedule_id), toScheduleId: String(r.to_schedule_id), fromMemberId: String(r.from_member_id), toMemberId: String(r.to_member_id), status: String(r.status) as SwapRequest["status"], createdAt: String(r.created_at) };
+}
+function rowToNotification(r: Record<string, unknown>): Notification {
+  return { id: String(r.id), type: String(r.type) as NotificationType, title: String(r.title), message: String(r.message), scheduleId: r.schedule_id ? String(r.schedule_id) : undefined, read: Boolean(r.read), createdAt: String(r.created_at) };
+}
+function rowToComment(r: Record<string, unknown>): Comment {
+  return { id: String(r.id), scheduleId: String(r.schedule_id), authorName: String(r.author_name), content: String(r.content), createdAt: String(r.created_at) };
+}
+function rowToUser(r: Record<string, unknown>): User {
+  return { id: String(r.id), username: String(r.username), password: String(r.password), name: String(r.name), phone: String(r.phone || ""), address: String(r.address || ""), residentNumber: String(r.resident_number || ""), businessLicenseFile: String(r.business_license_file || ""), role: String(r.role) as User["role"], status: String(r.status) as User["status"], createdAt: String(r.created_at) };
+}
+function rowToSettlement(r: Record<string, unknown>): Settlement {
+  return { id: String(r.id), scheduleId: String(r.schedule_id), quote: Number(r.quote), deposit: Number(r.deposit), balance: Number(r.balance), extraCharge: Number(r.extra_charge), subtotal: Number(r.subtotal), vat: Number(r.vat), totalAmount: Number(r.total_amount), paymentMethod: String(r.payment_method) as PaymentMethod, cashReceipt: Boolean(r.cash_receipt), bankInfo: String(r.bank_info), customerName: String(r.customer_name), customerPhone: String(r.customer_phone), note: String(r.note || ""), status: String(r.status) as "draft" | "completed", createdAt: String(r.created_at) };
 }
 
-// Members
-export function getMembers(): Member[] {
-  return members;
+// ===== Members =====
+export async function getMembers(): Promise<Member[]> {
+  const { data } = await supabase.from("members").select("*").order("name");
+  return (data || []).map(rowToMember);
 }
 
-export function getMember(id: string): Member | undefined {
-  return members.find((m) => m.id === id);
+export async function getMember(id: string): Promise<Member | undefined> {
+  const { data } = await supabase.from("members").select("*").eq("id", id).single();
+  return data ? rowToMember(data) : undefined;
 }
 
-export function addMember(data: Omit<Member, "id" | "color">): Member {
-  const member: Member = {
-    ...data,
-    id: genId(),
-    color: MEMBER_COLORS[members.length % MEMBER_COLORS.length],
-  };
-  members.push(member);
-  return member;
+export async function addMember(input: Omit<Member, "id" | "color">): Promise<Member> {
+  const { data: existing } = await supabase.from("members").select("id");
+  const color = MEMBER_COLORS[(existing?.length || 0) % MEMBER_COLORS.length];
+  const { data } = await supabase.from("members").insert({ name: input.name, phone: input.phone || "", available_days: input.availableDays, active: input.active, color }).select().single();
+  return rowToMember(data!);
 }
 
-export function updateMember(id: string, data: Partial<Member>): Member | null {
-  const idx = members.findIndex((m) => m.id === id);
-  if (idx === -1) return null;
-  members[idx] = { ...members[idx], ...data, id };
-  return members[idx];
+export async function updateMember(id: string, input: Partial<Member>): Promise<Member | null> {
+  const update: Record<string, unknown> = {};
+  if (input.name !== undefined) update.name = input.name;
+  if (input.phone !== undefined) update.phone = input.phone;
+  if (input.availableDays !== undefined) update.available_days = input.availableDays;
+  if (input.active !== undefined) update.active = input.active;
+  if (input.color !== undefined) update.color = input.color;
+  const { data } = await supabase.from("members").update(update).eq("id", id).select().single();
+  return data ? rowToMember(data) : null;
 }
 
-export function deleteMember(id: string): boolean {
-  const len = members.length;
-  members = members.filter((m) => m.id !== id);
-  return members.length < len;
+export async function deleteMember(id: string): Promise<boolean> {
+  const { error } = await supabase.from("members").delete().eq("id", id);
+  return !error;
 }
 
-// Schedules
-export function getSchedules(): Schedule[] {
-  return schedules;
+// ===== Schedules =====
+export async function getSchedules(): Promise<Schedule[]> {
+  const { data } = await supabase.from("schedules").select("*").order("date");
+  return (data || []).map(rowToSchedule);
 }
 
-export function getSchedulesByDate(date: string): Schedule[] {
-  return schedules.filter((s) => s.date === date);
+export async function getSchedulesByRange(start: string, end: string): Promise<Schedule[]> {
+  const { data } = await supabase.from("schedules").select("*").gte("date", start).lte("date", end).order("date");
+  return (data || []).map(rowToSchedule);
 }
 
-export function getSchedulesByMember(memberId: string): Schedule[] {
-  return schedules.filter((s) => s.memberId === memberId);
+export async function getUnassignedSchedules(): Promise<Schedule[]> {
+  const { data } = await supabase.from("schedules").select("*").eq("status", "unassigned").order("date");
+  return (data || []).map(rowToSchedule);
 }
 
-export function getSchedulesByRange(start: string, end: string): Schedule[] {
-  return schedules.filter((s) => s.date >= start && s.date <= end);
+export async function addSchedule(input: Omit<Schedule, "id" | "status">): Promise<Schedule> {
+  const { data } = await supabase.from("schedules").insert({
+    member_id: input.memberId, member_name: input.memberName, title: input.title, location: input.location || "", date: input.date, start_time: input.startTime, end_time: input.endTime, status: "confirmed", assigned_to: input.assignedTo, assigned_to_name: input.assignedToName, google_event_id: input.googleEventId, note: input.note || "",
+  }).select().single();
+  return rowToSchedule(data!);
 }
 
-export function getUnassignedSchedules(): Schedule[] {
-  return schedules.filter((s) => s.status === "unassigned");
+export async function addUnassignedSchedule(input: Omit<Schedule, "id" | "status" | "memberId" | "memberName">): Promise<Schedule> {
+  const { data } = await supabase.from("schedules").insert({
+    member_id: "", member_name: "미배정", title: input.title, location: input.location || "", date: input.date, start_time: input.startTime, end_time: input.endTime, status: "unassigned", google_event_id: input.googleEventId, note: input.note || "",
+  }).select().single();
+  return rowToSchedule(data!);
 }
 
-export function addSchedule(data: Omit<Schedule, "id" | "status">): Schedule {
-  const schedule: Schedule = { ...data, id: genId(), status: "confirmed" };
-  schedules.push(schedule);
-  return schedule;
+export async function assignSchedule(scheduleId: string, memberId: string, memberName: string): Promise<Schedule | null> {
+  const { data } = await supabase.from("schedules").update({
+    assigned_to: memberId, assigned_to_name: memberName, member_id: memberId, member_name: memberName, status: "confirmed",
+  }).eq("id", scheduleId).select().single();
+  return data ? rowToSchedule(data) : null;
 }
 
-export function addUnassignedSchedule(data: Omit<Schedule, "id" | "status" | "memberId" | "memberName">): Schedule {
-  const schedule: Schedule = {
-    ...data,
-    id: genId(),
-    memberId: "",
-    memberName: "미배정",
-    status: "unassigned",
-  };
-  schedules.push(schedule);
-  return schedule;
+export async function unassignSchedule(scheduleId: string): Promise<Schedule | null> {
+  const { data } = await supabase.from("schedules").update({
+    assigned_to: null, assigned_to_name: null, member_id: "", member_name: "미배정", status: "unassigned",
+  }).eq("id", scheduleId).select().single();
+  return data ? rowToSchedule(data) : null;
 }
 
-export function assignSchedule(scheduleId: string, memberId: string, memberName: string): Schedule | null {
-  const idx = schedules.findIndex((s) => s.id === scheduleId);
-  if (idx === -1) return null;
-  schedules[idx].assignedTo = memberId;
-  schedules[idx].assignedToName = memberName;
-  schedules[idx].memberId = memberId;
-  schedules[idx].memberName = memberName;
-  schedules[idx].status = "confirmed";
-  return schedules[idx];
+export async function updateSchedule(id: string, input: Partial<Schedule>): Promise<Schedule | null> {
+  const update: Record<string, unknown> = {};
+  if (input.memberId !== undefined) update.member_id = input.memberId;
+  if (input.memberName !== undefined) update.member_name = input.memberName;
+  if (input.title !== undefined) update.title = input.title;
+  if (input.location !== undefined) update.location = input.location;
+  if (input.date !== undefined) update.date = input.date;
+  if (input.startTime !== undefined) update.start_time = input.startTime;
+  if (input.endTime !== undefined) update.end_time = input.endTime;
+  if (input.status !== undefined) update.status = input.status;
+  if (input.assignedTo !== undefined) update.assigned_to = input.assignedTo;
+  if (input.assignedToName !== undefined) update.assigned_to_name = input.assignedToName;
+  if (input.note !== undefined) update.note = input.note;
+  const { data } = await supabase.from("schedules").update(update).eq("id", id).select().single();
+  return data ? rowToSchedule(data) : null;
 }
 
-export function unassignSchedule(scheduleId: string): Schedule | null {
-  const idx = schedules.findIndex((s) => s.id === scheduleId);
-  if (idx === -1) return null;
-  schedules[idx].assignedTo = undefined;
-  schedules[idx].assignedToName = undefined;
-  schedules[idx].memberId = "";
-  schedules[idx].memberName = "미배정";
-  schedules[idx].status = "unassigned";
-  return schedules[idx];
+export async function deleteSchedule(id: string): Promise<boolean> {
+  const { error } = await supabase.from("schedules").delete().eq("id", id);
+  return !error;
 }
 
-export function updateSchedule(id: string, data: Partial<Schedule>): Schedule | null {
-  const idx = schedules.findIndex((s) => s.id === id);
-  if (idx === -1) return null;
-  schedules[idx] = { ...schedules[idx], ...data, id };
-  return schedules[idx];
+// ===== Swap Requests =====
+export async function getSwapRequests(): Promise<SwapRequest[]> {
+  const { data } = await supabase.from("swap_requests").select("*").order("created_at", { ascending: false });
+  return (data || []).map(rowToSwapRequest);
 }
 
-export function deleteSchedule(id: string): boolean {
-  const len = schedules.length;
-  schedules = schedules.filter((s) => s.id !== id);
-  return schedules.length < len;
+export async function addSwapRequest(fromScheduleId: string, toScheduleId: string): Promise<SwapRequest | null> {
+  const from = await supabase.from("schedules").select("member_id").eq("id", fromScheduleId).single();
+  const to = await supabase.from("schedules").select("member_id").eq("id", toScheduleId).single();
+  if (!from.data || !to.data) return null;
+  const { data } = await supabase.from("swap_requests").insert({
+    from_schedule_id: fromScheduleId, to_schedule_id: toScheduleId, from_member_id: String(from.data.member_id), to_member_id: String(to.data.member_id), status: "pending",
+  }).select().single();
+  return data ? rowToSwapRequest(data) : null;
 }
 
-// Swap Requests
-export function getSwapRequests(): SwapRequest[] {
-  return swapRequests;
-}
-
-export function addSwapRequest(fromScheduleId: string, toScheduleId: string): SwapRequest | null {
-  const from = schedules.find((s) => s.id === fromScheduleId);
-  const to = schedules.find((s) => s.id === toScheduleId);
-  if (!from || !to) return null;
-
-  const req: SwapRequest = {
-    id: genId(),
-    fromScheduleId,
-    toScheduleId,
-    fromMemberId: from.memberId,
-    toMemberId: to.memberId,
-    status: "pending",
-    createdAt: new Date().toISOString(),
-  };
-  swapRequests.push(req);
-  return req;
-}
-
-export function approveSwap(swapId: string): boolean {
-  const req = swapRequests.find((r) => r.id === swapId);
-  if (!req || req.status !== "pending") return false;
-
-  const fromIdx = schedules.findIndex((s) => s.id === req.fromScheduleId);
-  const toIdx = schedules.findIndex((s) => s.id === req.toScheduleId);
-  if (fromIdx === -1 || toIdx === -1) return false;
-
-  // 팀원 교환
-  const tempMemberId = schedules[fromIdx].memberId;
-  const tempMemberName = schedules[fromIdx].memberName;
-  schedules[fromIdx].memberId = schedules[toIdx].memberId;
-  schedules[fromIdx].memberName = schedules[toIdx].memberName;
-  schedules[toIdx].memberId = tempMemberId;
-  schedules[toIdx].memberName = tempMemberName;
-
-  req.status = "approved";
+export async function approveSwap(swapId: string): Promise<boolean> {
+  const { data: req } = await supabase.from("swap_requests").select("*").eq("id", swapId).eq("status", "pending").single();
+  if (!req) return false;
+  const { data: fromS } = await supabase.from("schedules").select("*").eq("id", req.from_schedule_id).single();
+  const { data: toS } = await supabase.from("schedules").select("*").eq("id", req.to_schedule_id).single();
+  if (!fromS || !toS) return false;
+  await supabase.from("schedules").update({ member_id: toS.member_id, member_name: toS.member_name }).eq("id", req.from_schedule_id);
+  await supabase.from("schedules").update({ member_id: fromS.member_id, member_name: fromS.member_name }).eq("id", req.to_schedule_id);
+  await supabase.from("swap_requests").update({ status: "approved" }).eq("id", swapId);
   return true;
 }
 
-export function rejectSwap(swapId: string): boolean {
-  const req = swapRequests.find((r) => r.id === swapId);
-  if (!req || req.status !== "pending") return false;
-  req.status = "rejected";
-  return true;
+export async function rejectSwap(swapId: string): Promise<boolean> {
+  const { error } = await supabase.from("swap_requests").update({ status: "rejected" }).eq("id", swapId).eq("status", "pending");
+  return !error;
 }
 
-// Notifications
-let notifications: Notification[] = [];
-
-export function getNotifications(): Notification[] {
-  return notifications.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+// ===== Notifications =====
+export async function getNotifications(): Promise<Notification[]> {
+  const { data } = await supabase.from("notifications").select("*").order("created_at", { ascending: false });
+  return (data || []).map(rowToNotification);
 }
 
-export function getUnreadCount(): number {
-  return notifications.filter((n) => !n.read).length;
+export async function getUnreadCount(): Promise<number> {
+  const { count } = await supabase.from("notifications").select("*", { count: "exact", head: true }).eq("read", false);
+  return count || 0;
 }
 
-export function addNotification(type: NotificationType, title: string, message: string, scheduleId?: string): Notification {
-  const n: Notification = {
-    id: genId(),
-    type,
-    title,
-    message,
-    scheduleId,
-    read: false,
-    createdAt: new Date().toISOString(),
-  };
-  notifications.push(n);
-  return n;
+export async function addNotification(type: NotificationType, title: string, message: string, scheduleId?: string): Promise<Notification> {
+  const { data } = await supabase.from("notifications").insert({ type, title, message, schedule_id: scheduleId, read: false }).select().single();
+  return rowToNotification(data!);
 }
 
-export function markNotificationRead(id: string): boolean {
-  const n = notifications.find((x) => x.id === id);
-  if (!n) return false;
-  n.read = true;
-  return true;
+export async function markNotificationRead(id: string): Promise<boolean> {
+  const { error } = await supabase.from("notifications").update({ read: true }).eq("id", id);
+  return !error;
 }
 
-export function markAllNotificationsRead(): void {
-  notifications.forEach((n) => { n.read = true; });
+export async function markAllNotificationsRead(): Promise<void> {
+  await supabase.from("notifications").update({ read: true }).eq("read", false);
 }
 
-// Auto-generate happy call reminders for schedules happening tomorrow
-export function checkHappyCallReminders(): Notification[] {
+export async function checkHappyCallReminders(): Promise<Notification[]> {
   const tomorrow = new Date();
   tomorrow.setDate(tomorrow.getDate() + 1);
   const tomorrowStr = tomorrow.toISOString().split("T")[0];
 
-  const tomorrowSchedules = schedules.filter((s) => s.date === tomorrowStr);
+  const { data: tomorrowSchedules } = await supabase.from("schedules").select("*").eq("date", tomorrowStr);
   const newReminders: Notification[] = [];
 
-  for (const s of tomorrowSchedules) {
-    const alreadyNotified = notifications.some(
-      (n) => n.type === "happy_call_reminder" && n.scheduleId === s.id
-    );
-    if (!alreadyNotified) {
-      const n = addNotification(
+  for (const s of tomorrowSchedules || []) {
+    const { data: existing } = await supabase.from("notifications").select("id").eq("type", "happy_call_reminder").eq("schedule_id", String(s.id));
+    if (!existing || existing.length === 0) {
+      const n = await addNotification(
         "happy_call_reminder",
         "해피콜 요청",
-        `내일 ${s.startTime} "${s.title}" 일정이 있습니다. ${s.memberName}님에게 해피콜을 진행해주세요.`,
-        s.id
+        `내일 ${s.start_time} "${s.title}" 일정이 있습니다. ${s.member_name}님에게 해피콜을 진행해주세요.`,
+        String(s.id)
       );
       newReminders.push(n);
     }
@@ -241,234 +211,171 @@ export function checkHappyCallReminders(): Notification[] {
   return newReminders;
 }
 
-// Comments
-let comments: Comment[] = [];
-
-export function getCommentsBySchedule(scheduleId: string): Comment[] {
-  return comments
-    .filter((c) => c.scheduleId === scheduleId)
-    .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+// ===== Comments =====
+export async function getCommentsBySchedule(scheduleId: string): Promise<Comment[]> {
+  const { data } = await supabase.from("comments").select("*").eq("schedule_id", scheduleId).order("created_at");
+  return (data || []).map(rowToComment);
 }
 
-export function addComment(scheduleId: string, authorName: string, content: string): Comment {
-  const c: Comment = {
-    id: genId(),
-    scheduleId,
-    authorName,
-    content,
-    createdAt: new Date().toISOString(),
-  };
-  comments.push(c);
-  return c;
+export async function addComment(scheduleId: string, authorName: string, content: string): Promise<Comment> {
+  const { data } = await supabase.from("comments").insert({ schedule_id: scheduleId, author_name: authorName, content }).select().single();
+  return rowToComment(data!);
 }
 
-export function deleteComment(id: string): boolean {
-  const len = comments.length;
-  comments = comments.filter((c) => c.id !== id);
-  return comments.length < len;
+export async function deleteComment(id: string): Promise<boolean> {
+  const { error } = await supabase.from("comments").delete().eq("id", id);
+  return !error;
 }
 
 // ===== Users =====
-let users: User[] = [
-  {
-    id: "admin1",
-    username: "admin",
-    password: "1234",
-    name: "관리자",
-    phone: "010-0000-0000",
-    address: "서울시 강남구",
-    residentNumber: "******-*******",
-    businessLicenseFile: "",
-    role: "admin",
-    status: "approved",
-    createdAt: new Date().toISOString(),
-  },
-];
-
-export function getUsers(): User[] {
-  return users;
+export async function getUsers(): Promise<User[]> {
+  const { data } = await supabase.from("users").select("*").order("created_at");
+  return (data || []).map(rowToUser);
 }
 
-export function getUser(id: string): User | undefined {
-  return users.find((u) => u.id === id);
+export async function getUser(id: string): Promise<User | undefined> {
+  const { data } = await supabase.from("users").select("*").eq("id", id).single();
+  return data ? rowToUser(data) : undefined;
 }
 
-export function getUserByName(name: string): User | undefined {
-  return users.find((u) => u.name === name);
+export async function getUserByUsername(username: string): Promise<User | undefined> {
+  const { data } = await supabase.from("users").select("*").eq("username", username).single();
+  return data ? rowToUser(data) : undefined;
 }
 
-export function getUserByUsername(username: string): User | undefined {
-  return users.find((u) => u.username === username);
+export async function getPendingUsers(): Promise<User[]> {
+  const { data } = await supabase.from("users").select("*").eq("status", "pending");
+  return (data || []).map(rowToUser);
 }
 
-export function getPendingUsers(): User[] {
-  return users.filter((u) => u.status === "pending");
+export async function registerUser(input: { username: string; password: string; name: string; phone: string; address: string; residentNumber: string; businessLicenseFile: string }): Promise<User> {
+  const { data } = await supabase.from("users").insert({
+    username: input.username, password: input.password, name: input.name, phone: input.phone, address: input.address, resident_number: input.residentNumber, business_license_file: input.businessLicenseFile, role: "pending", status: "pending",
+  }).select().single();
+  return rowToUser(data!);
 }
 
-export function registerUser(data: {
-  username: string; password: string;
-  name: string; phone: string; address: string;
-  residentNumber: string; businessLicenseFile: string;
-}): User {
-  const user: User = {
-    id: genId(),
-    ...data,
-    role: "pending",
-    status: "pending",
-    createdAt: new Date().toISOString(),
-  };
-  users.push(user);
-  return user;
+export async function approveUser(id: string): Promise<boolean> {
+  const { error } = await supabase.from("users").update({ status: "approved", role: "manager" }).eq("id", id);
+  return !error;
 }
 
-export function approveUser(id: string): boolean {
-  const u = users.find((x) => x.id === id);
-  if (!u) return false;
-  u.status = "approved";
-  u.role = "manager";
-  return true;
+export async function rejectUser(id: string): Promise<boolean> {
+  const { error } = await supabase.from("users").update({ status: "rejected" }).eq("id", id);
+  return !error;
 }
 
-export function rejectUser(id: string): boolean {
-  const u = users.find((x) => x.id === id);
-  if (!u) return false;
-  u.status = "rejected";
-  return true;
+export async function loginUser(username: string, password: string): Promise<User | null> {
+  const { data } = await supabase.from("users").select("*").eq("username", username).eq("password", password).eq("status", "approved").single();
+  return data ? rowToUser(data) : null;
 }
 
-export function loginUser(username: string, password: string): User | null {
-  const u = users.find((x) => x.username === username && x.password === password && x.status === "approved");
-  return u || null;
-}
-
-export function findUserForLogin(username: string): User | undefined {
-  return users.find((x) => x.username === username);
+export async function findUserForLogin(username: string): Promise<User | undefined> {
+  const { data } = await supabase.from("users").select("*").eq("username", username).single();
+  return data ? rowToUser(data) : undefined;
 }
 
 // ===== Checklist =====
 const DEFAULT_CHECKLIST_TEMPLATE: ChecklistCategory[] = [
-  {
-    id: "cat1", name: "전체 천장", icon: "🔝",
-    items: [
-      { id: "c1-1", label: "환기디퓨저 오염/분진", checked: false },
-      { id: "c1-2", label: "조명 커버 벌레사체/먼지", checked: false },
-      { id: "c1-3", label: "몰딩 먼지/오염", checked: false },
-      { id: "c1-4", label: "천장 꼼꼼이 확인", checked: false },
-      { id: "c1-5", label: "흡기구 오염 확인", checked: false },
-    ],
-  },
-  {
-    id: "cat2", name: "전체 벽면", icon: "🧱",
-    items: [
-      { id: "c2-1", label: "인터폰/스위치 상단 먼지", checked: false },
-      { id: "c2-2", label: "벽지 오염/얼룩", checked: false },
-      { id: "c2-3", label: "문틀/문짝 오염", checked: false },
-      { id: "c2-4", label: "콘센트 주변 오염", checked: false },
-    ],
-  },
-  {
-    id: "cat3", name: "전체 바닥", icon: "🏠",
-    items: [
-      { id: "c3-1", label: "본드 얼룩/잔여물", checked: false },
-      { id: "c3-2", label: "걸레받이 오염", checked: false },
-      { id: "c3-3", label: "문턱/새시레일 오염", checked: false },
-    ],
-  },
-  {
-    id: "cat4", name: "자주 놓치는 곳", icon: "🔍",
-    items: [
-      { id: "c4-1", label: "베란다 구석/배수구", checked: false },
-      { id: "c4-2", label: "변기 안쪽/뒤쪽", checked: false },
-      { id: "c4-3", label: "거울/유리 얼룩", checked: false },
-      { id: "c4-4", label: "줄눈 오염", checked: false },
-      { id: "c4-5", label: "배수구 머리카락/이물질", checked: false },
-      { id: "c4-6", label: "에어컨 필터/외관", checked: false },
-      { id: "c4-7", label: "싱크대 배수구/하부장", checked: false },
-    ],
-  },
+  { id: "cat1", name: "전체 천장", icon: "🔝", items: [
+    { id: "c1-1", label: "환기디퓨저 오염/분진", checked: false },
+    { id: "c1-2", label: "조명 커버 벌레사체/먼지", checked: false },
+    { id: "c1-3", label: "몰딩 먼지/오염", checked: false },
+    { id: "c1-4", label: "천장 꼼꼼이 확인", checked: false },
+    { id: "c1-5", label: "흡기구 오염 확인", checked: false },
+  ]},
+  { id: "cat2", name: "전체 벽면", icon: "🧱", items: [
+    { id: "c2-1", label: "인터폰/스위치 상단 먼지", checked: false },
+    { id: "c2-2", label: "벽지 오염/얼룩", checked: false },
+    { id: "c2-3", label: "문틀/문짝 오염", checked: false },
+    { id: "c2-4", label: "콘센트 주변 오염", checked: false },
+  ]},
+  { id: "cat3", name: "전체 바닥", icon: "🏠", items: [
+    { id: "c3-1", label: "본드 얼룩/잔여물", checked: false },
+    { id: "c3-2", label: "걸레받이 오염", checked: false },
+    { id: "c3-3", label: "문턱/새시레일 오염", checked: false },
+  ]},
+  { id: "cat4", name: "자주 놓치는 곳", icon: "🔍", items: [
+    { id: "c4-1", label: "베란다 구석/배수구", checked: false },
+    { id: "c4-2", label: "변기 안쪽/뒤쪽", checked: false },
+    { id: "c4-3", label: "거울/유리 얼룩", checked: false },
+    { id: "c4-4", label: "줄눈 오염", checked: false },
+    { id: "c4-5", label: "배수구 머리카락/이물질", checked: false },
+    { id: "c4-6", label: "에어컨 필터/외관", checked: false },
+    { id: "c4-7", label: "싱크대 배수구/하부장", checked: false },
+  ]},
 ];
 
-let checklists: ScheduleChecklist[] = [];
-
-function cloneTemplate(): ChecklistCategory[] {
-  return JSON.parse(JSON.stringify(DEFAULT_CHECKLIST_TEMPLATE));
-}
-
-export function getChecklist(scheduleId: string): ScheduleChecklist {
-  let cl = checklists.find((c) => c.scheduleId === scheduleId);
-  if (!cl) {
-    const categories = cloneTemplate();
-    const totalCount = categories.reduce((sum, cat) => sum + cat.items.length, 0);
-    cl = { id: genId(), scheduleId, categories, completedCount: 0, totalCount, submittedAt: undefined };
-    checklists.push(cl);
+export async function getChecklist(scheduleId: string): Promise<ScheduleChecklist> {
+  const { data } = await supabase.from("checklists").select("*").eq("schedule_id", scheduleId).single();
+  if (data) {
+    return { id: String(data.id), scheduleId: String(data.schedule_id), categories: data.categories as ChecklistCategory[], completedCount: Number(data.completed_count), totalCount: Number(data.total_count), submittedAt: data.submitted_at ? String(data.submitted_at) : undefined };
   }
-  return cl;
+  // 새로 생성
+  const categories = JSON.parse(JSON.stringify(DEFAULT_CHECKLIST_TEMPLATE));
+  const totalCount = categories.reduce((sum: number, cat: ChecklistCategory) => sum + cat.items.length, 0);
+  const { data: newRow } = await supabase.from("checklists").insert({ schedule_id: scheduleId, categories, completed_count: 0, total_count: totalCount }).select().single();
+  return { id: String(newRow!.id), scheduleId, categories, completedCount: 0, totalCount, submittedAt: undefined };
 }
 
-export function updateChecklistItem(scheduleId: string, itemId: string, checked: boolean): ScheduleChecklist | null {
-  const cl = getChecklist(scheduleId);
+export async function updateChecklistItem(scheduleId: string, itemId: string, checked: boolean): Promise<ScheduleChecklist | null> {
+  const cl = await getChecklist(scheduleId);
   for (const cat of cl.categories) {
     const item = cat.items.find((i) => i.id === itemId);
-    if (item) {
-      item.checked = checked;
-      break;
-    }
+    if (item) { item.checked = checked; break; }
   }
-  cl.completedCount = cl.categories.reduce(
-    (sum, cat) => sum + cat.items.filter((i) => i.checked).length, 0
-  );
+  cl.completedCount = cl.categories.reduce((sum, cat) => sum + cat.items.filter((i) => i.checked).length, 0);
+  await supabase.from("checklists").update({ categories: cl.categories, completed_count: cl.completedCount }).eq("schedule_id", scheduleId);
   return cl;
 }
 
-export function submitChecklist(scheduleId: string): ScheduleChecklist | null {
-  const cl = getChecklist(scheduleId);
-  cl.submittedAt = new Date().toISOString();
+export async function submitChecklist(scheduleId: string): Promise<ScheduleChecklist | null> {
+  const cl = await getChecklist(scheduleId);
+  const now = new Date().toISOString();
+  await supabase.from("checklists").update({ submitted_at: now }).eq("schedule_id", scheduleId);
+  cl.submittedAt = now;
   return cl;
 }
 
 // ===== Settlement =====
-let settlements: Settlement[] = [];
-
-export function getSettlement(scheduleId: string): Settlement | null {
-  return settlements.find((s) => s.scheduleId === scheduleId) || null;
+export async function getSettlement(scheduleId: string): Promise<Settlement | null> {
+  const { data } = await supabase.from("settlements").select("*").eq("schedule_id", scheduleId).single();
+  return data ? rowToSettlement(data) : null;
 }
 
-export function createOrUpdateSettlement(scheduleId: string, data: {
+export async function createOrUpdateSettlement(scheduleId: string, input: {
   quote?: number; deposit?: number; extraCharge?: number;
   paymentMethod?: PaymentMethod; cashReceipt?: boolean;
   bankInfo?: string; customerName?: string; customerPhone?: string;
   note?: string; status?: "draft" | "completed";
-}): Settlement {
-  let s = settlements.find((x) => x.scheduleId === scheduleId);
+}): Promise<Settlement> {
+  let s = await getSettlement(scheduleId);
   if (!s) {
-    s = {
-      id: genId(), scheduleId,
-      quote: 0, deposit: 0, balance: 0, extraCharge: 0,
-      subtotal: 0, vat: 0, totalAmount: 0,
-      paymentMethod: "transfer", cashReceipt: false,
-      bankInfo: "우리은행 1005-504-852384 (주식회사 새집느낌)",
-      customerName: "", customerPhone: "", note: "",
-      status: "draft", createdAt: new Date().toISOString(),
-    };
-    settlements.push(s);
+    const { data } = await supabase.from("settlements").insert({
+      schedule_id: scheduleId, quote: 0, deposit: 0, balance: 0, extra_charge: 0, subtotal: 0, vat: 0, total_amount: 0, payment_method: "transfer", cash_receipt: false, bank_info: "우리은행 1005-504-852384 (주식회사 새집느낌)", customer_name: "", customer_phone: "", note: "", status: "draft",
+    }).select().single();
+    s = rowToSettlement(data!);
   }
 
-  if (data.quote !== undefined) s.quote = data.quote;
-  if (data.deposit !== undefined) s.deposit = data.deposit;
-  if (data.extraCharge !== undefined) s.extraCharge = data.extraCharge;
-  if (data.paymentMethod !== undefined) s.paymentMethod = data.paymentMethod;
-  if (data.cashReceipt !== undefined) s.cashReceipt = data.cashReceipt;
-  if (data.bankInfo !== undefined) s.bankInfo = data.bankInfo;
-  if (data.customerName !== undefined) s.customerName = data.customerName;
-  if (data.customerPhone !== undefined) s.customerPhone = data.customerPhone;
-  if (data.note !== undefined) s.note = data.note;
-  if (data.status !== undefined) s.status = data.status;
+  if (input.quote !== undefined) s.quote = input.quote;
+  if (input.deposit !== undefined) s.deposit = input.deposit;
+  if (input.extraCharge !== undefined) s.extraCharge = input.extraCharge;
+  if (input.paymentMethod !== undefined) s.paymentMethod = input.paymentMethod;
+  if (input.cashReceipt !== undefined) s.cashReceipt = input.cashReceipt;
+  if (input.bankInfo !== undefined) s.bankInfo = input.bankInfo;
+  if (input.customerName !== undefined) s.customerName = input.customerName;
+  if (input.customerPhone !== undefined) s.customerPhone = input.customerPhone;
+  if (input.note !== undefined) s.note = input.note;
+  if (input.status !== undefined) s.status = input.status;
 
-  // 자동 계산
   s.balance = s.quote - s.deposit;
   s.subtotal = s.balance + s.extraCharge;
   s.vat = Math.round(s.subtotal * 0.1);
   s.totalAmount = s.subtotal + s.vat;
+
+  await supabase.from("settlements").update({
+    quote: s.quote, deposit: s.deposit, balance: s.balance, extra_charge: s.extraCharge, subtotal: s.subtotal, vat: s.vat, total_amount: s.totalAmount, payment_method: s.paymentMethod, cash_receipt: s.cashReceipt, bank_info: s.bankInfo, customer_name: s.customerName, customer_phone: s.customerPhone, note: s.note, status: s.status,
+  }).eq("schedule_id", scheduleId);
 
   return s;
 }

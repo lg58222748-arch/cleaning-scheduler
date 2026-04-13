@@ -8,13 +8,12 @@ export async function PUT(
   const { id } = await params;
   const body = await req.json();
 
-  // 변경 전 정보 가져오기
-  const before = getSchedules().find((s) => s.id === id);
-  const schedule = updateSchedule(id, body);
+  const allSchedules = await getSchedules();
+  const before = allSchedules.find((s) => s.id === id);
+  const schedule = await updateSchedule(id, body);
   if (!schedule) return Response.json({ error: "Not found" }, { status: 404 });
 
-  // 일정 변경 알림
-  addNotification(
+  await addNotification(
     "schedule_updated",
     "일정 변경",
     `${schedule.date} ${schedule.startTime} "${schedule.title}" 일정이 변경되었습니다.${before?.memberName !== schedule.memberName ? ` (${before?.memberName} → ${schedule.memberName})` : ""}`,
@@ -30,14 +29,13 @@ export async function DELETE(
 ) {
   const { id } = await params;
 
-  // 삭제 전 정보 가져오기
-  const schedule = getSchedules().find((s) => s.id === id);
-  const deleted = deleteSchedule(id);
+  const allSchedules = await getSchedules();
+  const schedule = allSchedules.find((s) => s.id === id);
+  const deleted = await deleteSchedule(id);
   if (!deleted) return Response.json({ error: "Not found" }, { status: 404 });
 
-  // 일정 취소 알림
   if (schedule) {
-    addNotification(
+    await addNotification(
       "schedule_cancelled",
       "일정 취소",
       `${schedule.date} ${schedule.startTime} "${schedule.title}" 일정이 취소되었습니다. (담당: ${schedule.memberName})`,

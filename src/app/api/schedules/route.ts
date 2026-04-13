@@ -8,22 +8,21 @@ export async function GET(req: NextRequest) {
   const unassigned = searchParams.get("unassigned");
 
   if (unassigned === "true") {
-    return Response.json(getUnassignedSchedules());
+    return Response.json(await getUnassignedSchedules());
   }
   if (start && end) {
-    return Response.json(getSchedulesByRange(start, end));
+    return Response.json(await getSchedulesByRange(start, end));
   }
-  return Response.json(getSchedules());
+  return Response.json(await getSchedules());
 }
 
 export async function POST(req: NextRequest) {
   const body = await req.json();
 
-  // 배정 액션
   if (body.action === "assign" && body.scheduleId && body.memberId) {
-    const schedule = assignSchedule(body.scheduleId, body.memberId, body.memberName);
+    const schedule = await assignSchedule(body.scheduleId, body.memberId, body.memberName);
     if (!schedule) return Response.json({ error: "Not found" }, { status: 404 });
-    addNotification(
+    await addNotification(
       "schedule_created",
       "일정 배정",
       `"${schedule.title}" 일정이 ${schedule.memberName}님에게 배정되었습니다.`,
@@ -32,11 +31,10 @@ export async function POST(req: NextRequest) {
     return Response.json(schedule);
   }
 
-  // 일정 반환 (배정 해제 → 대기방으로)
   if (body.action === "unassign" && body.scheduleId) {
-    const schedule = unassignSchedule(body.scheduleId);
+    const schedule = await unassignSchedule(body.scheduleId);
     if (!schedule) return Response.json({ error: "Not found" }, { status: 404 });
-    addNotification(
+    await addNotification(
       "schedule_updated",
       "일정 반환",
       `"${schedule.title}" 일정이 대기방으로 반환되었습니다.`,
@@ -45,9 +43,8 @@ export async function POST(req: NextRequest) {
     return Response.json(schedule);
   }
 
-  // 미배정 일정 추가 (구글 캘린더에서 가져올 때)
   if (body.action === "addUnassigned") {
-    const schedule = addUnassignedSchedule({
+    const schedule = await addUnassignedSchedule({
       title: body.title,
       location: body.location || "",
       date: body.date,
@@ -59,8 +56,7 @@ export async function POST(req: NextRequest) {
     return Response.json(schedule, { status: 201 });
   }
 
-  // 기존: 팀원 지정하여 일정 추가
-  const schedule = addSchedule({
+  const schedule = await addSchedule({
     memberId: body.memberId,
     memberName: body.memberName,
     title: body.title,
@@ -72,7 +68,7 @@ export async function POST(req: NextRequest) {
     note: body.note || "",
   });
 
-  addNotification(
+  await addNotification(
     "schedule_created",
     "새 일정 등록",
     `${schedule.date} ${schedule.startTime} "${schedule.title}" 일정이 ${schedule.memberName}님에게 배정되었습니다.`,
