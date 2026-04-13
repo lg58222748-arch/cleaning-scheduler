@@ -42,6 +42,45 @@ export async function searchSchedules(query: string): Promise<Schedule[]> {
   return res.json();
 }
 
+export async function softDeleteSchedule(id: string): Promise<void> {
+  await fetch(`${BASE}/api/schedules`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ action: "softDelete", scheduleId: id }),
+  });
+}
+
+export async function deleteAllSchedules(): Promise<{ deleted: number }> {
+  const res = await fetch(`${BASE}/api/schedules`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ action: "deleteAll" }),
+  });
+  return res.json();
+}
+
+export async function fetchDeletedSchedules(): Promise<Schedule[]> {
+  const res = await fetch(`${BASE}/api/schedules?deleted=true`);
+  return res.json();
+}
+
+export async function restoreScheduleApi(id: string): Promise<void> {
+  await fetch(`${BASE}/api/schedules`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ action: "restore", scheduleId: id }),
+  });
+}
+
+export async function emptyTrashApi(): Promise<{ deleted: number }> {
+  const res = await fetch(`${BASE}/api/schedules`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ action: "emptyTrash" }),
+  });
+  return res.json();
+}
+
 export async function createSchedule(data: Omit<Schedule, "id" | "status">): Promise<Schedule> {
   const res = await fetch(`${BASE}/api/schedules`, {
     method: "POST",

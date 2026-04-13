@@ -66,12 +66,12 @@ export async function deleteMember(id: string): Promise<boolean> {
 
 // ===== Schedules =====
 export async function getSchedules(): Promise<Schedule[]> {
-  const { data } = await supabase.from("schedules").select("*").order("date");
+  const { data } = await supabase.from("schedules").select("*").neq("status", "deleted").order("date");
   return (data || []).map(rowToSchedule);
 }
 
 export async function getSchedulesByRange(start: string, end: string): Promise<Schedule[]> {
-  const { data } = await supabase.from("schedules").select("*").gte("date", start).lte("date", end).order("date");
+  const { data } = await supabase.from("schedules").select("*").gte("date", start).lte("date", end).neq("status", "deleted").order("date");
   return (data || []).map(rowToSchedule);
 }
 
@@ -81,8 +81,8 @@ export async function getUnassignedSchedules(): Promise<Schedule[]> {
 }
 
 export async function searchSchedules(query: string): Promise<Schedule[]> {
-  // title, note, member_name에서 검색
   const { data } = await supabase.from("schedules").select("*")
+    .neq("status", "deleted")
     .or(`title.ilike.%${query}%,note.ilike.%${query}%,member_name.ilike.%${query}%`)
     .order("date", { ascending: false })
     .limit(50);
@@ -96,11 +96,51 @@ export async function addSchedule(input: Omit<Schedule, "id" | "status">): Promi
   return rowToSchedule(data!);
 }
 
-export async function addUnassignedSchedule(input: Omit<Schedule, "id" | "status" | "memberId" | "memberName">): Promise<Schedule> {
+export async function addUnassignedSchedule(input: Omit<Schedule, "id" | "status" | "memberId" | "memberName">): Promise<Schedule | null> {
+  // 구글 캘린더 중복 체크 (googleEventId가 있으면)
+  if (input.googleEventId) {
+    const { data: existing } = await supabase.from("schedules").select("id").eq("google_event_id", input.googleEventId).limit(1);
+    if (existing && existing.length > 0) return null; // 이미 존재
+  }
   const { data } = await supabase.from("schedules").insert({
     member_id: "", member_name: "미배정", title: input.title, location: input.location || "", date: input.date, start_time: input.startTime, end_time: input.endTime, status: "unassigned", google_event_id: input.googleEventId, note: input.note || "",
   }).select().single();
   return rowToSchedule(data!);
+}
+
+// 전체 일정 삭제 (관리자용)
+export async function deleteAllSchedules(): Promise<number> {
+  // soft delete: deleted 컬럼이 있으면 사용, 없으면 실제 삭제
+  const { data } = await supabase.from("schedules").select("id");
+  const count = data?.length || 0;
+  await supabase.from("schedules").delete().neq("id", "");
+  return count;
+}
+
+// 소프트 삭제 (휴지통)
+export async function softDeleteSchedule(id: string): Promise<Schedule | null> {
+  const { data } = await supabase.from("schedules").update({ status: "deleted" }).eq("id", id).select().single();
+  return data ? rowToSchedule(data) : null;
+}
+
+// 휴지통 목록
+export async function getDeletedSchedules(): Promise<Schedule[]> {
+  const { data } = await supabase.from("schedules").select("*").eq("status", "deleted").order("date", { ascending: false });
+  return (data || []).map(rowToSchedule);
+}
+
+// 휴지통에서 복원
+export async function restoreSchedule(id: string): Promise<Schedule | null> {
+  const { data } = await supabase.from("schedules").update({ status: "confirmed" }).eq("id", id).select().single();
+  return data ? rowToSchedule(data) : null;
+}
+
+// 휴지통 비우기
+export async function emptyTrash(): Promise<number> {
+  const { data } = await supabase.from("schedules").select("id").eq("status", "deleted");
+  const count = data?.length || 0;
+  await supabase.from("schedules").delete().eq("status", "deleted");
+  return count;
 }
 
 export async function assignSchedule(scheduleId: string, memberId: string, memberName: string): Promise<Schedule | null> {

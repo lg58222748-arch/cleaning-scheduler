@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { getSchedules, getSchedulesByRange, getUnassignedSchedules, searchSchedules, addSchedule, addUnassignedSchedule, assignSchedule, unassignSchedule, addNotification } from "@/lib/store";
+import { getSchedules, getSchedulesByRange, getUnassignedSchedules, searchSchedules, addSchedule, addUnassignedSchedule, assignSchedule, unassignSchedule, addNotification, deleteAllSchedules, softDeleteSchedule, getDeletedSchedules, restoreSchedule, emptyTrash } from "@/lib/store";
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
@@ -8,8 +8,13 @@ export async function GET(req: NextRequest) {
   const unassigned = searchParams.get("unassigned");
   const query = searchParams.get("q");
 
+  const deleted = searchParams.get("deleted");
+
   if (query) {
     return Response.json(await searchSchedules(query));
+  }
+  if (deleted === "true") {
+    return Response.json(await getDeletedSchedules());
   }
   if (unassigned === "true") {
     return Response.json(await getUnassignedSchedules());
@@ -22,6 +27,30 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   const body = await req.json();
+
+  // 소프트 삭제 (휴지통으로)
+  if (body.action === "softDelete" && body.scheduleId) {
+    const schedule = await softDeleteSchedule(body.scheduleId);
+    return Response.json(schedule || { error: "Not found" });
+  }
+
+  // 전체 삭제 (관리자)
+  if (body.action === "deleteAll") {
+    const count = await deleteAllSchedules();
+    return Response.json({ deleted: count });
+  }
+
+  // 휴지통에서 복원
+  if (body.action === "restore" && body.scheduleId) {
+    const schedule = await restoreSchedule(body.scheduleId);
+    return Response.json(schedule || { error: "Not found" });
+  }
+
+  // 휴지통 비우기
+  if (body.action === "emptyTrash") {
+    const count = await emptyTrash();
+    return Response.json({ deleted: count });
+  }
 
   if (body.action === "assign" && body.scheduleId && body.memberId) {
     const schedule = await assignSchedule(body.scheduleId, body.memberId, body.memberName);

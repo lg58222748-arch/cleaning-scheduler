@@ -13,6 +13,7 @@ import LoginPage from "@/components/LoginPage";
 import AdminPanel from "@/components/AdminPanel";
 import AssignTab from "@/components/AssignTab";
 import SearchPanel from "@/components/SearchPanel";
+import ManageTab from "@/components/ManageTab";
 import {
   fetchMembers,
   createMember,
@@ -21,7 +22,11 @@ import {
   fetchSchedules,
   createSchedule,
   updateSchedule as apiUpdateSchedule,
-  deleteSchedule as apiDeleteSchedule,
+  softDeleteSchedule,
+  deleteAllSchedules,
+  fetchDeletedSchedules,
+  restoreScheduleApi,
+  emptyTrashApi,
   unassignScheduleApi,
   fetchSwapRequests,
   createSwapRequest,
@@ -35,7 +40,7 @@ import {
 import { format, startOfMonth, endOfMonth, addMonths, subMonths } from "date-fns";
 import { ko } from "date-fns/locale";
 
-type TabMode = "calendar" | "list" | "assign" | "members";
+type TabMode = "calendar" | "manage" | "assign" | "members";
 
 export default function Home() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -140,7 +145,7 @@ export default function Home() {
   }
   async function handleDeleteSchedule(id: string) {
     setSchedules((prev) => prev.filter((s) => s.id !== id));
-    await apiDeleteSchedule(id);
+    await softDeleteSchedule(id);
   }
   async function handleUnassignSchedule(id: string) {
     setSchedules((prev) => prev.map((s) => s.id === id ? { ...s, memberId: "", memberName: "미배정", status: "unassigned" as const } : s));
@@ -341,55 +346,8 @@ export default function Home() {
         )}
 
         {/* List tab */}
-        {activeTab === "list" && (
-          <div className="bg-white h-full overflow-y-auto">
-            <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
-              <div>
-                <h3 className="text-sm font-bold text-gray-800">전체 일정</h3>
-                <p className="text-xs text-gray-400">{allSchedulesSorted.length}건</p>
-              </div>
-              <button
-                onClick={() => { setEditingSchedule(null); setShowScheduleForm(true); }}
-                className="px-3 py-1.5 bg-blue-500 text-white rounded-lg text-xs font-medium active:bg-blue-600"
-              >
-                + 배정
-              </button>
-            </div>
-            <div className="divide-y divide-gray-50 max-h-[calc(100vh-200px)] overflow-y-auto">
-              {allSchedulesSorted.length === 0 ? (
-                <div className="px-4 py-12 text-center text-gray-400 text-sm">
-                  등록된 일정이 없습니다
-                </div>
-              ) : (
-                allSchedulesSorted.map((s) => {
-                  const color = members.find((m) => m.id === s.memberId)?.color || "#6B7280";
-                  return (
-                    <div key={s.id} className="px-4 py-3 active:bg-gray-50 flex items-center gap-2.5">
-                      <div className="w-1 h-10 rounded-full shrink-0" style={{ backgroundColor: color }} />
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-sm font-medium text-gray-800 truncate">{s.title}</span>
-                          <span className="text-xs text-gray-400 shrink-0">{s.memberName}</span>
-                        </div>
-                        <div className="text-xs text-gray-500">
-                          {s.date} {s.startTime}-{s.endTime}
-                          {s.location && ` · ${s.location}`}
-                        </div>
-                      </div>
-                      <div className="flex gap-0.5 shrink-0">
-                        <button onClick={() => handleEditSchedule(s)} className="p-1.5 text-gray-400 active:text-blue-500 rounded">
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
-                        </button>
-                        <button onClick={() => handleDeleteSchedule(s.id)} className="p-1.5 text-gray-400 active:text-red-500 rounded">
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })
-              )}
-            </div>
-          </div>
+        {activeTab === "manage" && (
+          <ManageTab isAdmin={isAdmin} onRefresh={() => loadData(undefined, true)} />
         )}
 
         {/* Assign tab */}
@@ -496,15 +454,15 @@ export default function Home() {
           </button>
 
           <button
-            onClick={() => setActiveTab("list")}
+            onClick={() => setActiveTab("manage")}
             className={`flex flex-col items-center justify-center gap-0.5 w-16 h-full ${
-              activeTab === "list" ? "text-blue-500" : "text-gray-400"
+              activeTab === "manage" ? "text-blue-500" : "text-gray-400"
             }`}
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={activeTab === "list" ? 2.5 : 1.5} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={activeTab === "manage" ? 2.5 : 1.5} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
             </svg>
-            <span className="text-[10px] font-medium">더보기</span>
+            <span className="text-[10px] font-medium">{isAdmin ? "관리" : "더보기"}</span>
           </button>
         </div>
       </nav>

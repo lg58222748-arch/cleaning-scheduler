@@ -35,11 +35,13 @@ export default function AssignTab({ members, onAssigned }: AssignTabProps) {
   const touchStartY = useRef(0);
 
   const loadUnassigned = useCallback(async () => {
-    setLoading(true);
+    // 첫 로드만 로딩 표시, 이후는 백그라운드
+    const isFirst = unassigned.length === 0;
+    if (isFirst) setLoading(true);
     const data = await fetchUnassignedSchedules();
     setUnassigned(data);
     setLoading(false);
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { loadUnassigned(); }, [loadUnassigned]);
 

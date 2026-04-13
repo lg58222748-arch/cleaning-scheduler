@@ -157,7 +157,11 @@ export default function ScheduleDetail({
               {schedule.title.replace(/^\[.+?\]\s*/, "") || schedule.title}
             </h3>
           )}
-          <div className="w-8" />
+          <button onClick={() => { onDelete(schedule.id); onClose(); }} className="p-1.5 active:bg-red-50 rounded-lg">
+            <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+            </svg>
+          </button>
         </div>
 
         {/* Tabs */}
@@ -257,12 +261,11 @@ export default function ScheduleDetail({
                 </div>
 
                 {/* 액션 버튼 */}
-                <div className="flex gap-2 pt-2 border-t border-gray-100">
-                  {isAdmin && schedule.status !== "unassigned" && onUnassign && (
-                    <button onClick={() => { onUnassign(schedule.id); onClose(); }} className="flex-1 px-3 py-2.5 bg-orange-50 text-orange-600 rounded-xl text-sm font-medium active:bg-orange-100">반환</button>
-                  )}
-                  <button onClick={() => { onDelete(schedule.id); onClose(); }} className="flex-1 px-3 py-2.5 bg-red-50 text-red-600 rounded-xl text-sm font-medium active:bg-red-100">삭제</button>
-                </div>
+                {isAdmin && schedule.status !== "unassigned" && onUnassign && (
+                  <div className="pt-2 border-t border-gray-100">
+                    <button onClick={() => { onUnassign(schedule.id); onClose(); }} className="w-full px-3 py-2.5 bg-orange-50 text-orange-600 rounded-xl text-sm font-medium active:bg-orange-100">반환</button>
+                  </div>
+                )}
               </div>
 
               {/* Comments */}
