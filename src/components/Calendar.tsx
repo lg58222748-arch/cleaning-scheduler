@@ -168,7 +168,7 @@ export default function Calendar({
                 <button
                   key={dateStr}
                   onClick={() => onSelectDate(d)}
-                  className={`min-h-[100px] p-1 text-left relative ${
+                  className={`min-h-[56px] p-1 text-left relative ${
                     isSelected
                       ? "bg-blue-50 ring-2 ring-blue-400 ring-inset"
                       : "active:bg-gray-50"
@@ -187,29 +187,21 @@ export default function Calendar({
                   >
                     {format(d, "d")}
                   </span>
-                  <div className="mt-0.5 space-y-0.5">
-                    {daySchedules.slice(0, 3).map((s) => {
-                      const timeMatch = s.title.match(/^\[(.+?)\]/);
-                      const time = timeMatch ? timeMatch[1] : "";
-                      const rest = s.title.replace(/^\[.+?\]\s*/, "");
-                      const name = rest.split("/")[0].replace(/^U/, "");
-                      return (
+                  {/* 일정 있으면 점으로 표시 (삼성 캘린더 스타일) */}
+                  {daySchedules.length > 0 && (
+                    <div className="flex gap-0.5 justify-center mt-0.5">
+                      {daySchedules.slice(0, 3).map((s) => (
                         <div
                           key={s.id}
-                          className="text-[10px] leading-tight px-1 py-0.5 rounded text-white"
+                          className="w-1 h-1 rounded-full"
                           style={{ backgroundColor: colorMap.get(s.memberId) || "#6B7280" }}
-                        >
-                          {time && <div className="font-medium">({time})</div>}
-                          <div className="truncate">{name || s.title.slice(0, 6)}</div>
-                        </div>
-                      );
-                    })}
-                    {daySchedules.length > 3 && (
-                      <div className="text-[9px] text-gray-400 px-0.5">
-                        +{daySchedules.length - 3}
-                      </div>
-                    )}
-                  </div>
+                        />
+                      ))}
+                      {daySchedules.length > 3 && (
+                        <div className="w-1 h-1 rounded-full bg-gray-300" />
+                      )}
+                    </div>
+                  )}
                 </button>
               );
             })}
