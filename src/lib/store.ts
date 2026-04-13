@@ -80,6 +80,15 @@ export async function getUnassignedSchedules(): Promise<Schedule[]> {
   return (data || []).map(rowToSchedule);
 }
 
+export async function searchSchedules(query: string): Promise<Schedule[]> {
+  // title, note, member_name에서 검색
+  const { data } = await supabase.from("schedules").select("*")
+    .or(`title.ilike.%${query}%,note.ilike.%${query}%,member_name.ilike.%${query}%`)
+    .order("date", { ascending: false })
+    .limit(50);
+  return (data || []).map(rowToSchedule);
+}
+
 export async function addSchedule(input: Omit<Schedule, "id" | "status">): Promise<Schedule> {
   const { data } = await supabase.from("schedules").insert({
     member_id: input.memberId, member_name: input.memberName, title: input.title, location: input.location || "", date: input.date, start_time: input.startTime, end_time: input.endTime, status: "confirmed", assigned_to: input.assignedTo, assigned_to_name: input.assignedToName, google_event_id: input.googleEventId, note: input.note || "", color: input.color || "#FDDCCC",

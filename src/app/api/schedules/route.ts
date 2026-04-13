@@ -1,12 +1,16 @@
 import { NextRequest } from "next/server";
-import { getSchedules, getSchedulesByRange, getUnassignedSchedules, addSchedule, addUnassignedSchedule, assignSchedule, unassignSchedule, addNotification } from "@/lib/store";
+import { getSchedules, getSchedulesByRange, getUnassignedSchedules, searchSchedules, addSchedule, addUnassignedSchedule, assignSchedule, unassignSchedule, addNotification } from "@/lib/store";
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const start = searchParams.get("start");
   const end = searchParams.get("end");
   const unassigned = searchParams.get("unassigned");
+  const query = searchParams.get("q");
 
+  if (query) {
+    return Response.json(await searchSchedules(query));
+  }
   if (unassigned === "true") {
     return Response.json(await getUnassignedSchedules());
   }

@@ -37,6 +37,11 @@ export async function fetchSchedules(start?: string, end?: string): Promise<Sche
   return res.json();
 }
 
+export async function searchSchedules(query: string): Promise<Schedule[]> {
+  const res = await fetch(`${BASE}/api/schedules?q=${encodeURIComponent(query)}`);
+  return res.json();
+}
+
 export async function createSchedule(data: Omit<Schedule, "id" | "status">): Promise<Schedule> {
   const res = await fetch(`${BASE}/api/schedules`, {
     method: "POST",

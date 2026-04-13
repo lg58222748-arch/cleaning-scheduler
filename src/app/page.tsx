@@ -12,6 +12,7 @@ import ScheduleDetail from "@/components/ScheduleDetail";
 import LoginPage from "@/components/LoginPage";
 import AdminPanel from "@/components/AdminPanel";
 import AssignTab from "@/components/AssignTab";
+import SearchPanel from "@/components/SearchPanel";
 import {
   fetchMembers,
   createMember,
@@ -56,6 +57,7 @@ export default function Home() {
   const [detailSchedule, setDetailSchedule] = useState<Schedule | null>(null);
   const [showAdminPanel, setShowAdminPanel] = useState(false);
   const [showDayPopup, setShowDayPopup] = useState(false);
+  const [showSearch, setShowSearch] = useState(false);
 
   const loadData = useCallback(async (monthDate?: Date) => {
     const d = monthDate || selectedDate;
@@ -256,6 +258,15 @@ export default function Home() {
             <span className="text-[10px] px-1.5 py-0.5 bg-blue-100 text-blue-600 rounded-full font-medium shrink-0">{currentUser.name}</span>
           </div>
           <div className="flex items-center shrink-0">
+            {/* Search */}
+            <button
+              onClick={() => setShowSearch(true)}
+              className="p-2 text-gray-400 active:bg-blue-50 rounded-lg"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+            </button>
             {/* Notification bell */}
             <button
               onClick={() => { setShowDayPopup(false); setShowNotifications(true); }}
@@ -601,6 +612,12 @@ export default function Home() {
       )}
       {showAdminPanel && (
         <AdminPanel onClose={() => setShowAdminPanel(false)} />
+      )}
+      {showSearch && (
+        <SearchPanel
+          onSelectSchedule={(s) => { setShowSearch(false); setDetailSchedule(s); }}
+          onClose={() => setShowSearch(false)}
+        />
       )}
     </div>
   );
