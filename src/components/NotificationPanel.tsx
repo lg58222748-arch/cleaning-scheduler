@@ -6,6 +6,7 @@ interface NotificationPanelProps {
   notifications: Notification[];
   onMarkRead: (id: string) => void;
   onMarkAllRead: () => void;
+  onClearAll?: () => void;
   onClose: () => void;
 }
 
@@ -34,6 +35,7 @@ export default function NotificationPanel({
   notifications,
   onMarkRead,
   onMarkAllRead,
+  onClearAll,
   onClose,
 }: NotificationPanelProps) {
   const unreadCount = notifications.filter((n) => !n.read).length;
@@ -50,16 +52,18 @@ export default function NotificationPanel({
               </span>
             )}
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5">
             {unreadCount > 0 && (
-              <button
-                onClick={onMarkAllRead}
-                className="text-xs text-blue-500 font-medium"
-              >
+              <button onClick={onMarkAllRead} className="text-xs px-2.5 py-1 bg-blue-50 text-blue-600 rounded-lg font-medium active:bg-blue-100">
                 모두 읽음
               </button>
             )}
-            <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded-lg">
+            {notifications.length > 0 && onClearAll && (
+              <button onClick={onClearAll} className="text-xs px-2.5 py-1 bg-red-50 text-red-500 rounded-lg font-medium active:bg-red-100">
+                지우기
+              </button>
+            )}
+            <button onClick={onClose} className="p-1.5 active:bg-gray-100 rounded-lg ml-1">
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
               </svg>

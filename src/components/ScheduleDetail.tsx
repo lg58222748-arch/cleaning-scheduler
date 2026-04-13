@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Schedule, Member, Comment } from "@/types";
-import { fetchComments, createComment, deleteCommentApi } from "@/lib/api";
+import { fetchComments, createComment, deleteCommentApi, updateSchedule as apiUpdateSchedule } from "@/lib/api";
 import ScheduleChecklist from "./ScheduleChecklist";
 import ScheduleSettlement from "./ScheduleSettlement";
 
@@ -14,6 +14,7 @@ interface ScheduleDetailProps {
   onDelete: (id: string) => void;
   onUnassign?: (id: string) => void;
   onClose: () => void;
+  onUpdated?: () => void;
 }
 
 type DetailTab = "info" | "checklist" | "settlement";
@@ -26,21 +27,27 @@ export default function ScheduleDetail({
   onDelete,
   onUnassign,
   onClose,
+  onUpdated,
 }: ScheduleDetailProps) {
   const [activeTab, setActiveTab] = useState<DetailTab>("info");
   const [comments, setComments] = useState<Comment[]>([]);
   const [newComment, setNewComment] = useState("");
   const [authorName, setAuthorName] = useState("팀장");
   const [loading, setLoading] = useState(false);
-  // 검수/정산 탭 사전 로드 여부
   const [preloadChecklist, setPreloadChecklist] = useState(false);
   const [preloadSettlement, setPreloadSettlement] = useState(false);
+
+  // 인라인 편집 상태
+  const [editingNote, setEditingNote] = useState(false);
+  const [noteText, setNoteText] = useState(schedule.note || "");
+  const [editingTitle, setEditingTitle] = useState(false);
+  const [titleText, setTitleText] = useState(schedule.title);
+  const [saving, setSaving] = useState(false);
 
   const memberColor = members.find((m) => m.id === schedule.memberId)?.color || "#6B7280";
 
   useEffect(() => {
     loadComments();
-    // 검수/정산 데이터 미리 로드 (약간 딜레이 후)
     const t = setTimeout(() => {
       setPreloadChecklist(true);
       setPreloadSettlement(true);
@@ -67,6 +74,25 @@ export default function ScheduleDetail({
     await loadComments();
   }
 
+  // 인라인 저장
+  async function handleSaveNote() {
+    setSaving(true);
+    await apiUpdateSchedule(schedule.id, { note: noteText });
+    schedule.note = noteText;
+    setEditingNote(false);
+    setSaving(false);
+    onUpdated?.();
+  }
+
+  async function handleSaveTitle() {
+    setSaving(true);
+    await apiUpdateSchedule(schedule.id, { title: titleText });
+    schedule.title = titleText;
+    setEditingTitle(false);
+    setSaving(false);
+    onUpdated?.();
+  }
+
   function formatTime(dateStr: string): string {
     const d = new Date(dateStr);
     const h = d.getHours();
@@ -78,7 +104,6 @@ export default function ScheduleDetail({
   const statusLabel = schedule.status === "confirmed" ? "확정" : schedule.status === "pending" ? "대기" : "교환요청";
   const statusClass = schedule.status === "confirmed" ? "bg-green-100 text-green-700" : schedule.status === "pending" ? "bg-yellow-100 text-yellow-700" : "bg-orange-100 text-orange-700";
 
-  // 날짜를 삼성 캘린더 스타일로 포맷
   const dayNames = ["일", "월", "화", "수", "목", "금", "토"];
   const schedDate = new Date(schedule.date + "T00:00:00");
   const dayName = dayNames[schedDate.getDay()];
@@ -89,14 +114,32 @@ export default function ScheduleDetail({
   return (
     <div className="fixed inset-0 bg-white z-50 flex flex-col animate-[modalIn_0.15s_ease-out]">
       <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Header - 삼성 캘린더 스타일 */}
+        {/* Header */}
         <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
           <button onClick={onClose} className="p-1.5 active:bg-gray-100 rounded-lg">
             <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
           </button>
-          <h3 className="text-base font-bold text-gray-800 flex-1 text-center">{schedule.title.replace(/^\[.+?\]\s*/, "").split("/")[0] || schedule.title}</h3>
+          {editingTitle ? (
+            <div className="flex-1 mx-2 flex items-center gap-1">
+              <input
+                value={titleText}
+                onChange={(e) => setTitleText(e.target.value)}
+                className="flex-1 text-base font-bold text-gray-800 text-center border-b-2 border-blue-400 outline-none bg-transparent"
+                autoFocus
+                onKeyDown={(e) => e.key === "Enter" && handleSaveTitle()}
+              />
+              <button onClick={handleSaveTitle} disabled={saving} className="text-xs px-2 py-1 bg-blue-500 text-white rounded-lg">저장</button>
+            </div>
+          ) : (
+            <h3
+              className="text-base font-bold text-gray-800 flex-1 text-center cursor-pointer active:text-blue-600"
+              onClick={() => { setTitleText(schedule.title); setEditingTitle(true); }}
+            >
+              {schedule.title.replace(/^\[.+?\]\s*/, "").split("/")[0] || schedule.title}
+            </h3>
+          )}
           <div className="w-8" />
         </div>
 
@@ -125,9 +168,8 @@ export default function ScheduleDetail({
         <div className="flex-1 overflow-y-auto">
           {activeTab === "info" && (
             <>
-              {/* 삼성 캘린더 스타일 상세 정보 */}
               <div className="px-4 py-4 space-y-4">
-                {/* 날짜 - 삼성 캘린더 스타일 */}
+                {/* 날짜 */}
                 <div className="flex items-center gap-3 text-sm text-gray-700">
                   <svg className="w-5 h-5 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -160,22 +202,40 @@ export default function ScheduleDetail({
                   </div>
                 )}
 
-                {/* 캘린더 본문 (노트) - 삼성 캘린더의 메모 영역 */}
+                {/* 본문 - 클릭하면 바로 편집 */}
                 <div className="flex items-start gap-3">
                   <svg className="w-5 h-5 text-gray-400 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                   </svg>
-                  <div className="flex-1 text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">
-                    {schedule.note || schedule.title}
-                  </div>
+                  {editingNote ? (
+                    <div className="flex-1">
+                      <textarea
+                        value={noteText}
+                        onChange={(e) => setNoteText(e.target.value)}
+                        className="w-full text-sm text-gray-700 whitespace-pre-wrap leading-relaxed border border-blue-300 rounded-lg p-3 outline-none focus:ring-2 focus:ring-blue-400 resize-y min-h-[200px]"
+                        autoFocus
+                      />
+                      <div className="flex gap-2 mt-2">
+                        <button onClick={() => setEditingNote(false)} className="flex-1 px-3 py-2 bg-gray-100 text-gray-600 rounded-lg text-sm font-medium">취소</button>
+                        <button onClick={handleSaveNote} disabled={saving} className="flex-1 px-3 py-2 bg-blue-500 text-white rounded-lg text-sm font-medium disabled:opacity-50">저장</button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div
+                      className="flex-1 text-sm text-gray-700 whitespace-pre-wrap leading-relaxed cursor-pointer active:bg-blue-50 rounded-lg p-1 -m-1"
+                      onClick={() => { setNoteText(schedule.note || ""); setEditingNote(true); }}
+                    >
+                      {schedule.note || schedule.title}
+                      <div className="text-[10px] text-blue-400 mt-1">터치하여 수정</div>
+                    </div>
+                  )}
                 </div>
 
-                {/* 액션 버튼 */}
+                {/* 액션 버튼 - 수정 제거, 반환+삭제만 */}
                 <div className="flex gap-2 pt-2 border-t border-gray-100">
                   {isAdmin && schedule.status !== "unassigned" && onUnassign && (
                     <button onClick={() => { onUnassign(schedule.id); onClose(); }} className="flex-1 px-3 py-2.5 bg-orange-50 text-orange-600 rounded-xl text-sm font-medium active:bg-orange-100">반환</button>
                   )}
-                  <button onClick={() => onEdit(schedule)} className="flex-1 px-3 py-2.5 bg-blue-50 text-blue-600 rounded-xl text-sm font-medium active:bg-blue-100">수정</button>
                   <button onClick={() => { onDelete(schedule.id); onClose(); }} className="flex-1 px-3 py-2.5 bg-red-50 text-red-600 rounded-xl text-sm font-medium active:bg-red-100">삭제</button>
                 </div>
               </div>
@@ -225,7 +285,6 @@ export default function ScheduleDetail({
             </>
           )}
 
-          {/* 검수/정산 탭 - 사전 로드로 빠른 전환 */}
           <div style={{ display: activeTab === "checklist" ? "block" : "none" }}>
             {preloadChecklist && <ScheduleChecklist scheduleId={schedule.id} />}
           </div>

@@ -180,6 +180,10 @@ export default function Home() {
     setUnreadCount(0);
     await apiMarkAllRead();
   }
+  function handleClearAllNotifications() {
+    setNotifications([]);
+    setUnreadCount(0);
+  }
 
   // Google Calendar Import - 미배정 상태로 대기 목록에 추가
   function handleGoogleImport(events: GoogleEvent[]) {
@@ -522,6 +526,7 @@ export default function Home() {
           notifications={notifications}
           onMarkRead={handleMarkRead}
           onMarkAllRead={handleMarkAllRead}
+          onClearAll={handleClearAllNotifications}
           onClose={() => setShowNotifications(false)}
         />
       )}
@@ -545,13 +550,13 @@ export default function Home() {
               </button>
             </div>
 
-            {/* 일정 목록 - 4개까지 편하게 */}
+            {/* 일정 목록 - 항상 4개분 높이 확보 */}
             {daySchedules.length === 0 ? (
-              <div className="px-5 pb-8 pt-3 text-center text-gray-400 text-sm">
-                일정이 없습니다
+              <div className="px-5 pb-6 pt-3 text-center text-gray-400 text-sm" style={{ minHeight: "300px" }}>
+                <div className="pt-20">일정이 없습니다</div>
               </div>
             ) : (
-              <div className="px-4 pb-6 pt-1 space-y-3 max-h-[480px] overflow-y-auto">
+              <div className="px-4 pb-6 pt-1 space-y-3 max-h-[480px] overflow-y-auto" style={{ minHeight: "300px" }}>
                 {daySchedules.map((s) => {
                   const titleDisplay = s.title.replace(/^\[.+?\]\s*/, "").split("/")[0].replace(/^U/, "") || s.title;
                   const schedColor = s.color || "#FDDCCC";
@@ -589,6 +594,7 @@ export default function Home() {
           onDelete={(id) => { handleDeleteSchedule(id); setDetailSchedule(null); }}
           onUnassign={(id) => { handleUnassignSchedule(id); setDetailSchedule(null); }}
           onClose={() => setDetailSchedule(null)}
+          onUpdated={() => loadData()}
         />
       )}
       {showAdminPanel && (
