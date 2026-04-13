@@ -102,45 +102,47 @@ export default function Home() {
 
   const isAdmin = currentUser.role === "admin";
 
-  // Members
+  // Members — 낙관적 업데이트
   async function handleAddMember(data: { name: string; phone: string; availableDays: number[] }) {
-    await createMember(data);
-    loadData();
+    const newMember = await createMember(data);
+    setMembers((prev) => [...prev, newMember]);
   }
   async function handleUpdateMember(id: string, data: Partial<Member>) {
+    setMembers((prev) => prev.map((m) => m.id === id ? { ...m, ...data } : m));
     await apiUpdateMember(id, data);
-    loadData();
   }
   async function handleDeleteMember(id: string) {
+    setMembers((prev) => prev.filter((m) => m.id !== id));
     await apiDeleteMember(id);
-    loadData();
   }
 
-  // Schedules
+  // Schedules — 낙관적 업데이트
   async function handleSaveSchedule(data: Omit<Schedule, "id" | "status">) {
-    if (editingSchedule) {
-      await apiUpdateSchedule(editingSchedule.id, data);
-    } else {
-      await createSchedule(data);
-    }
     setShowScheduleForm(false);
     setEditingSchedule(null);
-    loadData();
+    if (editingSchedule) {
+      setSchedules((prev) => prev.map((s) => s.id === editingSchedule.id ? { ...s, ...data } : s));
+      await apiUpdateSchedule(editingSchedule.id, data);
+    } else {
+      const newSchedule = await createSchedule(data);
+      setSchedules((prev) => [...prev, newSchedule]);
+    }
+    loadData(); // 백그라운드 동기화
   }
   async function handleDeleteSchedule(id: string) {
+    setSchedules((prev) => prev.filter((s) => s.id !== id));
     await apiDeleteSchedule(id);
-    loadData();
   }
   async function handleUnassignSchedule(id: string) {
+    setSchedules((prev) => prev.map((s) => s.id === id ? { ...s, memberId: "", memberName: "미배정", status: "unassigned" as const } : s));
     await unassignScheduleApi(id);
-    loadData();
   }
   function handleEditSchedule(schedule: Schedule) {
     setEditingSchedule(schedule);
     setShowScheduleForm(true);
   }
 
-  // Swap
+  // Swap select
   function handleSwapSelect(schedule: Schedule) {
     if (!swapFirstSchedule) {
       setSwapFirstSchedule(schedule);
@@ -154,23 +156,28 @@ export default function Home() {
       }
     }
   }
+
+  // Swap — 낙관적 업데이트
   async function handleApproveSwap(swapId: string) {
+    setSwapRequests((prev) => prev.map((r) => r.id === swapId ? { ...r, status: "approved" as const } : r));
     await approveSwapRequest(swapId);
     loadData();
   }
   async function handleRejectSwap(swapId: string) {
+    setSwapRequests((prev) => prev.map((r) => r.id === swapId ? { ...r, status: "rejected" as const } : r));
     await rejectSwapRequest(swapId);
-    loadData();
   }
 
-  // Notifications
+  // Notifications — 낙관적 업데이트
   async function handleMarkRead(id: string) {
+    setNotifications((prev) => prev.map((n) => n.id === id ? { ...n, read: true } : n));
+    setUnreadCount((c) => Math.max(0, c - 1));
     await apiMarkRead(id);
-    loadData();
   }
   async function handleMarkAllRead() {
+    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+    setUnreadCount(0);
     await apiMarkAllRead();
-    loadData();
   }
 
   // Google Calendar Import - 미배정 상태로 대기 목록에 추가

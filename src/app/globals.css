@@ -24,8 +24,20 @@ body {
 }
 
 /* Smooth scrolling on iOS */
-.overflow-y-auto {
+.overflow-y-auto,
+.overflow-y-scroll {
   -webkit-overflow-scrolling: touch;
+  will-change: scroll-position;
+}
+
+/* 하드웨어 가속 */
+.min-h-screen {
+  transform: translateZ(0);
+}
+
+/* 스크롤 성능 향상 */
+* {
+  -webkit-font-smoothing: antialiased;
 }
 
 /* Remove input zoom on iOS */
