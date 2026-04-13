@@ -77,16 +77,15 @@ export default function Calendar({
     }
   }, [currentMonth, animating, animateMonth]);
 
-  // 주별 날짜 배열 메모이제이션
+  // 주별 날짜 배열 메모이제이션 - 항상 6주 고정
   const weeks = useMemo(() => {
     const monthStart = startOfMonth(currentMonth);
-    const monthEnd = endOfMonth(currentMonth);
     const calStart = startOfWeek(monthStart, { weekStartsOn: 0 });
-    const calEnd = endOfWeek(monthEnd, { weekStartsOn: 0 });
 
     const days: Date[] = [];
     let day = calStart;
-    while (day <= calEnd) {
+    // 항상 42일 (6주) 고정
+    for (let i = 0; i < 42; i++) {
       days.push(day);
       day = addDays(day, 1);
     }
@@ -205,27 +204,23 @@ export default function Calendar({
                   >
                     {format(d, "d")}
                   </span>
-                  {/* 삼성 캘린더 스타일: 이벤트 바 (2줄×5글자=10글자) */}
-                  <div className="mt-0.5 space-y-0.5 overflow-hidden">
-                    {daySchedules.slice(0, 2).map((s) => {
-                      const name = s.title.replace(/^\[.+?\]\s*/, "").split("/")[0].replace(/^U/, "") || s.title.slice(0, 10);
-                      const display = name.slice(0, 10);
-                      const line1 = display.slice(0, 5);
-                      const line2 = display.slice(5, 10);
+                  {/* 이벤트 바 - 셀 꽉 채움, 2줄 표시 */}
+                  <div className="mt-0.5 overflow-hidden flex-1">
+                    {daySchedules.slice(0, 1).map((s) => {
+                      const fullName = s.title.replace(/^\[.+?\]\s*/, "");
                       const schedColor = s.color || "#FDDCCC";
                       return (
                         <div
                           key={s.id}
-                          className="text-[9px] leading-[1.2] px-1 py-px rounded font-medium"
-                          style={{ backgroundColor: schedColor, color: "#555" }}
+                          className="text-[9px] leading-[1.3] px-0.5 py-0.5 rounded font-medium overflow-hidden"
+                          style={{ backgroundColor: schedColor, color: "#555", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const }}
                         >
-                          <div>{line1}</div>
-                          {line2 && <div>{line2}</div>}
+                          {fullName}
                         </div>
                       );
                     })}
-                    {daySchedules.length > 2 && (
-                      <div className="text-[8px] text-gray-400 px-0.5">+{daySchedules.length - 2}</div>
+                    {daySchedules.length > 1 && (
+                      <div className="text-[8px] text-gray-400 px-0.5 mt-0.5">+{daySchedules.length - 1}</div>
                     )}
                   </div>
                 </button>

@@ -550,13 +550,13 @@ export default function Home() {
               </button>
             </div>
 
-            {/* 일정 목록 - 항상 4개분 높이 확보 */}
+            {/* 일정 목록 */}
             {daySchedules.length === 0 ? (
-              <div className="px-5 pb-6 pt-3 text-center text-gray-400 text-sm" style={{ minHeight: "300px" }}>
-                <div className="pt-20">일정이 없습니다</div>
+              <div className="px-5 pb-6 pt-3 text-center text-gray-400 text-sm">
+                일정이 없습니다
               </div>
             ) : (
-              <div className="px-4 pb-6 pt-1 space-y-3 max-h-[480px] overflow-y-auto" style={{ minHeight: "300px" }}>
+              <div className="px-4 pb-6 pt-1 space-y-3 max-h-[480px] overflow-y-auto">
                 {daySchedules.map((s) => {
                   const titleDisplay = s.title.replace(/^\[.+?\]\s*/, "").split("/")[0].replace(/^U/, "") || s.title;
                   const schedColor = s.color || "#FDDCCC";

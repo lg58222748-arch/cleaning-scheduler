@@ -6,9 +6,7 @@ import { fetchUnassignedSchedules, assignScheduleApi } from "@/lib/api";
 import {
   format,
   startOfMonth,
-  endOfMonth,
   startOfWeek,
-  endOfWeek,
   addDays,
   addMonths,
   subMonths,
@@ -57,14 +55,13 @@ export default function AssignTab({ members, onAssigned }: AssignTabProps) {
   const activeMembers = members.filter((m) => m.active);
 
   // 캘린더 주 배열
+  // 항상 6주 고정
   const weeks = useMemo(() => {
     const monthStart = startOfMonth(currentMonth);
-    const monthEnd = endOfMonth(currentMonth);
     const calStart = startOfWeek(monthStart, { weekStartsOn: 0 });
-    const calEnd = endOfWeek(monthEnd, { weekStartsOn: 0 });
     const days: Date[] = [];
     let day = calStart;
-    while (day <= calEnd) { days.push(day); day = addDays(day, 1); }
+    for (let i = 0; i < 42; i++) { days.push(day); day = addDays(day, 1); }
     const result: Date[][] = [];
     for (let i = 0; i < days.length; i += 7) result.push(days.slice(i, i + 7));
     return result;
@@ -142,7 +139,7 @@ export default function AssignTab({ members, onAssigned }: AssignTabProps) {
                   <button
                     key={dateStr}
                     onClick={() => { setSelectedDate(d); if (dayScheds.length > 0) setShowDayPopup(true); }}
-                    className={`min-h-[72px] p-1 text-left relative ${
+                    className={`min-h-[90px] p-1 text-left relative ${
                       isSelected ? "bg-orange-50 ring-2 ring-orange-400 ring-inset" : "active:bg-gray-50"
                     } ${!isCurrentMonth ? "opacity-40" : ""}`}
                   >
@@ -155,20 +152,20 @@ export default function AssignTab({ members, onAssigned }: AssignTabProps) {
                       {format(d, "d")}
                     </span>
                     <div className="mt-0.5 space-y-0.5 overflow-hidden">
-                      {dayScheds.slice(0, 2).map((s) => {
-                        const name = s.title.replace(/^\[.+?\]\s*/, "").split("/")[0].replace(/^U/, "") || s.title.slice(0, 10);
-                        const display = name.slice(0, 10);
-                        const line1 = display.slice(0, 5);
-                        const line2 = display.slice(5, 10);
+                      {dayScheds.slice(0, 1).map((s) => {
+                        const fullName = s.title.replace(/^\[.+?\]\s*/, "");
                         return (
-                          <div key={s.id} className="text-[9px] leading-[1.2] px-1 py-px rounded font-medium bg-orange-100 text-orange-700">
-                            <div>{line1}</div>
-                            {line2 && <div>{line2}</div>}
+                          <div
+                            key={s.id}
+                            className="text-[9px] leading-[1.3] px-0.5 py-0.5 rounded font-medium bg-orange-100 text-orange-700 overflow-hidden"
+                            style={{ display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const }}
+                          >
+                            {fullName}
                           </div>
                         );
                       })}
-                      {dayScheds.length > 2 && (
-                        <div className="text-[8px] text-gray-400 px-0.5">+{dayScheds.length - 2}</div>
+                      {dayScheds.length > 1 && (
+                        <div className="text-[8px] text-gray-400 px-0.5 mt-0.5">+{dayScheds.length - 1}</div>
                       )}
                     </div>
                   </button>

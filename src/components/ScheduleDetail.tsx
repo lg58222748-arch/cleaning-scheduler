@@ -43,6 +43,16 @@ export default function ScheduleDetail({
   const [editingTitle, setEditingTitle] = useState(false);
   const [titleText, setTitleText] = useState(schedule.title);
   const [saving, setSaving] = useState(false);
+  const [noteChanged, setNoteChanged] = useState(false);
+  const [schedColor, setSchedColor] = useState(schedule.color || "#FDDCCC");
+
+  const SCHEDULE_COLORS = [
+    { name: "살몬", value: "#FDDCCC" },
+    { name: "하늘", value: "#DBEAFE" },
+    { name: "연두", value: "#D1FAE5" },
+    { name: "보라", value: "#E9D5FF" },
+    { name: "노랑", value: "#FEF3C7" },
+  ];
 
   const memberColor = members.find((m) => m.id === schedule.memberId)?.color || "#6B7280";
 
@@ -79,7 +89,7 @@ export default function ScheduleDetail({
     setSaving(true);
     await apiUpdateSchedule(schedule.id, { note: noteText });
     schedule.note = noteText;
-    setEditingNote(false);
+    setNoteChanged(false);
     setSaving(false);
     onUpdated?.();
   }
@@ -90,6 +100,13 @@ export default function ScheduleDetail({
     schedule.title = titleText;
     setEditingTitle(false);
     setSaving(false);
+    onUpdated?.();
+  }
+
+  async function handleColorChange(color: string) {
+    setSchedColor(color);
+    schedule.color = color;
+    await apiUpdateSchedule(schedule.id, { color });
     onUpdated?.();
   }
 
@@ -202,36 +219,50 @@ export default function ScheduleDetail({
                   </div>
                 )}
 
-                {/* 본문 - 클릭하면 바로 편집 */}
+                {/* 일정 색상 */}
+                <div className="flex items-center gap-3">
+                  <svg className="w-5 h-5 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" />
+                  </svg>
+                  <div className="flex gap-2">
+                    {SCHEDULE_COLORS.map((c) => (
+                      <button
+                        key={c.value}
+                        onClick={() => handleColorChange(c.value)}
+                        className={`w-7 h-7 rounded-full border-2 transition-all ${
+                          schedColor === c.value ? "border-gray-800 scale-110" : "border-transparent"
+                        }`}
+                        style={{ backgroundColor: c.value }}
+                      />
+                    ))}
+                  </div>
+                </div>
+
+                {/* 본문 - 메모장처럼 항상 편집 가능 */}
                 <div className="flex items-start gap-3">
                   <svg className="w-5 h-5 text-gray-400 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                   </svg>
-                  {editingNote ? (
-                    <div className="flex-1">
-                      <textarea
-                        value={noteText}
-                        onChange={(e) => setNoteText(e.target.value)}
-                        className="w-full text-sm text-gray-700 whitespace-pre-wrap leading-relaxed border border-blue-300 rounded-lg p-3 outline-none focus:ring-2 focus:ring-blue-400 resize-y min-h-[200px]"
-                        autoFocus
-                      />
-                      <div className="flex gap-2 mt-2">
-                        <button onClick={() => setEditingNote(false)} className="flex-1 px-3 py-2 bg-gray-100 text-gray-600 rounded-lg text-sm font-medium">취소</button>
-                        <button onClick={handleSaveNote} disabled={saving} className="flex-1 px-3 py-2 bg-blue-500 text-white rounded-lg text-sm font-medium disabled:opacity-50">저장</button>
-                      </div>
-                    </div>
-                  ) : (
-                    <div
-                      className="flex-1 text-sm text-gray-700 whitespace-pre-wrap leading-relaxed cursor-pointer active:bg-blue-50 rounded-lg p-1 -m-1"
-                      onClick={() => { setNoteText(schedule.note || ""); setEditingNote(true); }}
-                    >
-                      {schedule.note || schedule.title}
-                      <div className="text-[10px] text-blue-400 mt-1">터치하여 수정</div>
-                    </div>
-                  )}
+                  <div className="flex-1">
+                    <textarea
+                      value={noteText}
+                      onChange={(e) => { setNoteText(e.target.value); setNoteChanged(true); }}
+                      className="w-full text-sm text-gray-700 leading-relaxed bg-transparent outline-none resize-none min-h-[180px]"
+                      placeholder="내용을 입력하세요..."
+                    />
+                    {noteChanged && (
+                      <button
+                        onClick={handleSaveNote}
+                        disabled={saving}
+                        className="mt-1 px-4 py-2 bg-blue-500 text-white rounded-lg text-sm font-medium w-full disabled:opacity-50"
+                      >
+                        {saving ? "저장 중..." : "저장"}
+                      </button>
+                    )}
+                  </div>
                 </div>
 
-                {/* 액션 버튼 - 수정 제거, 반환+삭제만 */}
+                {/* 액션 버튼 */}
                 <div className="flex gap-2 pt-2 border-t border-gray-100">
                   {isAdmin && schedule.status !== "unassigned" && onUnassign && (
                     <button onClick={() => { onUnassign(schedule.id); onClose(); }} className="flex-1 px-3 py-2.5 bg-orange-50 text-orange-600 rounded-xl text-sm font-medium active:bg-orange-100">반환</button>
