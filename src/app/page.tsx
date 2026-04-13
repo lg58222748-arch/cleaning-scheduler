@@ -213,6 +213,7 @@ export default function Home() {
         startTime: format(startDt, "HH:mm"),
         endTime: format(endDt, "HH:mm"),
         note: event.description || "",
+        googleEventId: event.id,
       });
     });
     setShowGoogleSync(false);
