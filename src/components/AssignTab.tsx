@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { useState, useMemo, useRef } from "react";
 import { Schedule, Member } from "@/types";
-import { fetchUnassignedSchedules, assignScheduleApi } from "@/lib/api";
+import { assignScheduleApi } from "@/lib/api";
 import {
   format,
   startOfMonth,
@@ -18,12 +18,14 @@ import { ko } from "date-fns/locale";
 
 interface AssignTabProps {
   members: Member[];
+  schedules: Schedule[]; // 전체 일정 (page.tsx에서 이미 로드됨)
   onAssigned: () => void;
 }
 
-export default function AssignTab({ members, onAssigned }: AssignTabProps) {
-  const [unassigned, setUnassigned] = useState<Schedule[]>([]);
-  const [loading, setLoading] = useState(true);
+export default function AssignTab({ members, schedules, onAssigned }: AssignTabProps) {
+  // 미배정만 필터 (API 호출 없이 즉시)
+  const unassigned = useMemo(() => schedules.filter((s) => s.status === "unassigned"), [schedules]);
+
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [showDayPopup, setShowDayPopup] = useState(false);
@@ -33,17 +35,6 @@ export default function AssignTab({ members, onAssigned }: AssignTabProps) {
   const [animating, setAnimating] = useState(false);
   const touchStartX = useRef(0);
   const touchStartY = useRef(0);
-
-  const loadUnassigned = useCallback(async () => {
-    // 첫 로드만 로딩 표시, 이후는 백그라운드
-    const isFirst = unassigned.length === 0;
-    if (isFirst) setLoading(true);
-    const data = await fetchUnassignedSchedules();
-    setUnassigned(data);
-    setLoading(false);
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  useEffect(() => { loadUnassigned(); }, [loadUnassigned]);
 
   async function handleAssign(schedule: Schedule) {
     if (!selectedMemberId) return;
@@ -119,7 +110,7 @@ export default function AssignTab({ members, onAssigned }: AssignTabProps) {
 
   const dayNames = ["일", "월", "화", "수", "목", "금", "토"];
 
-  if (loading) return <div className="py-12 text-center text-gray-400 text-sm">로딩 중...</div>;
+  // 로딩 없음 - schedules는 이미 page.tsx에서 로드됨
 
   return (
     <div className="h-full flex flex-col" onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>

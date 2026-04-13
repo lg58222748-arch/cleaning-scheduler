@@ -20,6 +20,7 @@ import {
   updateMember as apiUpdateMember,
   deleteMember as apiDeleteMember,
   fetchSchedules,
+  fetchUnassignedSchedules,
   createSchedule,
   updateSchedule as apiUpdateSchedule,
   softDeleteSchedule,
@@ -70,21 +71,29 @@ export default function Home() {
     const end = format(endOfMonth(addMonths(d, 1)), "yyyy-MM-dd");
 
     if (fullRefresh) {
-      const [m, s, sw, notif] = await Promise.all([
+      const [m, rangeScheds, unassignedScheds, sw, notif] = await Promise.all([
         fetchMembers(),
         fetchSchedules(start, end),
+        fetchUnassignedSchedules(),
         fetchSwapRequests(),
         fetchNotifications(),
       ]);
+      // 범위 일정 + 미배정 합치기 (중복 제거)
+      const ids = new Set(rangeScheds.map((s: Schedule) => s.id));
+      const merged = [...rangeScheds, ...unassignedScheds.filter((s: Schedule) => !ids.has(s.id))];
       setMembers(m);
-      setSchedules(s);
+      setSchedules(merged);
       setSwapRequests(sw);
       setNotifications(notif.notifications);
       setUnreadCount(notif.unreadCount);
     } else {
-      // 월 이동 시에는 일정만 빠르게 가져옴
-      const s = await fetchSchedules(start, end);
-      setSchedules(s);
+      // 월 이동 시에는 범위 일정 + 기존 미배정 유지
+      const rangeScheds = await fetchSchedules(start, end);
+      setSchedules((prev) => {
+        const unassignedFromPrev = prev.filter((s) => s.status === "unassigned");
+        const ids = new Set(rangeScheds.map((s: Schedule) => s.id));
+        return [...rangeScheds, ...unassignedFromPrev.filter((s) => !ids.has(s.id))];
+      });
     }
   }, [selectedDate]);
 
@@ -360,7 +369,7 @@ export default function Home() {
 
         {/* Assign tab */}
         {activeTab === "assign" && (
-          <div className="h-full"><AssignTab members={members} onAssigned={() => loadData(undefined, true)} /></div>
+          <div className="h-full"><AssignTab members={members} schedules={schedules} onAssigned={() => loadData(undefined, true)} /></div>
         )}
 
         {/* Members tab */}
