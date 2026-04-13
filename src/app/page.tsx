@@ -378,12 +378,14 @@ export default function Home() {
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
               <div className="flex items-center justify-between mb-3">
                 <h3 className="text-sm font-bold text-gray-800">팀원 목록</h3>
-                <button
-                  onClick={() => setShowMemberManager(true)}
-                  className="px-3 py-1.5 bg-blue-500 text-white rounded-lg text-xs font-medium"
-                >
-                  관리
-                </button>
+                {isAdmin && (
+                  <button
+                    onClick={() => setShowMemberManager(true)}
+                    className="px-3 py-1.5 bg-blue-500 text-white rounded-lg text-xs font-medium"
+                  >
+                    관리
+                  </button>
+                )}
               </div>
               <div className="space-y-2.5">
                 {members.map((m) => (
@@ -416,8 +418,8 @@ export default function Home() {
               </div>
             </div>
 
-            {/* Google Calendar section */}
-            <GoogleCalendarSync onImport={handleGoogleImport} />
+            {/* Google Calendar section - 관리자만 */}
+            {isAdmin && <GoogleCalendarSync onImport={handleGoogleImport} />}
           </div>
         )}
       </main>
