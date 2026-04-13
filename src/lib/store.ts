@@ -110,10 +110,10 @@ export async function addUnassignedSchedule(input: Omit<Schedule, "id" | "status
 
 // 전체 일정 삭제 (관리자용)
 export async function deleteAllSchedules(): Promise<number> {
-  // soft delete: deleted 컬럼이 있으면 사용, 없으면 실제 삭제
   const { data } = await supabase.from("schedules").select("id");
   const count = data?.length || 0;
-  await supabase.from("schedules").delete().neq("id", "");
+  // Supabase는 조건 없는 delete 불가 → gte로 모든 행 매칭
+  await supabase.from("schedules").delete().gte("id", "00000000-0000-0000-0000-000000000000");
   return count;
 }
 
@@ -139,7 +139,10 @@ export async function restoreSchedule(id: string): Promise<Schedule | null> {
 export async function emptyTrash(): Promise<number> {
   const { data } = await supabase.from("schedules").select("id").eq("status", "deleted");
   const count = data?.length || 0;
-  await supabase.from("schedules").delete().eq("status", "deleted");
+  if (count > 0) {
+    const ids = data!.map((r: { id: string }) => r.id);
+    await supabase.from("schedules").delete().in("id", ids);
+  }
   return count;
 }
 
