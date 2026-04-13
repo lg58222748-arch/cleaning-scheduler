@@ -12,7 +12,7 @@ function rowToMember(r: Record<string, unknown>): Member {
   return { id: String(r.id), name: String(r.name), color: String(r.color), phone: String(r.phone || ""), availableDays: (r.available_days as number[]) || [1,2,3,4,5], active: Boolean(r.active) };
 }
 function rowToSchedule(r: Record<string, unknown>): Schedule {
-  return { id: String(r.id), memberId: String(r.member_id || ""), memberName: String(r.member_name || "미배정"), title: String(r.title), location: String(r.location || ""), date: String(r.date), startTime: String(r.start_time), endTime: String(r.end_time), status: String(r.status) as Schedule["status"], assignedTo: r.assigned_to ? String(r.assigned_to) : undefined, assignedToName: r.assigned_to_name ? String(r.assigned_to_name) : undefined, googleEventId: r.google_event_id ? String(r.google_event_id) : undefined, note: String(r.note || "") };
+  return { id: String(r.id), memberId: String(r.member_id || ""), memberName: String(r.member_name || "미배정"), title: String(r.title), location: String(r.location || ""), date: String(r.date), startTime: String(r.start_time), endTime: String(r.end_time), status: String(r.status) as Schedule["status"], assignedTo: r.assigned_to ? String(r.assigned_to) : undefined, assignedToName: r.assigned_to_name ? String(r.assigned_to_name) : undefined, googleEventId: r.google_event_id ? String(r.google_event_id) : undefined, note: String(r.note || ""), color: r.color ? String(r.color) : undefined };
 }
 function rowToSwapRequest(r: Record<string, unknown>): SwapRequest {
   return { id: String(r.id), fromScheduleId: String(r.from_schedule_id), toScheduleId: String(r.to_schedule_id), fromMemberId: String(r.from_member_id), toMemberId: String(r.to_member_id), status: String(r.status) as SwapRequest["status"], createdAt: String(r.created_at) };
@@ -82,7 +82,7 @@ export async function getUnassignedSchedules(): Promise<Schedule[]> {
 
 export async function addSchedule(input: Omit<Schedule, "id" | "status">): Promise<Schedule> {
   const { data } = await supabase.from("schedules").insert({
-    member_id: input.memberId, member_name: input.memberName, title: input.title, location: input.location || "", date: input.date, start_time: input.startTime, end_time: input.endTime, status: "confirmed", assigned_to: input.assignedTo, assigned_to_name: input.assignedToName, google_event_id: input.googleEventId, note: input.note || "",
+    member_id: input.memberId, member_name: input.memberName, title: input.title, location: input.location || "", date: input.date, start_time: input.startTime, end_time: input.endTime, status: "confirmed", assigned_to: input.assignedTo, assigned_to_name: input.assignedToName, google_event_id: input.googleEventId, note: input.note || "", color: input.color || "#FDDCCC",
   }).select().single();
   return rowToSchedule(data!);
 }
@@ -121,6 +121,7 @@ export async function updateSchedule(id: string, input: Partial<Schedule>): Prom
   if (input.assignedTo !== undefined) update.assigned_to = input.assignedTo;
   if (input.assignedToName !== undefined) update.assigned_to_name = input.assignedToName;
   if (input.note !== undefined) update.note = input.note;
+  if (input.color !== undefined) update.color = input.color;
   const { data } = await supabase.from("schedules").update(update).eq("id", id).select().single();
   return data ? rowToSchedule(data) : null;
 }

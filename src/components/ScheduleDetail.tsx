@@ -32,10 +32,21 @@ export default function ScheduleDetail({
   const [newComment, setNewComment] = useState("");
   const [authorName, setAuthorName] = useState("팀장");
   const [loading, setLoading] = useState(false);
+  // 검수/정산 탭 사전 로드 여부
+  const [preloadChecklist, setPreloadChecklist] = useState(false);
+  const [preloadSettlement, setPreloadSettlement] = useState(false);
 
   const memberColor = members.find((m) => m.id === schedule.memberId)?.color || "#6B7280";
 
-  useEffect(() => { loadComments(); }, [schedule.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    loadComments();
+    // 검수/정산 데이터 미리 로드 (약간 딜레이 후)
+    const t = setTimeout(() => {
+      setPreloadChecklist(true);
+      setPreloadSettlement(true);
+    }, 100);
+    return () => clearTimeout(t);
+  }, [schedule.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function loadComments() {
     const data = await fetchComments(schedule.id);
@@ -67,17 +78,26 @@ export default function ScheduleDetail({
   const statusLabel = schedule.status === "confirmed" ? "확정" : schedule.status === "pending" ? "대기" : "교환요청";
   const statusClass = schedule.status === "confirmed" ? "bg-green-100 text-green-700" : schedule.status === "pending" ? "bg-yellow-100 text-yellow-700" : "bg-orange-100 text-orange-700";
 
+  // 날짜를 삼성 캘린더 스타일로 포맷
+  const dayNames = ["일", "월", "화", "수", "목", "금", "토"];
+  const schedDate = new Date(schedule.date + "T00:00:00");
+  const dayName = dayNames[schedDate.getDay()];
+  const month = schedDate.getMonth() + 1;
+  const day = schedDate.getDate();
+  const dateDisplay = `${month}월 ${day}일 (${dayName})`;
+
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md max-h-[85vh] flex flex-col animate-[modalIn_0.2s_ease-out]">
-        {/* Header */}
+    <div className="fixed inset-0 bg-white z-50 flex flex-col animate-[modalIn_0.15s_ease-out]">
+      <div className="flex-1 flex flex-col overflow-hidden">
+        {/* Header - 삼성 캘린더 스타일 */}
         <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
-          <h3 className="text-base font-bold text-gray-800">{schedule.title}</h3>
-          <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded-lg">
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          <button onClick={onClose} className="p-1.5 active:bg-gray-100 rounded-lg">
+            <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
           </button>
+          <h3 className="text-base font-bold text-gray-800 flex-1 text-center">{schedule.title.replace(/^\[.+?\]\s*/, "").split("/")[0] || schedule.title}</h3>
+          <div className="w-8" />
         </div>
 
         {/* Tabs */}
@@ -105,45 +125,58 @@ export default function ScheduleDetail({
         <div className="flex-1 overflow-y-auto">
           {activeTab === "info" && (
             <>
-              {/* Schedule info */}
-              <div className="px-4 py-4 space-y-3">
-                <div className="flex items-start gap-3">
-                  <div className="w-1.5 min-h-[40px] rounded-full" style={{ backgroundColor: memberColor }} />
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2">
-                      <span className={`text-[10px] px-2 py-0.5 rounded-full ${statusClass}`}>{statusLabel}</span>
-                    </div>
-                    <div className="mt-2 space-y-1.5 text-sm text-gray-600">
-                      <div className="flex items-center gap-2">
-                        <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
-                        {schedule.date}
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
-                        {schedule.memberName}
-                      </div>
-                      {schedule.location && (
-                        <div className="flex items-center gap-2">
-                          <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /></svg>
-                          {schedule.location}
-                        </div>
-                      )}
-                      {schedule.note && (
-                        <div className="mt-3 p-3 bg-gray-50 border border-gray-200 rounded-lg">
-                          <div className="text-[11px] font-medium text-gray-400 mb-1.5">캘린더 본문</div>
-                          <div className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">{schedule.note}</div>
-                        </div>
-                      )}
-                    </div>
+              {/* 삼성 캘린더 스타일 상세 정보 */}
+              <div className="px-4 py-4 space-y-4">
+                {/* 날짜 - 삼성 캘린더 스타일 */}
+                <div className="flex items-center gap-3 text-sm text-gray-700">
+                  <svg className="w-5 h-5 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium">{dateDisplay}</span>
+                    <svg className="w-4 h-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                    </svg>
+                    <span className="font-medium">{dateDisplay}</span>
                   </div>
                 </div>
 
-                <div className="flex gap-2 pt-1">
+                {/* 담당자 */}
+                <div className="flex items-center gap-3 text-sm text-gray-700">
+                  <svg className="w-5 h-5 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                  </svg>
+                  <span>담당: <span className="font-medium">{schedule.memberName}</span></span>
+                  <span className={`text-[10px] px-2 py-0.5 rounded-full ml-auto ${statusClass}`}>{statusLabel}</span>
+                </div>
+
+                {/* 위치 */}
+                {schedule.location && (
+                  <div className="flex items-center gap-3 text-sm text-gray-700">
+                    <svg className="w-5 h-5 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                    <span>{schedule.location}</span>
+                  </div>
+                )}
+
+                {/* 캘린더 본문 (노트) - 삼성 캘린더의 메모 영역 */}
+                <div className="flex items-start gap-3">
+                  <svg className="w-5 h-5 text-gray-400 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  <div className="flex-1 text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">
+                    {schedule.note || schedule.title}
+                  </div>
+                </div>
+
+                {/* 액션 버튼 */}
+                <div className="flex gap-2 pt-2 border-t border-gray-100">
                   {isAdmin && schedule.status !== "unassigned" && onUnassign && (
-                    <button onClick={() => { onUnassign(schedule.id); onClose(); }} className="flex-1 px-3 py-2 bg-orange-50 text-orange-600 rounded-lg text-sm font-medium active:bg-orange-100">반환</button>
+                    <button onClick={() => { onUnassign(schedule.id); onClose(); }} className="flex-1 px-3 py-2.5 bg-orange-50 text-orange-600 rounded-xl text-sm font-medium active:bg-orange-100">반환</button>
                   )}
-                  <button onClick={() => onEdit(schedule)} className="flex-1 px-3 py-2 bg-blue-50 text-blue-600 rounded-lg text-sm font-medium active:bg-blue-100">수정</button>
-                  <button onClick={() => { onDelete(schedule.id); onClose(); }} className="flex-1 px-3 py-2 bg-red-50 text-red-600 rounded-lg text-sm font-medium active:bg-red-100">삭제</button>
+                  <button onClick={() => onEdit(schedule)} className="flex-1 px-3 py-2.5 bg-blue-50 text-blue-600 rounded-xl text-sm font-medium active:bg-blue-100">수정</button>
+                  <button onClick={() => { onDelete(schedule.id); onClose(); }} className="flex-1 px-3 py-2.5 bg-red-50 text-red-600 rounded-xl text-sm font-medium active:bg-red-100">삭제</button>
                 </div>
               </div>
 
@@ -192,13 +225,13 @@ export default function ScheduleDetail({
             </>
           )}
 
-          {activeTab === "checklist" && (
-            <ScheduleChecklist scheduleId={schedule.id} />
-          )}
-
-          {activeTab === "settlement" && (
-            <ScheduleSettlement scheduleId={schedule.id} />
-          )}
+          {/* 검수/정산 탭 - 사전 로드로 빠른 전환 */}
+          <div style={{ display: activeTab === "checklist" ? "block" : "none" }}>
+            {preloadChecklist && <ScheduleChecklist scheduleId={schedule.id} />}
+          </div>
+          <div style={{ display: activeTab === "settlement" ? "block" : "none" }}>
+            {preloadSettlement && <ScheduleSettlement scheduleId={schedule.id} />}
+          </div>
         </div>
       </div>
     </div>

@@ -21,6 +21,7 @@ export interface Schedule {
   assignedToName?: string; // 배정된 팀장 이름
   googleEventId?: string;
   note?: string;
+  color?: string; // 일정 색상 (#FDDCCC, #DBEAFE, #D1FAE5, #E9D5FF, #FEF3C7)
 }
 
 export interface SwapRequest {

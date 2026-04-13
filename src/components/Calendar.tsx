@@ -33,11 +33,29 @@ export default function Calendar({
   onMonthChange,
 }: CalendarProps) {
   const [currentMonth, setCurrentMonth] = useState(selectedDate);
+  const [slideDirection, setSlideDirection] = useState<"" | "left" | "right">("");
+  const [animating, setAnimating] = useState(false);
 
   // 스와이프 감지
   const touchStartX = useRef<number>(0);
   const touchStartY = useRef<number>(0);
   const swiping = useRef(false);
+
+  const animateMonth = useCallback((direction: "left" | "right", newMonth: Date) => {
+    setSlideDirection(direction);
+    setAnimating(true);
+    setTimeout(() => {
+      setCurrentMonth(newMonth);
+      onMonthChange(newMonth);
+      setSlideDirection(direction === "left" ? "right" : "left");
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          setSlideDirection("");
+          setTimeout(() => setAnimating(false), 200);
+        });
+      });
+    }, 200);
+  }, [onMonthChange]);
 
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
     touchStartX.current = e.touches[0].clientX;
@@ -46,24 +64,18 @@ export default function Calendar({
   }, []);
 
   const handleTouchEnd = useCallback((e: React.TouchEvent) => {
+    if (animating) return;
     const dx = e.changedTouches[0].clientX - touchStartX.current;
     const dy = e.changedTouches[0].clientY - touchStartY.current;
-    // 수평 이동이 수직보다 크고 50px 이상일 때만 스와이프
     if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 50) {
       swiping.current = true;
       if (dx < 0) {
-        // 왼쪽 스와이프 → 다음달
-        const next = addMonths(currentMonth, 1);
-        setCurrentMonth(next);
-        onMonthChange(next);
+        animateMonth("left", addMonths(currentMonth, 1));
       } else {
-        // 오른쪽 스와이프 → 이전달
-        const prev = subMonths(currentMonth, 1);
-        setCurrentMonth(prev);
-        onMonthChange(prev);
+        animateMonth("right", subMonths(currentMonth, 1));
       }
     }
-  }, [currentMonth, onMonthChange]);
+  }, [currentMonth, animating, animateMonth]);
 
   // 주별 날짜 배열 메모이제이션
   const weeks = useMemo(() => {
@@ -107,29 +119,31 @@ export default function Calendar({
   }, [members]);
 
   const handlePrev = useCallback(() => {
-    const prev = subMonths(currentMonth, 1);
-    setCurrentMonth(prev);
-    onMonthChange(prev);
-  }, [currentMonth, onMonthChange]);
+    if (animating) return;
+    animateMonth("right", subMonths(currentMonth, 1));
+  }, [currentMonth, animating, animateMonth]);
 
   const handleNext = useCallback(() => {
-    const next = addMonths(currentMonth, 1);
-    setCurrentMonth(next);
-    onMonthChange(next);
-  }, [currentMonth, onMonthChange]);
+    if (animating) return;
+    animateMonth("left", addMonths(currentMonth, 1));
+  }, [currentMonth, animating, animateMonth]);
 
   const dayNames = ["일", "월", "화", "수", "목", "금", "토"];
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 transform-gpu" onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
       {/* Header */}
-      <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+      <div className="flex items-center justify-between px-6 py-3 border-b border-gray-100">
         <button onClick={handlePrev} className="p-2 active:bg-gray-100 rounded-lg">
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
           </svg>
         </button>
-        <h2 className="text-lg font-bold text-gray-800">
+        <h2 className={`text-lg font-bold text-gray-800 transition-all duration-200 ease-in-out ${
+          slideDirection === "left" ? "-translate-x-4 opacity-0" :
+          slideDirection === "right" ? "translate-x-4 opacity-0" :
+          "translate-x-0 opacity-100"
+        }`}>
           {format(currentMonth, "yyyy년 M월", { locale: ko })}
         </h2>
         <button onClick={handleNext} className="p-2 active:bg-gray-100 rounded-lg">
@@ -154,7 +168,11 @@ export default function Calendar({
       </div>
 
       {/* Calendar grid */}
-      <div className="divide-y divide-gray-50">
+      <div className={`divide-y divide-gray-50 transition-all duration-200 ease-in-out overflow-hidden ${
+        slideDirection === "left" ? "-translate-x-8 opacity-0" :
+        slideDirection === "right" ? "translate-x-8 opacity-0" :
+        "translate-x-0 opacity-100"
+      }`}>
         {weeks.map((week, wi) => (
           <div key={wi} className="grid grid-cols-7 divide-x divide-gray-50">
             {week.map((d) => {
@@ -168,7 +186,7 @@ export default function Calendar({
                 <button
                   key={dateStr}
                   onClick={() => onSelectDate(d)}
-                  className={`min-h-[56px] p-1 text-left relative ${
+                  className={`min-h-[90px] p-1 text-left relative ${
                     isSelected
                       ? "bg-blue-50 ring-2 ring-blue-400 ring-inset"
                       : "active:bg-gray-50"
@@ -187,21 +205,29 @@ export default function Calendar({
                   >
                     {format(d, "d")}
                   </span>
-                  {/* 일정 있으면 점으로 표시 (삼성 캘린더 스타일) */}
-                  {daySchedules.length > 0 && (
-                    <div className="flex gap-0.5 justify-center mt-0.5">
-                      {daySchedules.slice(0, 3).map((s) => (
+                  {/* 삼성 캘린더 스타일: 이벤트 바 (2줄×5글자=10글자) */}
+                  <div className="mt-0.5 space-y-0.5 overflow-hidden">
+                    {daySchedules.slice(0, 2).map((s) => {
+                      const name = s.title.replace(/^\[.+?\]\s*/, "").split("/")[0].replace(/^U/, "") || s.title.slice(0, 10);
+                      const display = name.slice(0, 10);
+                      const line1 = display.slice(0, 5);
+                      const line2 = display.slice(5, 10);
+                      const schedColor = s.color || "#FDDCCC";
+                      return (
                         <div
                           key={s.id}
-                          className="w-1 h-1 rounded-full"
-                          style={{ backgroundColor: colorMap.get(s.memberId) || "#6B7280" }}
-                        />
-                      ))}
-                      {daySchedules.length > 3 && (
-                        <div className="w-1 h-1 rounded-full bg-gray-300" />
-                      )}
-                    </div>
-                  )}
+                          className="text-[9px] leading-[1.2] px-1 py-px rounded font-medium"
+                          style={{ backgroundColor: schedColor, color: "#555" }}
+                        >
+                          <div>{line1}</div>
+                          {line2 && <div>{line2}</div>}
+                        </div>
+                      );
+                    })}
+                    {daySchedules.length > 2 && (
+                      <div className="text-[8px] text-gray-400 px-0.5">+{daySchedules.length - 2}</div>
+                    )}
+                  </div>
                 </button>
               );
             })}

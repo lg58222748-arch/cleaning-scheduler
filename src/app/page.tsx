@@ -55,6 +55,7 @@ export default function Home() {
   const [showNotifications, setShowNotifications] = useState(false);
   const [detailSchedule, setDetailSchedule] = useState<Schedule | null>(null);
   const [showAdminPanel, setShowAdminPanel] = useState(false);
+  const [showDayPopup, setShowDayPopup] = useState(false);
 
   const loadData = useCallback(async (monthDate?: Date) => {
     const d = monthDate || selectedDate;
@@ -304,61 +305,17 @@ export default function Home() {
       )}
 
       {/* Main content area */}
-      <main className="px-4 pt-3 pb-4">
+      <main className="px-3 pt-2 pb-2">
         {/* Calendar tab - 삼성 캘린더 스타일 */}
         {activeTab === "calendar" && (
-          <div className="space-y-0">
-            {/* Calendar 상단 */}
+          <div>
             <Calendar
               schedules={schedules}
               members={members}
               selectedDate={selectedDate}
-              onSelectDate={setSelectedDate}
+              onSelectDate={(d) => { setSelectedDate(d); setShowDayPopup(true); }}
               onMonthChange={(d) => loadData(d)}
             />
-
-            {/* 선택된 날짜 일정 패널 - 삼성 캘린더 스타일 */}
-            <div className="bg-white rounded-b-2xl shadow-sm border border-t-0 border-gray-200 -mt-1">
-              <div className="px-4 py-3 flex items-center justify-between border-b border-gray-100">
-                <div className="flex items-center gap-2">
-                  <span className="text-2xl font-bold text-gray-900">{format(selectedDate, "d")}</span>
-                  <span className="text-sm text-gray-500">{format(selectedDate, "EEEE", { locale: ko })}</span>
-                </div>
-                <div className="flex gap-1.5">
-                  <button
-                    onClick={() => { setEditingSchedule(null); setShowScheduleForm(true); }}
-                    className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center active:bg-blue-100"
-                  >
-                    <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                    </svg>
-                  </button>
-                </div>
-              </div>
-
-              {daySchedules.length === 0 ? (
-                <div className="px-4 py-8 text-center text-gray-400 text-sm">
-                  일정이 없습니다
-                </div>
-              ) : (
-                <div className="max-h-[300px] overflow-y-auto">
-                  {daySchedules.map((s) => {
-                    const color = members.find((m) => m.id === s.memberId)?.color || "#6B7280";
-                    return (
-                      <div
-                        key={s.id}
-                        className="mx-3 my-1.5 px-3 py-2.5 rounded-xl cursor-pointer active:opacity-80"
-                        style={{ backgroundColor: color + "18", borderLeft: `3px solid ${color}` }}
-                        onClick={() => swapMode ? handleSwapSelect(s) : setDetailSchedule(s)}
-                      >
-                        <div className="text-sm font-medium text-gray-800 truncate">{s.title}</div>
-                        <div className="text-xs text-gray-500 mt-0.5">{s.memberName} · 하루 종일</div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
           </div>
         )}
 
@@ -567,6 +524,61 @@ export default function Home() {
           onMarkAllRead={handleMarkAllRead}
           onClose={() => setShowNotifications(false)}
         />
+      )}
+      {/* 날짜 클릭 팝업 - 삼성 캘린더 스타일 */}
+      {showDayPopup && (
+        <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50 px-8" onClick={(e) => { if (e.target === e.currentTarget) setShowDayPopup(false); }}>
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-[340px] animate-[modalIn_0.15s_ease-out]">
+            {/* 날짜 헤더 */}
+            <div className="px-5 pt-5 pb-2 flex items-center justify-between">
+              <div className="flex items-baseline gap-2">
+                <span className="text-3xl font-bold text-gray-900">{format(selectedDate, "d")}</span>
+                <span className="text-sm text-gray-500">{format(selectedDate, "EEEE", { locale: ko })}</span>
+              </div>
+              <button
+                onClick={() => { setShowDayPopup(false); setEditingSchedule(null); setShowScheduleForm(true); }}
+                className="w-9 h-9 bg-gray-100 rounded-full flex items-center justify-center active:bg-blue-100"
+              >
+                <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                </svg>
+              </button>
+            </div>
+
+            {/* 일정 목록 - 4개까지 편하게 보이는 사이즈 */}
+            {daySchedules.length === 0 ? (
+              <div className="px-5 pb-6 pt-3 text-center text-gray-400 text-sm">
+                일정이 없습니다
+              </div>
+            ) : (
+              <div className="px-4 pb-5 pt-1 space-y-2 max-h-[380px] overflow-y-auto">
+                {daySchedules.map((s) => {
+                  const titleDisplay = s.title.replace(/^\[.+?\]\s*/, "").split("/")[0].replace(/^U/, "") || s.title;
+                  const schedColor = s.color || "#FDDCCC";
+                  return (
+                    <div
+                      key={s.id}
+                      className="rounded-2xl cursor-pointer active:scale-[0.97] transition-transform"
+                      style={{ backgroundColor: schedColor }}
+                      onClick={() => { setShowDayPopup(false); swapMode ? handleSwapSelect(s) : setDetailSchedule(s); }}
+                    >
+                      <div className="px-4 py-3 flex items-center gap-3">
+                        <span className="text-lg">📅</span>
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm font-bold text-gray-900 truncate">{titleDisplay}</div>
+                          <div className="text-xs text-gray-600 mt-0.5">하루 종일</div>
+                        </div>
+                        <svg className="w-4 h-4 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                        </svg>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
       )}
       {detailSchedule && (
         <ScheduleDetail

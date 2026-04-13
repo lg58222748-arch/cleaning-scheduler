@@ -21,11 +21,20 @@ export default function ScheduleForm({
   onSave,
   onCancel,
 }: ScheduleFormProps) {
+  const SCHEDULE_COLORS = [
+    { name: "살몬", value: "#FDDCCC" },
+    { name: "하늘", value: "#DBEAFE" },
+    { name: "연두", value: "#D1FAE5" },
+    { name: "보라", value: "#E9D5FF" },
+    { name: "노랑", value: "#FEF3C7" },
+  ];
+
   const [memberId, setMemberId] = useState("");
   const [title, setTitle] = useState("");
   const [timeSlot, setTimeSlot] = useState<TimeSlot>("오전");
   const [date, setDate] = useState(format(selectedDate, "yyyy-MM-dd"));
   const [note, setNote] = useState("");
+  const [color, setColor] = useState(SCHEDULE_COLORS[0].value);
 
   useEffect(() => {
     if (editingSchedule) {
@@ -42,6 +51,7 @@ export default function ScheduleForm({
       setTitle(t);
       setDate(editingSchedule.date);
       setNote(editingSchedule.note || "");
+      setColor(editingSchedule.color || SCHEDULE_COLORS[0].value);
       // 시간대 추정
       if (editingSchedule.startTime === "07:00") setTimeSlot("오전");
       else if (editingSchedule.startTime === "13:00") setTimeSlot("오후");
@@ -73,6 +83,7 @@ export default function ScheduleForm({
       startTime,
       endTime,
       note,
+      color,
     });
   }
 
@@ -164,6 +175,31 @@ export default function ScheduleForm({
               required
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-400 focus:border-transparent outline-none"
             />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">
+              일정 색상
+            </label>
+            <div className="flex gap-2.5">
+              {SCHEDULE_COLORS.map((c) => (
+                <button
+                  key={c.value}
+                  type="button"
+                  onClick={() => setColor(c.value)}
+                  className={`w-10 h-10 rounded-full border-2 transition-all flex items-center justify-center ${
+                    color === c.value ? "border-gray-800 scale-110" : "border-transparent"
+                  }`}
+                  style={{ backgroundColor: c.value }}
+                >
+                  {color === c.value && (
+                    <svg className="w-4 h-4 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                    </svg>
+                  )}
+                </button>
+              ))}
+            </div>
           </div>
 
           <div>
