@@ -139,11 +139,11 @@ export default function AssignTab({ members, onAssigned }: AssignTabProps) {
                   <button
                     key={dateStr}
                     onClick={() => { setSelectedDate(d); if (dayScheds.length > 0) setShowDayPopup(true); }}
-                    className={`min-h-[90px] p-1 text-left relative ${
+                    className={`min-h-[90px] px-0.5 pt-0.5 pb-0 text-left relative flex flex-col ${
                       isSelected ? "bg-orange-50 ring-2 ring-orange-400 ring-inset" : "active:bg-gray-50"
                     } ${!isCurrentMonth ? "opacity-40" : ""}`}
                   >
-                    <span className={`inline-flex items-center justify-center w-6 h-6 text-xs rounded-full ${
+                    <span className={`inline-flex items-center justify-center w-5 h-5 text-[11px] rounded-full ${
                       isToday(d) ? "bg-orange-500 text-white font-bold"
                         : dayOfWeek === 0 ? "text-red-500"
                         : dayOfWeek === 6 ? "text-blue-500"
@@ -151,21 +151,21 @@ export default function AssignTab({ members, onAssigned }: AssignTabProps) {
                     }`}>
                       {format(d, "d")}
                     </span>
-                    <div className="mt-0.5 space-y-0.5 overflow-hidden">
+                    <div className="overflow-hidden flex-1 w-full">
                       {dayScheds.slice(0, 1).map((s) => {
                         const fullName = s.title.replace(/^\[.+?\]\s*/, "");
                         return (
                           <div
                             key={s.id}
-                            className="text-[8px] leading-[1.2] px-0.5 py-0.5 rounded font-medium bg-orange-100 text-orange-700 overflow-hidden break-all"
-                            style={{ maxHeight: "2.4em" }}
+                            className="text-[9px] leading-[1.3] py-0.5 rounded font-medium bg-orange-100 text-orange-700 overflow-hidden break-all"
+                            style={{ maxHeight: "3.2em" }}
                           >
                             {fullName}
                           </div>
                         );
                       })}
                       {dayScheds.length > 1 && (
-                        <div className="text-[8px] text-gray-400 px-0.5 mt-0.5">+{dayScheds.length - 1}</div>
+                        <div className="text-[7px] text-gray-400 mt-0.5">+{dayScheds.length - 1}</div>
                       )}
                     </div>
                   </button>

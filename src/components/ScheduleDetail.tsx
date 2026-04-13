@@ -151,10 +151,10 @@ export default function ScheduleDetail({
             </div>
           ) : (
             <h3
-              className="text-base font-bold text-gray-800 flex-1 text-center cursor-pointer active:text-blue-600"
+              className="text-sm font-bold text-gray-800 flex-1 text-center cursor-pointer active:text-blue-600 break-all leading-tight"
               onClick={() => { setTitleText(schedule.title); setEditingTitle(true); }}
             >
-              {schedule.title.replace(/^\[.+?\]\s*/, "").split("/")[0] || schedule.title}
+              {schedule.title.replace(/^\[.+?\]\s*/, "") || schedule.title}
             </h3>
           )}
           <div className="w-8" />

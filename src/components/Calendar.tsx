@@ -185,14 +185,14 @@ export default function Calendar({
                 <button
                   key={dateStr}
                   onClick={() => onSelectDate(d)}
-                  className={`min-h-[90px] p-1 text-left relative ${
+                  className={`min-h-[90px] px-0.5 pt-0.5 pb-0 text-left relative flex flex-col ${
                     isSelected
                       ? "bg-blue-50 ring-2 ring-blue-400 ring-inset"
                       : "active:bg-gray-50"
                   } ${!isCurrentMonth ? "opacity-40" : ""}`}
                 >
                   <span
-                    className={`inline-flex items-center justify-center w-6 h-6 text-xs rounded-full ${
+                    className={`inline-flex items-center justify-center w-5 h-5 text-[11px] rounded-full ${
                       isToday(d)
                         ? "bg-blue-500 text-white font-bold"
                         : dayOfWeek === 0
@@ -204,23 +204,23 @@ export default function Calendar({
                   >
                     {format(d, "d")}
                   </span>
-                  {/* 이벤트 바 - 셀 꽉 채움, 잘림 없이 */}
-                  <div className="mt-0.5 overflow-hidden flex-1">
+                  {/* 이벤트 바 - 패딩 없이 꽉 채움 */}
+                  <div className="overflow-hidden flex-1 w-full">
                     {daySchedules.slice(0, 1).map((s) => {
                       const fullName = s.title.replace(/^\[.+?\]\s*/, "");
                       const schedColor = s.color || "#FDDCCC";
                       return (
                         <div
                           key={s.id}
-                          className="text-[8px] leading-[1.2] px-0.5 py-0.5 rounded font-medium overflow-hidden break-all"
-                          style={{ backgroundColor: schedColor, color: "#555", maxHeight: "2.4em" }}
+                          className="text-[9px] leading-[1.3] py-0.5 rounded font-medium overflow-hidden break-all"
+                          style={{ backgroundColor: schedColor, color: "#555", maxHeight: "3.2em" }}
                         >
                           {fullName}
                         </div>
                       );
                     })}
                     {daySchedules.length > 1 && (
-                      <div className="text-[7px] text-gray-400 px-0.5 mt-0.5">+{daySchedules.length - 1}</div>
+                      <div className="text-[7px] text-gray-400 mt-0.5">+{daySchedules.length - 1}</div>
                     )}
                   </div>
                 </button>
