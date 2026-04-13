@@ -15,7 +15,9 @@ body {
   background: var(--background);
   color: var(--foreground);
   -webkit-tap-highlight-color: transparent;
-  overscroll-behavior: none;
+  overscroll-behavior-y: contain;
+  overflow-x: hidden;
+  position: relative;
 }
 
 /* Safe area for notch devices */
@@ -61,6 +63,17 @@ button, a, [role="button"] {
 .max-h-\\[calc\\(100vh-200px\\)\\] {
   will-change: scroll-position;
   contain: strict;
+}
+
+/* 모달 팝업 애니메이션 */
+@keyframes modalIn {
+  from { opacity: 0; transform: scale(0.95) translateY(10px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+@keyframes modalOut {
+  from { opacity: 1; transform: scale(1); }
+  to { opacity: 0; transform: scale(0.95); }
 }
 
 /* Remove input zoom on iOS */

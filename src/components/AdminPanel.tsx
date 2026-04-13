@@ -38,7 +38,7 @@ export default function AdminPanel({ onClose }: AdminPanelProps) {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-end sm:items-center justify-center z-50 sm:p-4">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-xl w-full sm:max-w-lg max-h-[85vh] flex flex-col">
         <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
           <h3 className="text-base font-bold text-gray-800">관리사 관리</h3>

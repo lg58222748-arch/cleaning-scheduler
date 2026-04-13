@@ -68,8 +68,8 @@ export default function ScheduleDetail({
   const statusClass = schedule.status === "confirmed" ? "bg-green-100 text-green-700" : schedule.status === "pending" ? "bg-yellow-100 text-yellow-700" : "bg-orange-100 text-orange-700";
 
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-end sm:items-center justify-center z-50 sm:p-4">
-      <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-xl w-full sm:max-w-md max-h-[90vh] flex flex-col">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md max-h-[85vh] flex flex-col animate-[modalIn_0.2s_ease-out]">
         {/* Header */}
         <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
           <h3 className="text-base font-bold text-gray-800">{schedule.title}</h3>

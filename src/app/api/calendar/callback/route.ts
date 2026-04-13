@@ -5,11 +5,12 @@ export async function GET(req: NextRequest) {
   const code = searchParams.get("code");
   const error = searchParams.get("error");
 
+  const baseUrl = process.env.GOOGLE_REDIRECT_URI
+    ? new URL(process.env.GOOGLE_REDIRECT_URI).origin
+    : "http://localhost:3000";
+
   if (error) {
-    return new Response(
-      `<html><body><script>window.opener?.postMessage({type:'google-auth-error',error:'${error}'},'*');window.close();</script></body></html>`,
-      { headers: { "Content-Type": "text/html" } }
-    );
+    return Response.redirect(`${baseUrl}/?google_error=${encodeURIComponent(error)}`);
   }
 
   if (!code) {
@@ -32,22 +33,20 @@ export async function GET(req: NextRequest) {
   const tokenData = await tokenRes.json();
 
   if (!tokenRes.ok) {
-    return new Response(
-      `<html><body><script>window.opener?.postMessage({type:'google-auth-error',error:'토큰 교환 실패'},'*');window.close();</script></body></html>`,
-      { headers: { "Content-Type": "text/html" } }
-    );
+    return Response.redirect(`${baseUrl}/?google_error=token_exchange_failed`);
   }
 
-  // 부모 창에 토큰 전달 후 팝업 닫기
-  return new Response(
-    `<html><body><script>
-      window.opener?.postMessage({
-        type:'google-auth-success',
-        accessToken:'${tokenData.access_token}',
-        refreshToken:'${tokenData.refresh_token || ""}'
-      },'*');
-      window.close();
-    </script></body></html>`,
-    { headers: { "Content-Type": "text/html" } }
-  );
+  // 토큰을 sessionStorage에 저장하는 HTML 페이지로 리디렉트
+  const html = `<!DOCTYPE html>
+<html><head><meta charset="utf-8"></head>
+<body>
+<script>
+  sessionStorage.setItem("google_access_token", "${tokenData.access_token}");
+  ${tokenData.refresh_token ? `sessionStorage.setItem("google_refresh_token", "${tokenData.refresh_token}");` : ""}
+  window.location.href = "/?google_token=${tokenData.access_token}";
+</script>
+<p>연결 중...</p>
+</body></html>`;
+
+  return new Response(html, { headers: { "Content-Type": "text/html; charset=utf-8" } });
 }

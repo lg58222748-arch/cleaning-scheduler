@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { getGoogleAuthUrl, fetchGoogleEvents } from "@/lib/api";
+import { fetchGoogleEvents } from "@/lib/api";
 
 interface GoogleCalendarSyncProps {
   onImport: (events: GoogleEvent[]) => void;
@@ -27,11 +27,11 @@ export default function GoogleCalendarSync({ onImport }: GoogleCalendarSyncProps
     setLoading(true);
     try {
       const now = new Date();
-      const thirtyDaysLater = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+      const sixtyDaysLater = new Date(now.getTime() + 60 * 24 * 60 * 60 * 1000);
       const data = await fetchGoogleEvents(
         token,
         now.toISOString(),
-        thirtyDaysLater.toISOString()
+        sixtyDaysLater.toISOString()
       );
       if (data.items) {
         setEvents(data.items);
@@ -42,34 +42,37 @@ export default function GoogleCalendarSync({ onImport }: GoogleCalendarSyncProps
     setLoading(false);
   }, []);
 
+  // URL에서 토큰 확인 (리디렉트 방식)
   useEffect(() => {
-    function handleMessage(e: MessageEvent) {
-      if (e.data?.type === "google-auth-success") {
-        setAccessToken(e.data.accessToken);
-        setConnected(true);
-        setError(null);
-        handleFetchEvents(e.data.accessToken);
-      } else if (e.data?.type === "google-auth-error") {
-        setError("Google 인증에 실패했습니다: " + e.data.error);
-      }
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get("google_token");
+    if (token) {
+      setAccessToken(token);
+      setConnected(true);
+      setError(null);
+      handleFetchEvents(token);
+      // URL에서 토큰 파라미터 제거
+      const url = new URL(window.location.href);
+      url.searchParams.delete("google_token");
+      window.history.replaceState({}, "", url.pathname);
     }
-    window.addEventListener("message", handleMessage);
-    return () => window.removeEventListener("message", handleMessage);
   }, [handleFetchEvents]);
+
+  // sessionStorage에서 토큰 복원
+  useEffect(() => {
+    const saved = sessionStorage.getItem("google_access_token");
+    if (saved && !accessToken) {
+      setAccessToken(saved);
+      setConnected(true);
+      handleFetchEvents(saved);
+    }
+  }, [accessToken, handleFetchEvents]);
 
   async function handleConnect() {
     setLoading(true);
     setError(null);
-    const data = await getGoogleAuthUrl();
-    if (data.needSetup) {
-      setError("Google Calendar API 설정이 필요합니다. .env.local 파일에 GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET을 설정해주세요.");
-      setLoading(false);
-      return;
-    }
-    if (data.authUrl) {
-      window.open(data.authUrl, "google-auth", "width=500,height=600");
-    }
-    setLoading(false);
+    // 현재 페이지 URL을 리디렉트 방식으로 Google OAuth로 이동
+    window.location.href = "/api/calendar?action=auth-redirect";
   }
 
   return (
@@ -98,7 +101,7 @@ export default function GoogleCalendarSync({ onImport }: GoogleCalendarSyncProps
         <button
           onClick={handleConnect}
           disabled={loading}
-          className="w-full px-4 py-2.5 bg-white border-2 border-gray-200 rounded-lg hover:border-blue-400 hover:bg-blue-50 transition-colors flex items-center justify-center gap-2 font-medium text-gray-700"
+          className="w-full px-4 py-2.5 bg-white border-2 border-gray-200 rounded-lg active:border-blue-400 active:bg-blue-50 flex items-center justify-center gap-2 font-medium text-gray-700"
         >
           {loading ? (
             <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
@@ -127,7 +130,7 @@ export default function GoogleCalendarSync({ onImport }: GoogleCalendarSyncProps
             <button
               onClick={() => accessToken && handleFetchEvents(accessToken)}
               disabled={loading}
-              className="text-sm px-3 py-1 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100"
+              className="text-sm px-3 py-1 bg-blue-50 text-blue-600 rounded-lg active:bg-blue-100"
             >
               {loading ? "가져오는 중..." : "새로고침"}
             </button>
@@ -136,21 +139,13 @@ export default function GoogleCalendarSync({ onImport }: GoogleCalendarSyncProps
           {events.length > 0 && (
             <div className="border border-gray-200 rounded-lg max-h-60 overflow-y-auto">
               {events.map((event) => (
-                <div
-                  key={event.id}
-                  className="px-3 py-2.5 border-b border-gray-100 last:border-0"
-                >
+                <div key={event.id} className="px-3 py-2.5 border-b border-gray-100 last:border-0">
                   <div className="text-sm font-medium text-gray-800">{event.summary}</div>
                   <div className="text-xs text-gray-400 mt-0.5">
                     {event.start.dateTime
                       ? new Date(event.start.dateTime).toLocaleDateString("ko", { month: "long", day: "numeric", weekday: "short" })
                       : event.start.date}
                   </div>
-                  {event.description && (
-                    <div className="text-xs text-gray-500 mt-1 line-clamp-2 whitespace-pre-wrap leading-relaxed">
-                      {event.description}
-                    </div>
-                  )}
                 </div>
               ))}
             </div>
@@ -159,7 +154,7 @@ export default function GoogleCalendarSync({ onImport }: GoogleCalendarSyncProps
           {events.length > 0 && (
             <button
               onClick={() => onImport(events)}
-              className="w-full px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 text-sm font-medium"
+              className="w-full px-4 py-2 bg-blue-500 text-white rounded-lg active:bg-blue-600 text-sm font-medium"
             >
               {events.length}개 일정 가져오기
             </button>

@@ -1,20 +1,14 @@
 import { NextRequest } from "next/server";
 
-// Google Calendar API 연동
-// 실제 사용 시 .env.local에 아래 값들을 설정해야 합니다:
-// GOOGLE_CLIENT_ID=your_client_id
-// GOOGLE_CLIENT_SECRET=your_client_secret
-// GOOGLE_REDIRECT_URI=http://localhost:3000/api/calendar/callback
-
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const action = searchParams.get("action");
 
-  if (action === "auth-url") {
+  if (action === "auth-redirect") {
     const clientId = process.env.GOOGLE_CLIENT_ID;
     if (!clientId) {
       return Response.json({
-        error: "Google Calendar API가 설정되지 않았습니다. .env.local 파일을 확인해주세요.",
+        error: "Google Calendar API가 설정되지 않았습니다.",
         needSetup: true,
       }, { status: 400 });
     }
@@ -23,6 +17,18 @@ export async function GET(req: NextRequest) {
     const scope = encodeURIComponent("https://www.googleapis.com/auth/calendar.readonly");
     const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${scope}&access_type=offline&prompt=consent`;
 
+    // 팝업 대신 리디렉트로 이동 (disallowed_useragent 해결)
+    return Response.redirect(authUrl);
+  }
+
+  if (action === "auth-url") {
+    const clientId = process.env.GOOGLE_CLIENT_ID;
+    if (!clientId) {
+      return Response.json({ error: "Google Calendar API가 설정되지 않았습니다.", needSetup: true }, { status: 400 });
+    }
+    const redirectUri = process.env.GOOGLE_REDIRECT_URI || "http://localhost:3000/api/calendar/callback";
+    const scope = encodeURIComponent("https://www.googleapis.com/auth/calendar.readonly");
+    const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${scope}&access_type=offline&prompt=consent`;
     return Response.json({ authUrl });
   }
 
@@ -32,7 +38,6 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const body = await req.json();
 
-  // Google Calendar에서 일정 가져오기 (토큰이 있는 경우)
   if (body.action === "fetch-events") {
     const accessToken = body.accessToken;
     if (!accessToken) {
@@ -40,11 +45,14 @@ export async function POST(req: NextRequest) {
     }
 
     const timeMin = body.timeMin || new Date().toISOString();
-    const timeMax = body.timeMax || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+    const timeMax = body.timeMax || new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString();
+
+    // 여러 캘린더에서 일정 가져오기 (calendarId가 있으면 해당 캘린더, 없으면 primary)
+    const calendarId = body.calendarId || "primary";
 
     try {
       const calendarRes = await fetch(
-        `https://www.googleapis.com/calendar/v3/calendars/primary/events?timeMin=${timeMin}&timeMax=${timeMax}&singleEvents=true&orderBy=startTime`,
+        `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events?timeMin=${timeMin}&timeMax=${timeMax}&singleEvents=true&orderBy=startTime&maxResults=500`,
         { headers: { Authorization: `Bearer ${accessToken}` } }
       );
 
