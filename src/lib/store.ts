@@ -239,7 +239,8 @@ export async function getUser(id: string): Promise<User | undefined> {
 }
 
 export async function getUserByUsername(username: string): Promise<User | undefined> {
-  const { data } = await supabase.from("users").select("*").eq("username", username).single();
+  const lower = username.toLowerCase();
+  const { data } = await supabase.from("users").select("*").ilike("username", lower).single();
   return data ? rowToUser(data) : undefined;
 }
 
@@ -266,12 +267,14 @@ export async function rejectUser(id: string): Promise<boolean> {
 }
 
 export async function loginUser(username: string, password: string): Promise<User | null> {
-  const { data } = await supabase.from("users").select("*").eq("username", username).eq("password", password).eq("status", "approved").single();
+  const lower = username.toLowerCase();
+  const { data } = await supabase.from("users").select("*").ilike("username", lower).eq("password", password).eq("status", "approved").single();
   return data ? rowToUser(data) : null;
 }
 
 export async function findUserForLogin(username: string): Promise<User | undefined> {
-  const { data } = await supabase.from("users").select("*").eq("username", username).single();
+  const lower = username.toLowerCase();
+  const { data } = await supabase.from("users").select("*").ilike("username", lower).single();
   return data ? rowToUser(data) : undefined;
 }
 
