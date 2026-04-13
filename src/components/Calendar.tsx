@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useRef } from "react";
 import { Schedule, Member } from "@/types";
 import {
   format,
@@ -33,6 +33,37 @@ export default function Calendar({
   onMonthChange,
 }: CalendarProps) {
   const [currentMonth, setCurrentMonth] = useState(selectedDate);
+
+  // 스와이프 감지
+  const touchStartX = useRef<number>(0);
+  const touchStartY = useRef<number>(0);
+  const swiping = useRef(false);
+
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    touchStartX.current = e.touches[0].clientX;
+    touchStartY.current = e.touches[0].clientY;
+    swiping.current = false;
+  }, []);
+
+  const handleTouchEnd = useCallback((e: React.TouchEvent) => {
+    const dx = e.changedTouches[0].clientX - touchStartX.current;
+    const dy = e.changedTouches[0].clientY - touchStartY.current;
+    // 수평 이동이 수직보다 크고 50px 이상일 때만 스와이프
+    if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 50) {
+      swiping.current = true;
+      if (dx < 0) {
+        // 왼쪽 스와이프 → 다음달
+        const next = addMonths(currentMonth, 1);
+        setCurrentMonth(next);
+        onMonthChange(next);
+      } else {
+        // 오른쪽 스와이프 → 이전달
+        const prev = subMonths(currentMonth, 1);
+        setCurrentMonth(prev);
+        onMonthChange(prev);
+      }
+    }
+  }, [currentMonth, onMonthChange]);
 
   // 주별 날짜 배열 메모이제이션
   const weeks = useMemo(() => {
@@ -90,7 +121,7 @@ export default function Calendar({
   const dayNames = ["일", "월", "화", "수", "목", "금", "토"];
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-200 transform-gpu">
+    <div className="bg-white rounded-xl shadow-sm border border-gray-200 transform-gpu" onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
       {/* Header */}
       <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
         <button onClick={handlePrev} className="p-2 active:bg-gray-100 rounded-lg">
