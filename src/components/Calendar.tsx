@@ -5,9 +5,7 @@ import { Schedule, Member } from "@/types";
 import {
   format,
   startOfMonth,
-  endOfMonth,
   startOfWeek,
-  endOfWeek,
   addDays,
   addMonths,
   subMonths,
@@ -33,71 +31,130 @@ export default function Calendar({
   onMonthChange,
 }: CalendarProps) {
   const [currentMonth, setCurrentMonth] = useState(selectedDate);
-  const [slideDirection, setSlideDirection] = useState<"" | "left" | "right">("");
-  const [animating, setAnimating] = useState(false);
+  const [dragX, setDragX] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
+  const [isSnapping, setIsSnapping] = useState(false);
 
-  // 스와이프 감지
-  const touchStartX = useRef<number>(0);
-  const touchStartY = useRef<number>(0);
-  const swiping = useRef(false);
+  const touchStartX = useRef(0);
+  const touchStartY = useRef(0);
+  const touchStartTime = useRef(0);
+  const isHorizontal = useRef<boolean | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
-  const animateMonth = useCallback((direction: "left" | "right", newMonth: Date) => {
-    setSlideDirection(direction);
-    setAnimating(true);
+  // 월 변경
+  const changeMonth = useCallback((direction: 1 | -1) => {
+    const newMonth = direction === 1 ? addMonths(currentMonth, 1) : subMonths(currentMonth, 1);
+    setCurrentMonth(newMonth);
+    onMonthChange(newMonth);
+  }, [currentMonth, onMonthChange]);
+
+  // 터치 시작
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    if (isSnapping) return;
+    touchStartX.current = e.touches[0].clientX;
+    touchStartY.current = e.touches[0].clientY;
+    touchStartTime.current = Date.now();
+    isHorizontal.current = null;
+    setIsDragging(true);
+  }, [isSnapping]);
+
+  // 터치 이동 - 손가락 따라감
+  const handleTouchMove = useCallback((e: React.TouchEvent) => {
+    if (!isDragging || isSnapping) return;
+    const dx = e.touches[0].clientX - touchStartX.current;
+    const dy = e.touches[0].clientY - touchStartY.current;
+
+    // 방향 결정 (첫 10px)
+    if (isHorizontal.current === null && (Math.abs(dx) > 8 || Math.abs(dy) > 8)) {
+      isHorizontal.current = Math.abs(dx) > Math.abs(dy);
+    }
+
+    if (isHorizontal.current) {
+      e.preventDefault();
+      // 저항감 적용 (끝으로 갈수록 느려짐)
+      const resistance = 0.4;
+      setDragX(dx * resistance);
+    }
+  }, [isDragging, isSnapping]);
+
+  // 터치 끝 - 스냅
+  const handleTouchEnd = useCallback(() => {
+    if (!isDragging) return;
+    setIsDragging(false);
+
+    const velocity = dragX / Math.max(1, Date.now() - touchStartTime.current) * 1000;
+    const width = containerRef.current?.offsetWidth || 300;
+    const threshold = width * 0.15;
+
+    if (Math.abs(dragX) > threshold || Math.abs(velocity) > 300) {
+      // 월 변경 스냅
+      const direction = dragX > 0 ? -1 : 1;
+      setIsSnapping(true);
+      setDragX(direction === 1 ? -width * 0.5 : width * 0.5);
+
+      setTimeout(() => {
+        changeMonth(direction);
+        setDragX(direction === 1 ? width * 0.3 : -width * 0.3);
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            setDragX(0);
+            setTimeout(() => setIsSnapping(false), 250);
+          });
+        });
+      }, 150);
+    } else {
+      // 원래 위치로 복귀
+      setDragX(0);
+    }
+  }, [isDragging, dragX, changeMonth]);
+
+  // 버튼 클릭 월 이동
+  const handlePrev = useCallback(() => {
+    if (isSnapping) return;
+    const width = containerRef.current?.offsetWidth || 300;
+    setIsSnapping(true);
+    setDragX(width * 0.5);
     setTimeout(() => {
-      setCurrentMonth(newMonth);
-      onMonthChange(newMonth);
-      setSlideDirection(direction === "left" ? "right" : "left");
+      changeMonth(-1);
+      setDragX(-width * 0.3);
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
-          setSlideDirection("");
-          setTimeout(() => setAnimating(false), 120);
+          setDragX(0);
+          setTimeout(() => setIsSnapping(false), 250);
         });
       });
     }, 120);
-  }, [onMonthChange]);
+  }, [isSnapping, changeMonth]);
 
-  const handleTouchStart = useCallback((e: React.TouchEvent) => {
-    touchStartX.current = e.touches[0].clientX;
-    touchStartY.current = e.touches[0].clientY;
-    swiping.current = false;
-  }, []);
+  const handleNext = useCallback(() => {
+    if (isSnapping) return;
+    const width = containerRef.current?.offsetWidth || 300;
+    setIsSnapping(true);
+    setDragX(-width * 0.5);
+    setTimeout(() => {
+      changeMonth(1);
+      setDragX(width * 0.3);
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          setDragX(0);
+          setTimeout(() => setIsSnapping(false), 250);
+        });
+      });
+    }, 120);
+  }, [isSnapping, changeMonth]);
 
-  const handleTouchEnd = useCallback((e: React.TouchEvent) => {
-    if (animating) return;
-    const dx = e.changedTouches[0].clientX - touchStartX.current;
-    const dy = e.changedTouches[0].clientY - touchStartY.current;
-    if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 50) {
-      swiping.current = true;
-      if (dx < 0) {
-        animateMonth("left", addMonths(currentMonth, 1));
-      } else {
-        animateMonth("right", subMonths(currentMonth, 1));
-      }
-    }
-  }, [currentMonth, animating, animateMonth]);
-
-  // 주별 날짜 배열 메모이제이션 - 항상 6주 고정
+  // 6주 고정
   const weeks = useMemo(() => {
     const monthStart = startOfMonth(currentMonth);
     const calStart = startOfWeek(monthStart, { weekStartsOn: 0 });
-
     const days: Date[] = [];
     let day = calStart;
-    // 항상 42일 (6주) 고정
-    for (let i = 0; i < 42; i++) {
-      days.push(day);
-      day = addDays(day, 1);
-    }
-
+    for (let i = 0; i < 42; i++) { days.push(day); day = addDays(day, 1); }
     const result: Date[][] = [];
-    for (let i = 0; i < days.length; i += 7) {
-      result.push(days.slice(i, i + 7));
-    }
+    for (let i = 0; i < days.length; i += 7) result.push(days.slice(i, i + 7));
     return result;
   }, [currentMonth]);
 
-  // 날짜별 일정 맵 메모이제이션
   const scheduleMap = useMemo(() => {
     const map = new Map<string, Schedule[]>();
     for (const s of schedules) {
@@ -108,29 +165,18 @@ export default function Calendar({
     return map;
   }, [schedules]);
 
-  // 멤버 색상 맵 메모이제이션
-  const colorMap = useMemo(() => {
-    const map = new Map<string, string>();
-    for (const m of members) {
-      map.set(m.id, m.color);
-    }
-    return map;
-  }, [members]);
-
-  const handlePrev = useCallback(() => {
-    if (animating) return;
-    animateMonth("right", subMonths(currentMonth, 1));
-  }, [currentMonth, animating, animateMonth]);
-
-  const handleNext = useCallback(() => {
-    if (animating) return;
-    animateMonth("left", addMonths(currentMonth, 1));
-  }, [currentMonth, animating, animateMonth]);
-
   const dayNames = ["일", "월", "화", "수", "목", "금", "토"];
+  const opacity = Math.max(0, 1 - Math.abs(dragX) / 200);
 
   return (
-    <div className="bg-white transform-gpu h-full flex flex-col" onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
+    <div
+      ref={containerRef}
+      className="bg-white h-full flex flex-col select-none"
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+      style={{ touchAction: isDragging && isHorizontal.current ? "none" : "pan-y" }}
+    >
       {/* Header */}
       <div className="flex items-center justify-between px-6 py-3 border-b border-gray-100">
         <button onClick={handlePrev} className="p-2 active:bg-gray-100 rounded-lg">
@@ -138,11 +184,14 @@ export default function Calendar({
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
           </svg>
         </button>
-        <h2 className={`text-lg font-bold text-gray-800 transition-all duration-[120ms] ease-out ${
-          slideDirection === "left" ? "-translate-x-4 opacity-0" :
-          slideDirection === "right" ? "translate-x-4 opacity-0" :
-          "translate-x-0 opacity-100"
-        }`}>
+        <h2
+          className="text-lg font-bold text-gray-800 will-change-transform"
+          style={{
+            transform: `translateX(${dragX * 0.5}px)`,
+            opacity,
+            transition: isDragging ? "none" : "all 0.25s cubic-bezier(0.22, 1, 0.36, 1)",
+          }}
+        >
           {format(currentMonth, "yyyy년 M월", { locale: ko })}
         </h2>
         <button onClick={handleNext} className="p-2 active:bg-gray-100 rounded-lg">
@@ -155,23 +204,21 @@ export default function Calendar({
       {/* Day names */}
       <div className="grid grid-cols-7 border-b border-gray-100">
         {dayNames.map((name, i) => (
-          <div
-            key={name}
-            className={`py-2 text-center text-sm font-medium ${
-              i === 0 ? "text-red-500" : i === 6 ? "text-blue-500" : "text-gray-500"
-            }`}
-          >
+          <div key={name} className={`py-2 text-center text-sm font-medium ${i === 0 ? "text-red-500" : i === 6 ? "text-blue-500" : "text-gray-500"}`}>
             {name}
           </div>
         ))}
       </div>
 
-      {/* Calendar grid */}
-      <div className={`flex-1 divide-y divide-gray-50 transition-all duration-[120ms] ease-out overflow-hidden flex flex-col ${
-        slideDirection === "left" ? "-translate-x-6 opacity-0" :
-        slideDirection === "right" ? "translate-x-6 opacity-0" :
-        "translate-x-0 opacity-100"
-      }`}>
+      {/* Calendar grid - 손가락 따라감 */}
+      <div
+        className="flex-1 divide-y divide-gray-50 overflow-hidden flex flex-col will-change-transform"
+        style={{
+          transform: `translateX(${dragX}px)`,
+          opacity,
+          transition: isDragging ? "none" : "all 0.25s cubic-bezier(0.22, 1, 0.36, 1)",
+        }}
+      >
         {weeks.map((week, wi) => (
           <div key={wi} className="grid grid-cols-7 divide-x divide-gray-50 flex-1">
             {week.map((d) => {
@@ -184,37 +231,26 @@ export default function Calendar({
               return (
                 <button
                   key={dateStr}
-                  onClick={() => onSelectDate(d)}
+                  onClick={() => !isSnapping && onSelectDate(d)}
                   className={`px-0.5 pt-0.5 pb-0 text-left relative flex flex-col ${
-                    isSelected
-                      ? "bg-blue-50 ring-2 ring-blue-400 ring-inset"
-                      : "active:bg-gray-50"
+                    isSelected ? "bg-blue-50 ring-2 ring-blue-400 ring-inset" : "active:bg-gray-50"
                   } ${!isCurrentMonth ? "opacity-40" : ""}`}
                 >
-                  <span
-                    className={`inline-flex items-center justify-center w-5 h-5 text-[11px] rounded-full ${
-                      isToday(d)
-                        ? "bg-blue-500 text-white font-bold"
-                        : dayOfWeek === 0
-                        ? "text-red-500"
-                        : dayOfWeek === 6
-                        ? "text-blue-500"
-                        : "text-gray-700"
-                    }`}
-                  >
+                  <span className={`inline-flex items-center justify-center w-5 h-5 text-[11px] rounded-full ${
+                    isToday(d) ? "bg-blue-500 text-white font-bold"
+                      : dayOfWeek === 0 ? "text-red-500"
+                      : dayOfWeek === 6 ? "text-blue-500"
+                      : "text-gray-700"
+                  }`}>
                     {format(d, "d")}
                   </span>
-                  {/* 이벤트 바 - 2개까지 표시, 초과분 우측하단 숫자 */}
                   <div className="overflow-hidden flex-1 w-full relative">
                     {daySchedules.slice(0, 2).map((s) => {
                       const fullName = s.title.replace(/^\[.+?\]\s*/, "");
                       const schedColor = s.color || "#FDDCCC";
                       return (
-                        <div
-                          key={s.id}
-                          className="text-[8px] leading-[1.2] py-0.5 rounded font-medium overflow-hidden break-all mb-0.5"
-                          style={{ backgroundColor: schedColor, color: "#555", maxHeight: "1.5em" }}
-                        >
+                        <div key={s.id} className="text-[8px] leading-[1.2] py-0.5 rounded font-medium overflow-hidden break-all mb-0.5"
+                          style={{ backgroundColor: schedColor, color: "#555", maxHeight: "1.5em" }}>
                           {fullName}
                         </div>
                       );
