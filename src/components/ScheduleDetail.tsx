@@ -185,19 +185,14 @@ export default function ScheduleDetail({
         <div className="flex-1 overflow-y-auto">
           {activeTab === "info" && (
             <>
-              <div className="px-4 py-4 space-y-4">
-                {/* 날짜 */}
+              <div className="px-4 py-3 space-y-3">
+                {/* 날짜 + 담당자 한줄 */}
                 <div className="flex items-center gap-3 text-sm text-gray-700">
                   <svg className="w-5 h-5 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                   </svg>
-                  <div className="flex items-center gap-2">
-                    <span className="font-medium">{dateDisplay}</span>
-                    <svg className="w-4 h-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
-                    </svg>
-                    <span className="font-medium">{dateDisplay}</span>
-                  </div>
+                  <span className="font-medium">{dateDisplay}</span>
+                  <span className={`text-[10px] px-2 py-0.5 rounded-full ml-auto ${statusClass}`}>{statusLabel}</span>
                 </div>
 
                 {/* 담당자 */}
@@ -206,7 +201,6 @@ export default function ScheduleDetail({
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                   </svg>
                   <span>담당: <span className="font-medium">{schedule.memberName}</span></span>
-                  <span className={`text-[10px] px-2 py-0.5 rounded-full ml-auto ${statusClass}`}>{statusLabel}</span>
                 </div>
 
                 {/* 위치 */}
@@ -219,18 +213,18 @@ export default function ScheduleDetail({
                   </div>
                 )}
 
-                {/* 일정 색상 */}
-                <div className="flex items-center gap-3">
-                  <svg className="w-5 h-5 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                {/* 일정 색상 - 작게 */}
+                <div className="flex items-center gap-2">
+                  <svg className="w-4 h-4 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" />
                   </svg>
-                  <div className="flex gap-2">
+                  <div className="flex gap-1.5">
                     {SCHEDULE_COLORS.map((c) => (
                       <button
                         key={c.value}
                         onClick={() => handleColorChange(c.value)}
-                        className={`w-7 h-7 rounded-full border-2 transition-all ${
-                          schedColor === c.value ? "border-gray-800 scale-110" : "border-transparent"
+                        className={`w-5 h-5 rounded-full border-[1.5px] transition-all ${
+                          schedColor === c.value ? "border-gray-700 scale-125" : "border-gray-300"
                         }`}
                         style={{ backgroundColor: c.value }}
                       />
