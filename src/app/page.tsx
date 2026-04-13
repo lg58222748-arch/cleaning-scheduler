@@ -230,10 +230,10 @@ export default function Home() {
     setTimeout(() => loadData(undefined, true), 500);
   }
 
-  // Derived - 관리자는 전체, 일반회원은 자기에게 배정된 것만
+  // Derived - 달력에는 배정된 것만 (미배정은 배정탭에서만)
   const myLinkedMember = members.find((m) => m.linkedUsername === currentUser.username);
-  const visibleSchedules = isAdmin
-    ? schedules
+  const calendarSchedules = isAdmin
+    ? schedules.filter((s) => s.status !== "unassigned")
     : schedules.filter((s) =>
         s.status !== "unassigned" && (
           s.memberName === currentUser.name ||
@@ -243,7 +243,7 @@ export default function Home() {
         )
       );
   const dateStr = format(selectedDate, "yyyy-MM-dd");
-  const daySchedules = visibleSchedules
+  const daySchedules = calendarSchedules
     .filter((s) => s.date === dateStr)
     .sort((a, b) => a.startTime.localeCompare(b.startTime));
   const pendingSwapCount = swapRequests.filter((r) => r.status === "pending").length;
@@ -353,7 +353,7 @@ export default function Home() {
         {activeTab === "calendar" && (
           <div className="h-full">
             <Calendar
-              schedules={visibleSchedules}
+              schedules={calendarSchedules}
               members={members}
               selectedDate={selectedDate}
               onSelectDate={(d) => { setSelectedDate(d); setShowDayPopup(true); }}
