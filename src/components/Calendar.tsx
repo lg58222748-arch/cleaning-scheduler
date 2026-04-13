@@ -51,10 +51,10 @@ export default function Calendar({
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
           setSlideDirection("");
-          setTimeout(() => setAnimating(false), 200);
+          setTimeout(() => setAnimating(false), 120);
         });
       });
-    }, 200);
+    }, 120);
   }, [onMonthChange]);
 
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
@@ -138,7 +138,7 @@ export default function Calendar({
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
           </svg>
         </button>
-        <h2 className={`text-lg font-bold text-gray-800 transition-all duration-200 ease-in-out ${
+        <h2 className={`text-lg font-bold text-gray-800 transition-all duration-[120ms] ease-out ${
           slideDirection === "left" ? "-translate-x-4 opacity-0" :
           slideDirection === "right" ? "translate-x-4 opacity-0" :
           "translate-x-0 opacity-100"
@@ -167,9 +167,9 @@ export default function Calendar({
       </div>
 
       {/* Calendar grid */}
-      <div className={`flex-1 divide-y divide-gray-50 transition-all duration-200 ease-in-out overflow-hidden flex flex-col ${
-        slideDirection === "left" ? "-translate-x-8 opacity-0" :
-        slideDirection === "right" ? "translate-x-8 opacity-0" :
+      <div className={`flex-1 divide-y divide-gray-50 transition-all duration-[120ms] ease-out overflow-hidden flex flex-col ${
+        slideDirection === "left" ? "-translate-x-6 opacity-0" :
+        slideDirection === "right" ? "translate-x-6 opacity-0" :
         "translate-x-0 opacity-100"
       }`}>
         {weeks.map((week, wi) => (
@@ -204,23 +204,23 @@ export default function Calendar({
                   >
                     {format(d, "d")}
                   </span>
-                  {/* 이벤트 바 - 패딩 없이 꽉 채움 */}
-                  <div className="overflow-hidden flex-1 w-full">
-                    {daySchedules.slice(0, 1).map((s) => {
+                  {/* 이벤트 바 - 2개까지 표시, 초과분 우측하단 숫자 */}
+                  <div className="overflow-hidden flex-1 w-full relative">
+                    {daySchedules.slice(0, 2).map((s) => {
                       const fullName = s.title.replace(/^\[.+?\]\s*/, "");
                       const schedColor = s.color || "#FDDCCC";
                       return (
                         <div
                           key={s.id}
-                          className="text-[9px] leading-[1.3] py-0.5 rounded font-medium overflow-hidden break-all"
-                          style={{ backgroundColor: schedColor, color: "#555", maxHeight: "3.2em" }}
+                          className="text-[8px] leading-[1.2] py-0.5 rounded font-medium overflow-hidden break-all mb-0.5"
+                          style={{ backgroundColor: schedColor, color: "#555", maxHeight: "1.5em" }}
                         >
                           {fullName}
                         </div>
                       );
                     })}
-                    {daySchedules.length > 1 && (
-                      <div className="text-[7px] text-gray-400 mt-0.5">+{daySchedules.length - 1}</div>
+                    {daySchedules.length > 2 && (
+                      <div className="absolute bottom-0 right-0 text-[7px] text-gray-400 font-medium">+{daySchedules.length - 2}</div>
                     )}
                   </div>
                 </button>

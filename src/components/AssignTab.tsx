@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { Schedule, Member } from "@/types";
 import { fetchUnassignedSchedules, assignScheduleApi } from "@/lib/api";
 import {
@@ -30,6 +30,9 @@ export default function AssignTab({ members, onAssigned }: AssignTabProps) {
   const [selectedSchedule, setSelectedSchedule] = useState<Schedule | null>(null);
   const [selectedMemberId, setSelectedMemberId] = useState("");
   const [slideDir, setSlideDir] = useState<"" | "left" | "right">("");
+  const [animating, setAnimating] = useState(false);
+  const touchStartX = useRef(0);
+  const touchStartY = useRef(0);
 
   const loadUnassigned = useCallback(async () => {
     setLoading(true);
@@ -83,12 +86,33 @@ export default function AssignTab({ members, onAssigned }: AssignTabProps) {
     : [];
 
   function animateMonth(direction: "left" | "right", newMonth: Date) {
+    if (animating) return;
+    setAnimating(true);
     setSlideDir(direction);
     setTimeout(() => {
       setCurrentMonth(newMonth);
       setSlideDir(direction === "left" ? "right" : "left");
-      setTimeout(() => setSlideDir(""), 20);
-    }, 150);
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          setSlideDir("");
+          setTimeout(() => setAnimating(false), 120);
+        });
+      });
+    }, 120);
+  }
+
+  function handleTouchStart(e: React.TouchEvent) {
+    touchStartX.current = e.touches[0].clientX;
+    touchStartY.current = e.touches[0].clientY;
+  }
+  function handleTouchEnd(e: React.TouchEvent) {
+    if (animating) return;
+    const dx = e.changedTouches[0].clientX - touchStartX.current;
+    const dy = e.changedTouches[0].clientY - touchStartY.current;
+    if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 50) {
+      if (dx < 0) animateMonth("left", addMonths(currentMonth, 1));
+      else animateMonth("right", subMonths(currentMonth, 1));
+    }
   }
 
   const dayNames = ["일", "월", "화", "수", "목", "금", "토"];
@@ -96,7 +120,7 @@ export default function AssignTab({ members, onAssigned }: AssignTabProps) {
   if (loading) return <div className="py-12 text-center text-gray-400 text-sm">로딩 중...</div>;
 
   return (
-    <div className="h-full flex flex-col">
+    <div className="h-full flex flex-col" onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
       {/* 미배정 캘린더 */}
       <div className="bg-white flex-1 flex flex-col">
         {/* 헤더 */}
@@ -151,21 +175,21 @@ export default function AssignTab({ members, onAssigned }: AssignTabProps) {
                     }`}>
                       {format(d, "d")}
                     </span>
-                    <div className="overflow-hidden flex-1 w-full">
-                      {dayScheds.slice(0, 1).map((s) => {
+                    <div className="overflow-hidden flex-1 w-full relative">
+                      {dayScheds.slice(0, 2).map((s) => {
                         const fullName = s.title.replace(/^\[.+?\]\s*/, "");
                         return (
                           <div
                             key={s.id}
-                            className="text-[9px] leading-[1.3] py-0.5 rounded font-medium bg-orange-100 text-orange-700 overflow-hidden break-all"
-                            style={{ maxHeight: "3.2em" }}
+                            className="text-[8px] leading-[1.2] py-0.5 rounded font-medium bg-orange-100 text-orange-700 overflow-hidden break-all mb-0.5"
+                            style={{ maxHeight: "1.5em" }}
                           >
                             {fullName}
                           </div>
                         );
                       })}
-                      {dayScheds.length > 1 && (
-                        <div className="text-[7px] text-gray-400 mt-0.5">+{dayScheds.length - 1}</div>
+                      {dayScheds.length > 2 && (
+                        <div className="absolute bottom-0 right-0 text-[7px] text-gray-400 font-medium">+{dayScheds.length - 2}</div>
                       )}
                     </div>
                   </button>

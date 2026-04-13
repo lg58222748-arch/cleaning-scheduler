@@ -59,26 +59,32 @@ export default function Home() {
   const [showDayPopup, setShowDayPopup] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
 
-  const loadData = useCallback(async (monthDate?: Date) => {
+  const loadData = useCallback(async (monthDate?: Date, fullRefresh = false) => {
     const d = monthDate || selectedDate;
     const start = format(startOfMonth(subMonths(d, 1)), "yyyy-MM-dd");
     const end = format(endOfMonth(addMonths(d, 1)), "yyyy-MM-dd");
 
-    const [m, s, sw, notif] = await Promise.all([
-      fetchMembers(),
-      fetchSchedules(start, end),
-      fetchSwapRequests(),
-      fetchNotifications(),
-    ]);
-    setMembers(m);
-    setSchedules(s);
-    setSwapRequests(sw);
-    setNotifications(notif.notifications);
-    setUnreadCount(notif.unreadCount);
+    if (fullRefresh) {
+      const [m, s, sw, notif] = await Promise.all([
+        fetchMembers(),
+        fetchSchedules(start, end),
+        fetchSwapRequests(),
+        fetchNotifications(),
+      ]);
+      setMembers(m);
+      setSchedules(s);
+      setSwapRequests(sw);
+      setNotifications(notif.notifications);
+      setUnreadCount(notif.unreadCount);
+    } else {
+      // 월 이동 시에는 일정만 빠르게 가져옴
+      const s = await fetchSchedules(start, end);
+      setSchedules(s);
+    }
   }, [selectedDate]);
 
   useEffect(() => {
-    if (currentUser) loadData();
+    if (currentUser) loadData(undefined, true);
   }, [currentUser]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // PWA 서비스워커 등록 + 설치 배너
@@ -130,7 +136,7 @@ export default function Home() {
       const newSchedule = await createSchedule(data);
       setSchedules((prev) => [...prev, newSchedule]);
     }
-    loadData(); // 백그라운드 동기화
+    loadData(undefined, true); // 백그라운드 동기화
   }
   async function handleDeleteSchedule(id: string) {
     setSchedules((prev) => prev.filter((s) => s.id !== id));
@@ -152,7 +158,7 @@ export default function Home() {
     } else {
       if (swapFirstSchedule.id !== schedule.id) {
         createSwapRequest(swapFirstSchedule.id, schedule.id).then(() => {
-          loadData();
+          loadData(undefined, true);
           setSwapMode(false);
           setSwapFirstSchedule(null);
         });
@@ -164,7 +170,7 @@ export default function Home() {
   async function handleApproveSwap(swapId: string) {
     setSwapRequests((prev) => prev.map((r) => r.id === swapId ? { ...r, status: "approved" as const } : r));
     await approveSwapRequest(swapId);
-    loadData();
+    loadData(undefined, true);
   }
   async function handleRejectSwap(swapId: string) {
     setSwapRequests((prev) => prev.map((r) => r.id === swapId ? { ...r, status: "rejected" as const } : r));
@@ -206,7 +212,7 @@ export default function Home() {
     });
     setShowGoogleSync(false);
     setActiveTab("assign");
-    setTimeout(() => loadData(), 500);
+    setTimeout(() => loadData(undefined, true), 500);
   }
 
   // Derived
@@ -388,7 +394,7 @@ export default function Home() {
 
         {/* Assign tab */}
         {activeTab === "assign" && (
-          <div className="h-full"><AssignTab members={members} onAssigned={() => loadData()} /></div>
+          <div className="h-full"><AssignTab members={members} onAssigned={() => loadData(undefined, true)} /></div>
         )}
 
         {/* Members tab */}
@@ -607,7 +613,7 @@ export default function Home() {
           onDelete={(id) => { handleDeleteSchedule(id); setDetailSchedule(null); }}
           onUnassign={(id) => { handleUnassignSchedule(id); setDetailSchedule(null); }}
           onClose={() => setDetailSchedule(null)}
-          onUpdated={() => loadData()}
+          onUpdated={() => loadData(undefined, true)}
         />
       )}
       {showAdminPanel && (
