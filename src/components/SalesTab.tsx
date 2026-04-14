@@ -254,18 +254,16 @@ export default function SalesTab({ userName, onCreated }: SalesTabProps) {
     const n = name || parsedName;
     const svcList = services.map((s) => s.name).join(", ");
     // 일정별 날짜에서 청소희망날짜 자동 생성
+    const timeDesc: Record<string, string> = {
+      "오전": " 오전(7~9시 사이 방문)",
+      "오후": " 오후(13시~15시 사이 방문)",
+      "시무": " 시무(9시~11시 사이 방문)",
+      "사이": " 사이(11시~13시 사이 방문)",
+    };
     const schedDateStr = schedules
       .filter(s => s.date)
-      .map(s => {
-        const d = new Date(s.date + "T00:00:00");
-        const m = d.getMonth() + 1;
-        const day = d.getDate();
-        const dayNames = ["일", "월", "화", "수", "목", "금", "토"];
-        const dayName = dayNames[d.getDay()];
-        const time = s.time && s.time !== "선택" ? ` ${s.time}` : "";
-        return `${m}/${day}(${dayName})${time}`;
-      })
-      .join(", ") || _wish || parsedWishDate;
+      .map(s => `${s.date}${s.time && s.time !== "선택" ? timeDesc[s.time] || ` ${s.time}` : ""}`)
+      .join("\n4)청소희망날짜 : ") || _wish || parsedWishDate;
     let msg = `안녕하세요 ${n}님 😊\n예약이 확정되었습니다!\n\n`;
     msg += `1)성함 : ${n}\n2)주소 : ${addr || parsedAddr}\n3)연락처 : ${phone || parsedPhone}\n`;
     msg += `4)청소희망날짜 : ${schedDateStr}\n`;
