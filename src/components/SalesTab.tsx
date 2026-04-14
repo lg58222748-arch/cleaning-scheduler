@@ -209,6 +209,17 @@ export default function SalesTab({ userName, onCreated }: SalesTabProps) {
   }
 
   // 예약 확정 → 배정탭 등록
+  const [confirmed, setConfirmed] = useState(false);
+  const [postDone, setPostDone] = useState<number[]>([]);
+
+  const POST_MSGS = [
+    { label: "1. 최종 확정 예약 양식", getText: () => confirmMsg },
+    { label: "2. 사전 고지사항", getText: () => `안녕하세요 청소로 행복을 드리는 새집느낌입니다.\n입주청소를 처음 받아보는 분들을 위해 드리는 방문 전 사전 진행 약관 및 고지사항입니다.\n\n방문 전 고객님들과 원활한 소통을 위해 드리는 Qna 고지사항이므로 꼭 읽어주세요!\n\nQ.외창 청소는 기본인가요?\nA.입주청소는 기본적으로 내부 공간 케어를 진행하기 때문에 외창은 추가비용이 발생 되는 부분입니다.\n\nQ.빌트인 가전,블라인드 청소도 해주시나요?\nA.입주청소는 비어져 있는 공간을 청소하는 것이기 때문에, 가전과 커튼 블라인드가 있는 상태에서 내부까지 청소하게 되는것은 거주 청소로 분류 됩니다.\n\nQ.추가비용이 나올 상황들은 어떤것들이 있을까요?\nA.저희 업체는 현장 추가비용은 만들지 않으려고 노력하고 있습니다.\n왠만한 적은 범위들은 모두 서비스로 진행되시며\n추가 견적이 나올 수 있는 상황은 다음과 같습니다.\n\n-상담때 확인이 안된 인테리어로 인한 심각한 분진 및 먼지\n-가전 내부청소\n-천장, 몰딩의 심각한 니코틴 오염\n-별도로 설치한 서랍장, 붙박이장\n-3층 이상으로 엘레베이터가 없을경우\n-다량의 심각한 곰팡이/스티커/시트지\n-주차비가 별도로 필요할 경우\n\n감사합니다.` },
+    { label: "3. 예약/변경/취소 안내", getText: () => `📌 [입주청소 예약 / 변경 / 취소 안내]\n\n📢 예약금 결제 후 24시간 경과 시 취소하실 경우, 예약금의 50%만 환불됩니다.\n📢 1주 내 변경 / 취소 : 예약 변경 or 취소 예약금 환불 불가\n📢 1주 전 변경 : 1회만 가능. 변경 후 취소는 예약금 환불 불가\n📢 당일 현장 철수 시 청소비용의 20% 위약금으로 발생\n📢 탄성코트와 입주청소 날짜는 최소 7일입니다.\n\n위 내용 꼭 숙지해주시길 부탁드립니다!` },
+    { label: "4. 확인 안내", getText: () => `확인했습니다!\n\n해피콜은 보통 1일전 오후 12시~18시 사이 드리고 있으니 참고 부탁드리며,\n방문에 필요한 집 비밀번호, 임시 방문증 등은 1일 전 해피콜 드린 관리사님께 전달주시면 감사드리겠습니다.\n\n그럼 1일 전날 해피콜 연락 드리고 방문드리겠습니다.\n\n믿고 맡겨주신만큼 최선을 다해서 꼼꼼하게 작업해드리겠습니다^^` },
+    { label: "5. 인터넷 할인 안내", getText: () => `아참 그리구요 이번에 이사하실때 인터넷도 알아보고 계시다면 1644-0199로 연락주시면\n\n저희 새집느낌 인터넷 센터 통해서 48만원 지원금도 받고 청소 비용도 10~20만원 할인받을 수 있으셔서 참고하시면 좋으실거 같으세용\n\n참고해보세요 고객님^^\n오늘도 좋은 하루되세요!` },
+  ];
+
   async function handleConfirm() {
     setSaving(true);
     for (let i = 0; i < schedules.length; i++) {
@@ -227,8 +238,9 @@ export default function SalesTab({ userName, onCreated }: SalesTabProps) {
       });
     }
     setSaving(false);
+    setConfirmed(true);
+    setPostDone([]);
     onCreated();
-    alert(`${schedules.length}건 배정탭에 등록 완료!`);
   }
 
   return (
@@ -451,16 +463,49 @@ export default function SalesTab({ userName, onCreated }: SalesTabProps) {
               </div>
 
               {/* 버튼 */}
-              <div className="space-y-2">
-                <button onClick={() => handleCopy(confirmMsg, "confirm")}
-                  className="w-full py-3 rounded-xl text-sm font-bold text-white" style={{ background: "linear-gradient(135deg, #1a6b3c, #22874c)" }}>
-                  {copied === "confirm" ? "✅ 복사됨!" : "📋 확정 메시지 복사"}
-                </button>
-                <button onClick={handleConfirm} disabled={saving}
-                  className="w-full py-3 rounded-xl text-sm font-bold text-white active:opacity-90 disabled:opacity-50" style={{ background: "linear-gradient(135deg, #0f4c81, #1a6bb5)" }}>
-                  {saving ? "저장 중..." : `📅 예약 확정 (${schedules.length}건 배정탭 등록)`}
-                </button>
-              </div>
+              {!confirmed ? (
+                <div className="space-y-2">
+                  <button onClick={() => handleCopy(confirmMsg, "confirm")}
+                    className="w-full py-3 rounded-xl text-sm font-bold text-white" style={{ background: "linear-gradient(135deg, #1a6b3c, #22874c)" }}>
+                    {copied === "confirm" ? "✅ 복사됨!" : "📋 확정 메시지 복사"}
+                  </button>
+                  <button onClick={handleConfirm} disabled={saving}
+                    className="w-full py-3 rounded-xl text-sm font-bold text-white active:opacity-90 disabled:opacity-50" style={{ background: "linear-gradient(135deg, #0f4c81, #1a6bb5)" }}>
+                    {saving ? "저장 중..." : `📅 예약 확정 (${schedules.length}건 배정탭 등록)`}
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <div className="p-3 bg-green-50 border border-green-200 rounded-xl text-center">
+                    <div className="text-lg mb-1">✅</div>
+                    <div className="text-sm font-bold text-green-700">{schedules.length}건 배정탭 등록 완료!</div>
+                    <div className="text-xs text-green-600 mt-1">아래 순서대로 고객에게 전송하세요</div>
+                  </div>
+
+                  <div className="text-xs font-bold text-green-700 mb-1">고객 전송 (순서대로 복사 → 붙여넣기)</div>
+                  {POST_MSGS.map((msg, i) => (
+                    <div key={i} className={`border rounded-xl p-3 ${postDone.includes(i) ? "border-green-300 bg-green-50" : "border-gray-200"}`}>
+                      <div className="flex items-center justify-between">
+                        <span className={`text-xs font-bold ${postDone.includes(i) ? "text-green-600" : "text-green-800"}`}>
+                          {postDone.includes(i) ? "✅ " : ""}{msg.label}
+                        </span>
+                        <button onClick={() => {
+                          handleCopy(msg.getText(), `post${i}`);
+                          if (!postDone.includes(i)) setPostDone((p) => [...p, i]);
+                        }} className="px-3 py-1 bg-green-700 text-white rounded-lg text-[11px] font-bold active:bg-green-800">
+                          {copied === `post${i}` ? "✅" : "📋 복사"}
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+
+                  {postDone.length >= 5 && (
+                    <div className="text-center text-xs text-green-600 font-bold py-2">
+                      🎉 모든 전송 완료! 수고하셨습니다.
+                    </div>
+                  )}
+                </div>
+              )}
             </>
           )}
         </div>
