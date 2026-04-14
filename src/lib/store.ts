@@ -365,6 +365,16 @@ export async function changeUserRole(id: string, role: string): Promise<boolean>
   return !error;
 }
 
+export async function deleteUser(id: string): Promise<boolean> {
+  // 연결된 멤버도 삭제
+  const { data: user } = await supabase.from("users").select("username").eq("id", id).single();
+  if (user) {
+    await supabase.from("members").delete().eq("linked_username", String(user.username));
+  }
+  const { error } = await supabase.from("users").delete().eq("id", id);
+  return !error;
+}
+
 export async function loginUser(username: string, password: string): Promise<User | null> {
   const lower = username.toLowerCase();
   const { data } = await supabase.from("users").select("*").ilike("username", lower).eq("password", password).eq("status", "approved").single();

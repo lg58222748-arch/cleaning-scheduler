@@ -288,6 +288,14 @@ export async function rejectUserApi(userId: string): Promise<void> {
   });
 }
 
+export async function deleteUserApi(userId: string): Promise<void> {
+  await fetch(`${BASE}/api/users`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ action: "delete", userId }),
+  });
+}
+
 export async function changeUserRoleApi(userId: string, role: string): Promise<void> {
   await fetch(`${BASE}/api/users`, {
     method: "POST",
