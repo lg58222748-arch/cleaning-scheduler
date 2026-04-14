@@ -159,9 +159,8 @@ export default function Home() {
     setSchedules((prev) => prev.filter((s) => s.id !== id));
     if (target) {
       setUnassignedSchedules((prev) => [...prev, { ...target, memberId: "", memberName: "미배정", status: "unassigned" as const }]);
-      // 반환 알림 표시
+      // 반환 알림 - 재배정될 때까지 유지
       setReturnAlert({ title: target.title.replace(/^\[.+?\]\s*/, ""), date: target.date });
-      setTimeout(() => setReturnAlert(null), 4000);
     }
     await unassignScheduleApi(id);
   }
