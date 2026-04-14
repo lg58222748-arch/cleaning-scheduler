@@ -505,9 +505,11 @@ export default function Home() {
         </div>
       )}
       {/* 디버그: 뒤로가기 감지 확인 (테스트 후 제거) */}
-      {backDebug && (
-        <div className="bg-green-500 text-white text-xs text-center py-1 z-50">{backDebug}</div>
-      )}
+      {/* 디버그 (테스트 후 제거) */}
+      <div className="bg-green-500 text-white text-xs text-center py-1 z-50 flex items-center justify-center gap-2">
+        <span>{backDebug || "대기중"}</span>
+        <button onClick={() => history.back()} className="px-2 py-0.5 bg-white text-green-700 rounded text-xs font-bold">뒤로테스트</button>
+      </div>
       {/* Compact mobile header */}
       <header className="bg-white border-b border-gray-200 sticky top-0 z-40">
         <div className="px-4 flex items-center justify-between h-14">
