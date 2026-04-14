@@ -112,10 +112,16 @@ export default function Home() {
   // PWA 서비스워커 등록 + 설치 배너
   const [installPrompt, setInstallPrompt] = useState<Event | null>(null);
   const [showInstallBanner, setShowInstallBanner] = useState(false);
+  const [isInApp, setIsInApp] = useState(false);
 
   useEffect(() => {
     if ("serviceWorker" in navigator) {
       navigator.serviceWorker.register("/sw.js");
+    }
+    // 카카오톡/네이버 인앱브라우저 감지
+    const ua = navigator.userAgent || "";
+    if (/KAKAOTALK|NAVER|Instagram|FB_IAB|Line/i.test(ua)) {
+      setIsInApp(true);
     }
     const handler = (e: Event) => {
       e.preventDefault();
@@ -246,14 +252,36 @@ export default function Home() {
 
   return (
     <div className="h-screen bg-white pb-16 flex flex-col overflow-hidden">
-      {/* PWA 설치 배너 */}
-      {showInstallBanner && (
-        <div className="bg-blue-600 text-white px-4 py-3 flex items-center justify-between z-50 relative">
-          <div className="flex items-center gap-2">
-            <span className="text-lg">🏠</span>
-            <span className="text-sm font-medium">앱으로 설치하면 더 편해요!</span>
+      {/* 카카오톡 인앱브라우저 감지 → 외부 브라우저 이동 */}
+      {isInApp && (
+        <div className="fixed inset-0 bg-black/80 z-[100] flex items-center justify-center p-6">
+          <div className="bg-white rounded-2xl p-6 text-center max-w-sm w-full">
+            <div className="text-3xl mb-3">⚠️</div>
+            <h2 className="text-lg font-bold text-gray-900 mb-2">외부 브라우저에서 열어주세요</h2>
+            <p className="text-sm text-gray-500 mb-4">카카오톡/네이버 브라우저에서는<br/>앱 설치가 제한됩니다.</p>
+            <button onClick={() => {
+              const url = window.location.href;
+              if (/Android/i.test(navigator.userAgent)) {
+                window.location.href = "intent://" + url.replace(/https?:\/\//, "") + "#Intent;scheme=https;package=com.android.chrome;end";
+              } else {
+                navigator.clipboard?.writeText(url);
+                alert("주소가 복사되었습니다!\n사파리에 붙여넣기 해주세요.");
+              }
+            }} className="w-full py-3 bg-blue-600 text-white rounded-xl font-bold text-sm mb-2">
+              크롬/사파리로 열기
+            </button>
+            <button onClick={() => setIsInApp(false)} className="text-xs text-gray-400">그냥 사용하기</button>
           </div>
-          <div className="flex gap-2">
+        </div>
+      )}
+
+      {/* PWA 설치 - 대문짝만하게 */}
+      {showInstallBanner && !isInApp && (
+        <div className="fixed inset-0 bg-black/70 z-[90] flex items-center justify-center p-6">
+          <div className="bg-white rounded-2xl p-6 text-center max-w-sm w-full">
+            <div className="text-4xl mb-3">📲</div>
+            <h2 className="text-xl font-bold text-gray-900 mb-2">새집느낌 앱 설치</h2>
+            <p className="text-sm text-gray-500 mb-5">홈 화면에 추가하면<br/>앱처럼 빠르게 사용할 수 있어요!</p>
             <button
               onClick={async () => {
                 if (installPrompt && "prompt" in installPrompt) {
@@ -261,15 +289,12 @@ export default function Home() {
                 }
                 setShowInstallBanner(false);
               }}
-              className="bg-white text-blue-600 px-3 py-1 rounded-lg text-xs font-bold"
+              className="w-full py-4 bg-blue-600 text-white rounded-xl font-bold text-base mb-3"
             >
-              설치
+              설치하기
             </button>
-            <button
-              onClick={() => setShowInstallBanner(false)}
-              className="text-blue-200 text-xs"
-            >
-              닫기
+            <button onClick={() => setShowInstallBanner(false)} className="text-sm text-gray-400">
+              나중에 하기
             </button>
           </div>
         </div>

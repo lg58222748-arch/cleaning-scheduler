@@ -107,28 +107,61 @@ export default function SalesTab({ userName, onCreated }: SalesTabProps) {
     return `예약금 안내드립니다.\n\n💳 입금 계좌\n하나은행 12345678901\n예금주: 새집느낌\n\n예약금: ${totalDeposit.toLocaleString()}원\n\n입금 확인 후 예약 확정 안내드리겠습니다.\n감사합니다!`;
   }
 
-  // AI 파싱
+  // AI 파싱 - 양식 뒤에 붙은 답변도 추출
   function parseCustomer() {
     const t = customerText;
     const lines = t.split("\n").map((l) => l.trim()).filter(Boolean);
 
-    // 간단한 파싱
     let name = "", phone = "", addr = "", wish = "", note = "";
+
+    // 1차: 양식 번호로 파싱 (1)성함 : 홍길동)
     for (const line of lines) {
-      const clean = line.replace(/^\d+\)?\s*/, "");
-      if (/성함|이름/i.test(line)) name = clean.replace(/성함\s*[:：]?\s*/i, "").replace(/이름\s*[:：]?\s*/i, "").trim();
-      else if (/주소/i.test(line)) addr = clean.replace(/주소\s*[:：]?\s*/i, "").trim();
-      else if (/연락처|전화|핸드폰/i.test(line)) phone = clean.replace(/연락처\s*[:：]?\s*/i, "").replace(/전화\s*[:：]?\s*/i, "").trim();
-      else if (/날짜|희망/i.test(line)) wish = clean.replace(/.*날짜\s*[:：]?\s*/i, "").trim();
-      else if (/특이사항|신경/i.test(line)) note = clean.replace(/.*특이사항\s*[:：]?\s*/i, "").replace(/.*신경\s*[:：]?\s*/i, "").trim();
+      const m1 = line.match(/1\)\s*성함\s*[:：]\s*(.+)/); if (m1 && m1[1].trim()) name = m1[1].trim();
+      const m2 = line.match(/2\)\s*주소\s*[:：]\s*(.+)/); if (m2 && m2[1].trim()) addr = m2[1].trim();
+      const m3 = line.match(/3\)\s*연락처\s*[:：]\s*(.+)/); if (m3 && m3[1].trim()) phone = m3[1].trim();
+      const m4 = line.match(/4\)\s*.*날짜\s*[:：]?\s*(.+)/); if (m4 && m4[1].trim()) wish = m4[1].trim();
+      const m5 = line.match(/5\)\s*.*특이사항\s*[:：]?\s*(.+)/); if (m5 && m5[1].trim()) note = m5[1].trim();
     }
 
-    // 이름/전화만 있는 간단 입력
-    if (!name && !phone) {
-      const shortLines = lines.filter((l) => !l.includes("예약") && !l.includes("확인"));
-      if (shortLines.length >= 1) name = shortLines[0];
-      if (shortLines.length >= 2 && /\d/.test(shortLines[1])) addr = shortLines[1];
-      if (shortLines.length >= 3 && /\d{3}/.test(shortLines[2])) phone = shortLines[2];
+    // 2차: 양식 뒤에 자유형식으로 적은 답변 추출
+    // "감사합니다" 이후 또는 "*예약금은" 이후의 줄들
+    const freeLines: string[] = [];
+    let afterEnd = false;
+    for (const line of lines) {
+      if (afterEnd && line.trim()) {
+        // 양식 관련 줄 건너뛰기
+        if (line.startsWith("*") || line.includes("──") || /^\d+\)/.test(line) || line.includes("확인 차원") || line.includes("체크사항") || line.includes("빠르게 도와")) continue;
+        freeLines.push(line.trim());
+      }
+      if (line.includes("감사합니다") || line.includes("안내드립니다")) afterEnd = true;
+    }
+
+    // 자유형식 줄 분석
+    for (const line of freeLines) {
+      // 전화번호 패턴 (010으로 시작 또는 11자리 숫자)
+      if (!phone && /01[016789]\d{7,8}/.test(line.replace(/[-\s]/g, ""))) {
+        // 이름+전화 같은 줄일 수 있음 "김개똥 01058222748"
+        const parts = line.split(/\s+/);
+        if (parts.length >= 2) {
+          const phoneIdx = parts.findIndex((p) => /01[016789]\d{7,8}/.test(p.replace(/[-\s]/g, "")));
+          if (phoneIdx >= 0) {
+            phone = parts[phoneIdx].replace(/[-\s]/g, "");
+            if (phoneIdx > 0 && !name) name = parts.slice(0, phoneIdx).join(" ");
+            else if (phoneIdx === 0 && parts[1] && !/\d/.test(parts[1]) && !name) name = parts[1];
+          }
+        } else {
+          phone = line.replace(/[-\s]/g, "");
+        }
+        continue;
+      }
+      // 한글 2-4자 (이름)
+      if (!name && /^[가-힣]{2,4}$/.test(line)) { name = line; continue; }
+      // 주소 패턴 (시/도/구/동/아파트)
+      if (!addr && (/[시도군구읍면동리로길]/.test(line) || /아파트|오피스텔|빌라|맨션|자이|푸르지오|래미안|힐스테이트/.test(line))) { addr = line; continue; }
+      // 날짜 패턴 (숫자 4자리 또는 월/일)
+      if (!wish && (/^\d{4}$/.test(line) || /^\d{1,2}[\/\.\-]\d{1,2}$/.test(line) || /\d+월\s*\d+일/.test(line))) { wish = line; continue; }
+      // 나머지는 특이사항
+      if (!name && !phone && !addr && freeLines.indexOf(line) === 0) { name = line; continue; }
     }
 
     setParsedName(name);
