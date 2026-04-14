@@ -91,11 +91,12 @@ export async function searchSchedules(query: string): Promise<Schedule[]> {
   return (data || []).map(rowToSchedule);
 }
 
-export async function addSchedule(input: Omit<Schedule, "id" | "status">): Promise<Schedule> {
-  const { data } = await supabase.from("schedules").insert({
-    member_id: input.memberId, member_name: input.memberName, title: input.title, location: input.location || "", date: input.date, start_time: input.startTime, end_time: input.endTime, status: "confirmed", assigned_to: input.assignedTo, assigned_to_name: input.assignedToName, google_event_id: input.googleEventId, note: input.note || "", color: input.color || "#FDDCCC",
+export async function addSchedule(input: Omit<Schedule, "id" | "status">): Promise<Schedule | null> {
+  const { data, error } = await supabase.from("schedules").insert({
+    member_id: input.memberId, member_name: input.memberName, title: input.title, location: input.location || "", date: input.date, start_time: input.startTime, end_time: input.endTime, status: "confirmed", assigned_to: input.assignedTo, assigned_to_name: input.assignedToName, google_event_id: input.googleEventId || null, note: input.note || "", color: input.color || "#FDDCCC",
   }).select().single();
-  return rowToSchedule(data!);
+  if (error || !data) return null;
+  return rowToSchedule(data);
 }
 
 export async function addUnassignedSchedule(input: Omit<Schedule, "id" | "status" | "memberId" | "memberName">): Promise<Schedule | null> {

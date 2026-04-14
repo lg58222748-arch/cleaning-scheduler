@@ -163,8 +163,18 @@ export default function Home() {
     if (editingSchedule) {
       setSchedules((prev) => prev.map((s) => s.id === editingSchedule.id ? { ...s, ...data } : s));
       await apiUpdateSchedule(editingSchedule.id, data);
+    } else if (activeTab === "calendar" && data.memberId) {
+      // 달력탭 + 팀원 선택 → 달력에 바로 등록
+      try {
+        const newSchedule = await createSchedule(data);
+        if (newSchedule?.id) setSchedules((prev) => [...prev, newSchedule]);
+      } catch {
+        // fallback: 배정탭으로
+        const ns = await addUnassignedSchedule({ title: data.title, date: data.date, startTime: data.startTime, endTime: data.endTime, note: data.note || "", color: data.color });
+        if (ns?.id) setUnassignedSchedules((prev) => [...prev, ns]);
+      }
     } else {
-      // 항상 배정탭(미배정)으로 등록
+      // 배정탭 또는 팀원 미선택 → 배정탭(미배정)으로
       const newSchedule = await addUnassignedSchedule({
         title: data.title, date: data.date, startTime: data.startTime, endTime: data.endTime, note: data.note || "", color: data.color,
       });

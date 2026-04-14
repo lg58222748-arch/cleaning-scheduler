@@ -100,7 +100,10 @@ export async function POST(req: NextRequest) {
     endTime: body.endTime,
     googleEventId: body.googleEventId,
     note: body.note || "",
+    color: body.color,
   });
+
+  if (!schedule) return Response.json({ error: "저장 실패" }, { status: 500 });
 
   await addNotification(
     "schedule_created",
