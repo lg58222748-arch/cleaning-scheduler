@@ -123,45 +123,57 @@ export default function SalesTab({ userName, onCreated }: SalesTabProps) {
       const m5 = line.match(/5\)\s*.*특이사항\s*[:：]?\s*(.+)/); if (m5 && m5[1].trim()) note = m5[1].trim();
     }
 
-    // 2차: 양식 뒤에 자유형식으로 적은 답변 추출
-    // "감사합니다" 이후 또는 "*예약금은" 이후의 줄들
+    // 2차: 양식 뒤 자유형식 답변 추출
+    // 마지막 "*" 줄 이후의 내용물을 모두 수집
     const freeLines: string[] = [];
-    let afterEnd = false;
-    for (const line of lines) {
-      if (afterEnd && line.trim()) {
-        // 양식 관련 줄 건너뛰기
-        if (line.startsWith("*") || line.includes("──") || /^\d+\)/.test(line) || line.includes("확인 차원") || line.includes("체크사항") || line.includes("빠르게 도와")) continue;
-        freeLines.push(line.trim());
+    let lastStarIdx = -1;
+    for (let i = lines.length - 1; i >= 0; i--) {
+      if (lines[i].startsWith("*")) { lastStarIdx = i; break; }
+    }
+    if (lastStarIdx >= 0) {
+      for (let i = lastStarIdx + 1; i < lines.length; i++) {
+        const l = lines[i].trim();
+        if (l) freeLines.push(l);
       }
-      if (line.includes("감사합니다") || line.includes("안내드립니다")) afterEnd = true;
     }
 
-    // 자유형식 줄 분석
+    // 자유형식: 각 줄을 타입별로 분류
+    const classified: { type: string; value: string }[] = [];
     for (const line of freeLines) {
-      // 전화번호 패턴 (010으로 시작 또는 11자리 숫자)
-      if (!phone && /01[016789]\d{7,8}/.test(line.replace(/[-\s]/g, ""))) {
-        // 이름+전화 같은 줄일 수 있음 "김개똥 01058222748"
-        const parts = line.split(/\s+/);
-        if (parts.length >= 2) {
-          const phoneIdx = parts.findIndex((p) => /01[016789]\d{7,8}/.test(p.replace(/[-\s]/g, "")));
-          if (phoneIdx >= 0) {
-            phone = parts[phoneIdx].replace(/[-\s]/g, "");
-            if (phoneIdx > 0 && !name) name = parts.slice(0, phoneIdx).join(" ");
-            else if (phoneIdx === 0 && parts[1] && !/\d/.test(parts[1]) && !name) name = parts[1];
-          }
-        } else {
-          phone = line.replace(/[-\s]/g, "");
-        }
-        continue;
+      const stripped = line.replace(/[-\s]/g, "");
+      // 전화번호 (010으로 시작하는 10-11자리)
+      if (/^01[016789]\d{7,8}$/.test(stripped)) {
+        classified.push({ type: "phone", value: stripped }); continue;
       }
-      // 한글 2-4자 (이름)
-      if (!name && /^[가-힣]{2,4}$/.test(line)) { name = line; continue; }
-      // 주소 패턴 (시/도/구/동/아파트)
-      if (!addr && (/[시도군구읍면동리로길]/.test(line) || /아파트|오피스텔|빌라|맨션|자이|푸르지오|래미안|힐스테이트/.test(line))) { addr = line; continue; }
-      // 날짜 패턴 (숫자 4자리 또는 월/일)
-      if (!wish && (/^\d{4}$/.test(line) || /^\d{1,2}[\/\.\-]\d{1,2}$/.test(line) || /\d+월\s*\d+일/.test(line))) { wish = line; continue; }
-      // 나머지는 특이사항
-      if (!name && !phone && !addr && freeLines.indexOf(line) === 0) { name = line; continue; }
+      // 이름+전화 같은 줄 "김개똥 01058222748"
+      const namePhone = line.match(/^([가-힣]{2,4})\s+(01[016789][\d\-]{7,9})$/);
+      if (namePhone) {
+        classified.push({ type: "name", value: namePhone[1] });
+        classified.push({ type: "phone", value: namePhone[2].replace(/-/g, "") }); continue;
+      }
+      // 날짜 패턴 (4.21, 4/21, 0421, 4월21일, 2026-05-20 등)
+      if (/^\d{1,2}[\.\/-]\d{1,2}$/.test(line) || /^\d{4}$/.test(line) || /\d+월\s*\d+일/.test(line) || /^\d{4}-\d{2}-\d{2}$/.test(line)) {
+        classified.push({ type: "date", value: line }); continue;
+      }
+      // 주소 (시/도/구/동/길/로 또는 아파트 이름)
+      if (/[시도군구읍면동리로길]/.test(line) || /아파트|오피스텔|빌라|맨션|자이|푸르지오|래미안|힐스|센트럴/.test(line)) {
+        classified.push({ type: "addr", value: line }); continue;
+      }
+      // 한글 2-4자 = 이름
+      if (/^[가-힣]{2,4}$/.test(line)) {
+        classified.push({ type: "name", value: line }); continue;
+      }
+      // 나머지 = 특이사항
+      classified.push({ type: "note", value: line });
+    }
+
+    // 분류 결과 적용
+    for (const c of classified) {
+      if (c.type === "name" && !name) name = c.value;
+      else if (c.type === "phone" && !phone) phone = c.value;
+      else if (c.type === "addr" && !addr) addr = c.value;
+      else if (c.type === "date" && !wish) wish = c.value;
+      else if (c.type === "note" && !note) note = c.value;
     }
 
     setParsedName(name);
