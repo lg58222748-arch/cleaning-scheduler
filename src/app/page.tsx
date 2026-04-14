@@ -29,6 +29,7 @@ import {
   restoreScheduleApi,
   emptyTrashApi,
   unassignScheduleApi,
+  assignScheduleApi,
   fetchSwapRequests,
   createSwapRequest,
   approveSwapRequest,
@@ -428,7 +429,18 @@ export default function Home() {
 
         {isAdmin && (
           <div className="h-full" style={{ display: activeTab === "assign" ? "block" : "none" }}>
-            <AssignTab members={members} schedules={unassignedSchedules} onAssigned={() => loadData(undefined, true)} />
+            <AssignTab members={members} schedules={unassignedSchedules} onAssigned={(scheduleId, memberId, memberName) => {
+              // 낙관적 업데이트: 즉시 UI 반영
+              const target = unassignedSchedules.find((s) => s.id === scheduleId);
+              if (target) {
+                // 배정탭에서 제거
+                setUnassignedSchedules((prev) => prev.filter((s) => s.id !== scheduleId));
+                // 달력에 추가
+                setSchedules((prev) => [...prev, { ...target, memberId, memberName, status: "confirmed" as const }]);
+              }
+              // API는 백그라운드 (안 기다림)
+              assignScheduleApi(scheduleId, memberId, memberName);
+            }} />
           </div>
         )}
 

@@ -18,8 +18,8 @@ import { ko } from "date-fns/locale";
 
 interface AssignTabProps {
   members: Member[];
-  schedules: Schedule[]; // 전체 일정 (page.tsx에서 이미 로드됨)
-  onAssigned: () => void;
+  schedules: Schedule[];
+  onAssigned: (scheduleId: string, memberId: string, memberName: string) => void;
 }
 
 export default function AssignTab({ members, schedules, onAssigned }: AssignTabProps) {
@@ -36,15 +36,15 @@ export default function AssignTab({ members, schedules, onAssigned }: AssignTabP
   const touchStartX = useRef(0);
   const touchStartY = useRef(0);
 
-  async function handleAssign(schedule: Schedule) {
+  function handleAssign(schedule: Schedule) {
     if (!selectedMemberId) return;
     const member = members.find((m) => m.id === selectedMemberId);
     if (!member) return;
-    await assignScheduleApi(schedule.id, member.id, member.name);
+    // 즉시 UI 반영 (API는 page.tsx에서 백그라운드)
     setSelectedSchedule(null);
     setSelectedMemberId("");
     setShowDayPopup(false);
-    onAssigned();
+    onAssigned(schedule.id, member.id, member.name);
   }
 
   const activeMembers = members.filter((m) => m.active);
