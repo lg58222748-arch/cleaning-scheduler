@@ -17,7 +17,7 @@ export interface Schedule {
   date: string; // YYYY-MM-DD
   startTime: string; // HH:mm
   endTime: string; // HH:mm
-  status: "confirmed" | "pending" | "swapRequested" | "unassigned";
+  status: "confirmed" | "pending" | "swapRequested" | "unassigned" | "completed";
   assignedTo?: string; // 배정된 팀장 ID (미배정이면 빈값)
   assignedToName?: string; // 배정된 팀장 이름
   googleEventId?: string;
