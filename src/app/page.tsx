@@ -245,8 +245,20 @@ export default function Home() {
   // ★ 뒤로가기 + 당겨서 새로고침 방지
 
   useEffect(() => {
-    // 당겨서 새로고침 차단
+    // 당겨서 새로고침 차단 (CSS + touch 이벤트)
     document.body.style.overscrollBehavior = "none";
+    document.documentElement.style.overscrollBehavior = "none";
+    let touchStartY = 0;
+    const onTouchStart = (e: TouchEvent) => { touchStartY = e.touches[0].clientY; };
+    const onTouchMove = (e: TouchEvent) => {
+      const y = e.touches[0].clientY;
+      // 페이지 맨 위에서 아래로 당기면 차단
+      if (document.scrollingElement && document.scrollingElement.scrollTop <= 0 && y > touchStartY) {
+        e.preventDefault();
+      }
+    };
+    document.addEventListener("touchstart", onTouchStart, { passive: true });
+    document.addEventListener("touchmove", onTouchMove, { passive: false });
 
     const doBack = (): boolean => {
       const s = stateRef.current;
@@ -299,12 +311,14 @@ export default function Home() {
     } | undefined;
     const onNav = (e: Record<string, unknown>) => {
       if (e.navigationType === "traverse" && e.canIntercept) {
-        // 무조건 가로채기
-        (e.intercept as (o: { handler: () => Promise<void> }) => void)({
-          handler: async () => {
-            handleBackPress();
-          }
-        });
+        const shouldPrevent = handleBackPress();
+        if (shouldPrevent) {
+          // 앱 유지 → intercept
+          (e.intercept as (o: { handler: () => Promise<void> }) => void)({
+            handler: async () => {}
+          });
+        }
+        // shouldPrevent=false → intercept 안 함 → 브라우저가 앱 종료
       }
     };
     if (nav) nav.addEventListener("navigate", onNav);
@@ -334,6 +348,8 @@ export default function Home() {
       if (nav) nav.removeEventListener("navigate", onNav);
       window.removeEventListener("hashchange", onHashPop);
       window.removeEventListener("popstate", onHashPop);
+      document.removeEventListener("touchstart", onTouchStart);
+      document.removeEventListener("touchmove", onTouchMove);
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
