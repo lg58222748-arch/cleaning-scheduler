@@ -484,37 +484,40 @@ export default function ScheduleDetail({
               배정
             </button>
           )}
-          {/* 입금확인 버튼 */}
-          <button
-            onClick={async () => {
-              if (titleText.includes("/미입금")) {
-                const originalMatch = schedule.note?.match(/원래제목:\s*(.+)/);
-                const newTitle = originalMatch ? originalMatch[1].trim() : titleText.replace(/\/미입금/g, "");
-                schedule.title = newTitle;
-                setTitleText(newTitle);
-                await apiUpdateSchedule(schedule.id, { title: newTitle });
-                onUpdated?.();
-              }
-            }}
-            className={`flex-1 py-3 rounded-xl text-sm font-bold active:opacity-90 ${titleText.includes("/미입금") ? "text-white" : "text-green-600 bg-green-50 border border-green-200"}`}
-            style={titleText.includes("/미입금") ? { background: "linear-gradient(135deg, #00c473, #00a35e)" } : {}}
-          >
-            {titleText.includes("/미입금") ? "입금확인" : "입금완료"}
-          </button>
-          {/* 미입금 버튼 - 입금완료 상태에서 미입금으로 되돌리기 */}
-          {!titleText.includes("/미입금") && (
-            <button
-              onClick={async () => {
-                const newTitle = `${titleText}/미입금`;
-                schedule.title = newTitle;
-                setTitleText(newTitle);
-                await apiUpdateSchedule(schedule.id, { title: newTitle });
-                onUpdated?.();
-              }}
-              className="flex-1 py-3 rounded-xl text-sm font-bold text-red-500 bg-red-50 border border-red-200 active:opacity-90"
-            >
-              미입금
-            </button>
+          {/* 입금확인/미입금 버튼 - 배정 모드에서만 */}
+          {mode === "assign" && (
+            <>
+              <button
+                onClick={async () => {
+                  if (titleText.includes("/미입금")) {
+                    const originalMatch = schedule.note?.match(/원래제목:\s*(.+)/);
+                    const newTitle = originalMatch ? originalMatch[1].trim() : titleText.replace(/\/미입금/g, "");
+                    schedule.title = newTitle;
+                    setTitleText(newTitle);
+                    await apiUpdateSchedule(schedule.id, { title: newTitle });
+                    onUpdated?.();
+                  }
+                }}
+                className={`flex-1 py-3 rounded-xl text-sm font-bold active:opacity-90 ${titleText.includes("/미입금") ? "text-white" : "text-green-600 bg-green-50 border border-green-200"}`}
+                style={titleText.includes("/미입금") ? { background: "linear-gradient(135deg, #00c473, #00a35e)" } : {}}
+              >
+                {titleText.includes("/미입금") ? "입금확인" : "입금완료"}
+              </button>
+              {!titleText.includes("/미입금") && (
+                <button
+                  onClick={async () => {
+                    const newTitle = `${titleText}/미입금`;
+                    schedule.title = newTitle;
+                    setTitleText(newTitle);
+                    await apiUpdateSchedule(schedule.id, { title: newTitle });
+                    onUpdated?.();
+                  }}
+                  className="flex-1 py-3 rounded-xl text-sm font-bold text-red-500 bg-red-50 border border-red-200 active:opacity-90"
+                >
+                  미입금
+                </button>
+              )}
+            </>
           )}
           <button
             onClick={async () => {
