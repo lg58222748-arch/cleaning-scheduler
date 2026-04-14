@@ -45,8 +45,17 @@ import { ko } from "date-fns/locale";
 
 type TabMode = "calendar" | "manage" | "assign" | "members";
 
+// localStorage에서 로그인 정보 복원
+function getSavedUser(): User | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const saved = localStorage.getItem("currentUser");
+    return saved ? JSON.parse(saved) : null;
+  } catch { return null; }
+}
+
 export default function Home() {
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [currentUser, setCurrentUser] = useState<User | null>(getSavedUser);
   const [members, setMembers] = useState<Member[]>([]);
   const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [unassignedSchedules, setUnassignedSchedules] = useState<Schedule[]>([]);
@@ -118,7 +127,10 @@ export default function Home() {
 
   // Login gate - must be AFTER all hooks
   if (!currentUser) {
-    return <LoginPage onLogin={(user) => setCurrentUser(user)} />;
+    return <LoginPage onLogin={(user) => {
+      localStorage.setItem("currentUser", JSON.stringify(user));
+      setCurrentUser(user);
+    }} />;
   }
 
   const isAdmin = currentUser.role === "admin";
@@ -346,7 +358,7 @@ export default function Home() {
               </button>
             )}
             {/* Logout */}
-            <button onClick={() => setCurrentUser(null)} className="p-1.5 text-gray-400 active:bg-red-50 rounded-lg">
+            <button onClick={() => { localStorage.removeItem("currentUser"); setCurrentUser(null); }} className="p-1.5 text-gray-400 active:bg-red-50 rounded-lg">
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
             </button>
           </div>
