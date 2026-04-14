@@ -250,8 +250,8 @@ export default memo(function Calendar({
                       const schedColor = s.color || "#FDDCCC";
                       return (
                         <div key={s.id} className="text-[8px] leading-[1.2] px-0.5 py-0.5 rounded font-medium overflow-hidden mb-0.5"
-                          style={{ backgroundColor: schedColor, color: "#555", maxHeight: "2.6em", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const }}>
-                          {fullName}
+                          style={{ backgroundColor: s.status === "completed" ? "#D1FAE5" : schedColor, color: "#555", maxHeight: "2.6em", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const }}>
+                          {s.status === "completed" ? "V " : ""}{fullName}
                         </div>
                       );
                     })}

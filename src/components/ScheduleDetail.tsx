@@ -399,6 +399,7 @@ export default function ScheduleDetail({
               customerPhoneFromSchedule={schedule.note?.match(/3\)연락처\s*[:：]\s*(.+)/)?.[1]?.trim()}
               memberName={schedule.memberName}
               memberBranch={memberBranch}
+              onCompleted={() => { schedule.status = "completed"; onUpdated?.(); }}
             />}
           </div>
         </div>
