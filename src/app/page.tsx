@@ -701,11 +701,8 @@ export default function Home() {
               if (target) {
                 // 배정탭에서 제거
                 setUnassignedSchedules((prev) => prev.filter((s) => s.id !== scheduleId));
-                // 달력에 추가 - 이름/미입금 형태 + 원래 제목을 note에 보존
-                const newTitle = `${memberName}/미입금`;
-                const preservedNote = target.note ? `제목: ${target.title}\n${target.note}` : `제목: ${target.title}`;
-                setSchedules((prev) => [...prev, { ...target, title: newTitle, note: preservedNote, memberId, memberName, status: "confirmed" as const }]);
-                apiUpdateSchedule(scheduleId, { title: newTitle, note: preservedNote });
+                // 달력에 추가 (제목 그대로 유지)
+                setSchedules((prev) => [...prev, { ...target, memberId, memberName, status: "confirmed" as const }]);
               }
               // API는 백그라운드 (안 기다림)
               assignScheduleApi(scheduleId, memberId, memberName);
@@ -1000,10 +997,7 @@ export default function Home() {
             const target = unassignedSchedules.find((s) => s.id === scheduleId);
             if (target) {
               setUnassignedSchedules((prev) => prev.filter((s) => s.id !== scheduleId));
-              const newTitle = `${memberName}/미입금`;
-              const preservedNote = target.note ? `제목: ${target.title}\n${target.note}` : `제목: ${target.title}`;
-              setSchedules((prev) => [...prev, { ...target, title: newTitle, note: preservedNote, memberId, memberName, status: "confirmed" as const }]);
-              apiUpdateSchedule(scheduleId, { title: newTitle, note: preservedNote });
+              setSchedules((prev) => [...prev, { ...target, memberId, memberName, status: "confirmed" as const }]);
             }
             assignScheduleApi(scheduleId, memberId, memberName);
             setDetailSchedule(null);

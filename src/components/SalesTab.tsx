@@ -298,7 +298,7 @@ export default function SalesTab({ userName, onCreated }: SalesTabProps) {
       const sched = schedules[i];
       const svc = services[i];
       if (!svc) continue;
-      const title = `U${parsedName}/${parsedAddr?.split(" ").slice(0, 2).join("")}/${userName} [${i + 1}/${schedules.length}]/${svc.name}`;
+      const title = `U${parsedName}/${parsedAddr?.split(" ").slice(0, 2).join("")}/${userName} [${i + 1}/${schedules.length}]/${svc.name}/미입금`;
       const calTitle = sched.time && sched.time !== "선택" ? `[${sched.time}] ${title}` : title;
 
       await addUnassignedSchedule({

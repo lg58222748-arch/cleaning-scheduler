@@ -488,10 +488,10 @@ export default function ScheduleDetail({
           <button
             onClick={async () => {
               if (titleText.includes("/미입금")) {
-                const originalTitle = (schedule.note?.match(/제목\s*[:：]\s*(.+)/)?.[1] || titleText.replace(/\/미입금$/, "")).trim();
-                schedule.title = originalTitle;
-                setTitleText(originalTitle);
-                await apiUpdateSchedule(schedule.id, { title: originalTitle });
+                const newTitle = titleText.replace(/\/미입금/g, "");
+                schedule.title = newTitle;
+                setTitleText(newTitle);
+                await apiUpdateSchedule(schedule.id, { title: newTitle });
                 onUpdated?.();
               }
             }}
