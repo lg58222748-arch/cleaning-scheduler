@@ -250,9 +250,13 @@ export default function Home() {
         (e.intercept as (o: { handler: () => Promise<void> }) => void)({
           handler: async () => {
             if (hashStackRef.current.length > 0) hashStackRef.current.pop();
+            const s = stateRef.current;
+            // 뭔가 열려있으면 닫고 해시 보충, 아무것도 없으면 보충 안 함 (앱 종료 허용)
+            const hasOpen = s.detailSchedule || s.showDayPopup || s.showNotifications ||
+              s.showScheduleForm || s.showMemberManager || s.showAdminPanel ||
+              s.showSearch || s.showMemberFilter || s.profileUser || s.activeTab !== "calendar";
             doBack();
-            // 항상 해시 보충 (다음 뒤로가기를 위해)
-            pushHash("b");
+            if (hasOpen) pushHash("b");
           }
         });
       }
