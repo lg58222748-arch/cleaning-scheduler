@@ -616,7 +616,8 @@ export default function SalesTab({ userName, onCreated }: SalesTabProps) {
                   <button onClick={() => generateConfirmMsg()} className="text-xs text-green-600 font-bold">↻ 갱신</button>
                 </div>
                 <textarea value={confirmMsg} onChange={(e) => setConfirmMsg(e.target.value)} rows={10}
-                  className="w-full text-xs text-gray-700 font-sans leading-relaxed bg-transparent outline-none resize-y" />
+                  style={{ fontSize: "12px" }}
+                  className="w-full text-gray-700 font-sans leading-relaxed bg-transparent outline-none resize-y" />
               </div>
 
               {/* 버튼: 예약 확정 → 5개 복사 → 캘린더 저장 */}
