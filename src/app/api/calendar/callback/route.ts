@@ -36,7 +36,7 @@ export async function GET(req: NextRequest) {
     return Response.redirect(`${baseUrl}/?google_error=token_exchange_failed`);
   }
 
-  // 토큰을 sessionStorage에 저장하는 HTML 페이지로 리디렉트
+  // 새 탭이면 토큰 저장 후 닫기, 아니면 리디렉트
   const html = `<!DOCTYPE html>
 <html><head><meta charset="utf-8"></head>
 <body>
@@ -44,9 +44,18 @@ export async function GET(req: NextRequest) {
   sessionStorage.setItem("google_access_token", "${tokenData.access_token}");
   ${tokenData.refresh_token ? `localStorage.setItem("google_refresh_token", "${tokenData.refresh_token}");` : ""}
   ${tokenData.refresh_token ? `sessionStorage.setItem("google_refresh_token", "${tokenData.refresh_token}");` : ""}
-  window.location.href = "/?google_token=${tokenData.access_token}";
+  // opener가 있으면 새 탭 → opener의 sessionStorage에도 저장 후 닫기
+  if (window.opener) {
+    try {
+      window.opener.sessionStorage.setItem("google_access_token", "${tokenData.access_token}");
+      ${tokenData.refresh_token ? `window.opener.localStorage.setItem("google_refresh_token", "${tokenData.refresh_token}");` : ""}
+    } catch(e) {}
+    window.close();
+  } else {
+    window.location.href = "/?google_token=${tokenData.access_token}";
+  }
 </script>
-<p>연결 중...</p>
+<p>연결 중... 이 창은 자동으로 닫힙니다.</p>
 </body></html>`;
 
   return new Response(html, { headers: { "Content-Type": "text/html; charset=utf-8" } });

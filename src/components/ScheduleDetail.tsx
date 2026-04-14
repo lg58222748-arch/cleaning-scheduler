@@ -46,6 +46,14 @@ export default function ScheduleDetail({
   const [noteChanged, setNoteChanged] = useState(false);
   const [schedColor, setSchedColor] = useState(schedule.color || "#FDDCCC");
 
+  // 시간대 (제목 앞에 [오전] 등)
+  const TIME_SLOTS = ["오전", "오후", "시무", "사이"] as const;
+  const extractTimeSlot = () => {
+    const m = schedule.title.match(/^\[(.+?)\]/);
+    return m ? m[1] : "";
+  };
+  const [timeSlot, setTimeSlot] = useState(extractTimeSlot());
+
   const SCHEDULE_COLORS = [
     { name: "살몬", value: "#FDDCCC" },
     { name: "하늘", value: "#DBEAFE" },
@@ -70,18 +78,27 @@ export default function ScheduleDetail({
     setComments(data);
   }
 
-  async function handleAddComment() {
+  function handleAddComment() {
     if (!newComment.trim()) return;
-    setLoading(true);
-    await createComment(schedule.id, authorName, newComment.trim());
+    // 낙관적: 즉시 표시
+    const tempComment: Comment = {
+      id: "temp-" + Date.now(),
+      scheduleId: schedule.id,
+      authorName,
+      content: newComment.trim(),
+      createdAt: new Date().toISOString(),
+    };
+    setComments((prev) => [...prev, tempComment]);
+    const text = newComment.trim();
     setNewComment("");
-    await loadComments();
-    setLoading(false);
+    // API 백그라운드
+    createComment(schedule.id, authorName, text);
   }
 
-  async function handleDeleteComment(id: string) {
-    await deleteCommentApi(id);
-    await loadComments();
+  function handleDeleteComment(id: string) {
+    // 즉시 UI 제거
+    setComments((prev) => prev.filter((c) => c.id !== id));
+    deleteCommentApi(id);
   }
 
   // 인라인 저장
@@ -100,6 +117,18 @@ export default function ScheduleDetail({
     schedule.title = titleText;
     setEditingTitle(false);
     setSaving(false);
+    onUpdated?.();
+  }
+
+  async function handleTimeSlotChange(slot: string) {
+    const newSlot = timeSlot === slot ? "" : slot; // 토글
+    setTimeSlot(newSlot);
+    // 제목에서 기존 시간대 제거 후 새로 추가
+    const bare = schedule.title.replace(/^\[.+?\]\s*/, "");
+    const newTitle = newSlot ? `[${newSlot}] ${bare}` : bare;
+    schedule.title = newTitle;
+    setTitleText(newTitle);
+    apiUpdateSchedule(schedule.id, { title: newTitle });
     onUpdated?.();
   }
 
@@ -190,7 +219,22 @@ export default function ScheduleDetail({
           {activeTab === "info" && (
             <>
               <div className="px-4 py-3 space-y-3">
-                {/* 날짜 + 담당자 한줄 */}
+                {/* 시간대 선택 */}
+                <div className="flex gap-1.5">
+                  {TIME_SLOTS.map((slot) => (
+                    <button
+                      key={slot}
+                      onClick={() => handleTimeSlotChange(slot)}
+                      className={`flex-1 py-2 rounded-lg text-xs font-bold transition-colors ${
+                        timeSlot === slot ? "bg-blue-500 text-white" : "bg-gray-100 text-gray-500 active:bg-gray-200"
+                      }`}
+                    >
+                      {slot}
+                    </button>
+                  ))}
+                </div>
+
+                {/* 날짜 + 상태 */}
                 <div className="flex items-center gap-3 text-sm text-gray-700">
                   <svg className="w-5 h-5 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />

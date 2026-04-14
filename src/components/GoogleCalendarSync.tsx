@@ -71,8 +71,26 @@ export default function GoogleCalendarSync({ onImport }: GoogleCalendarSyncProps
   async function handleConnect() {
     setLoading(true);
     setError(null);
-    // 현재 페이지 URL을 리디렉트 방식으로 Google OAuth로 이동
-    window.location.href = "/api/calendar?action=auth-redirect";
+    // 새 탭으로 Google OAuth (현재 페이지 유지)
+    const w = window.open("/api/calendar?action=auth-redirect", "_blank");
+    // 새 탭에서 돌아오면 토큰 감지
+    const check = setInterval(() => {
+      const token = sessionStorage.getItem("google_access_token");
+      if (token && !accessToken) {
+        clearInterval(check);
+        setAccessToken(token);
+        setConnected(true);
+        setLoading(false);
+        handleFetchEvents(token);
+      }
+      // 탭이 닫혔는데 토큰 없으면 취소
+      if (w?.closed && !sessionStorage.getItem("google_access_token")) {
+        clearInterval(check);
+        setLoading(false);
+      }
+    }, 500);
+    // 30초 타임아웃
+    setTimeout(() => { clearInterval(check); setLoading(false); }, 30000);
   }
 
   return (
