@@ -55,7 +55,10 @@ type TabMode = "calendar" | "manage" | "assign" | "members" | "sales";
 
 export default function Home() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const [showSplash, setShowSplash] = useState(false);
+  const [showSplash, setShowSplash] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return !sessionStorage.getItem("splashShown");
+  });
 
   // 클라이언트에서만 localStorage 복원 (hydration mismatch 방지)
   useEffect(() => {
@@ -64,9 +67,7 @@ export default function Home() {
       if (saved) setCurrentUser(JSON.parse(saved));
     } catch {}
     // 스플래시: 세션당 최초 1회만
-    const alreadyShown = sessionStorage.getItem("splashShown");
-    if (!alreadyShown) {
-      setShowSplash(true);
+    if (!sessionStorage.getItem("splashShown")) {
       sessionStorage.setItem("splashShown", "1");
       const timer = setTimeout(() => setShowSplash(false), 1500);
       return () => clearTimeout(timer);
@@ -156,9 +157,8 @@ export default function Home() {
     return () => window.removeEventListener("beforeinstallprompt", handler);
   }, []);
 
-  // 뒤로가기 버튼 처리 - 히스토리 스택 카운터 방식
+  // 뒤로가기 버튼 처리 - hash 기반 (페이지 새로고침 방지)
   const prevTabRef = useRef<TabMode>("calendar");
-  const historyDepthRef = useRef(0);
   const stateRef = useRef({
     detailSchedule: null as Schedule | null,
     showDayPopup: false,
@@ -178,65 +178,77 @@ export default function Home() {
     profileUser, activeTab,
   };
 
-  // 히스토리 push + depth 추적
-  const pushHistory = useCallback(() => {
-    historyDepthRef.current++;
-    history.pushState({ depth: historyDepthRef.current }, "");
+  // hash 카운터로 히스토리 관리 (pushState 대신 hash 사용 → 페이지 리로드 없음)
+  const hashCounter = useRef(0);
+  const isHandlingPop = useRef(false);
+
+  const pushHash = useCallback(() => {
+    hashCounter.current++;
+    window.location.hash = `s${hashCounter.current}`;
   }, []);
 
   const openModal = useCallback((setter: (v: boolean) => void) => {
-    pushHistory();
+    pushHash();
     setter(true);
-  }, [pushHistory]);
+  }, [pushHash]);
 
   const openDetailSchedule = useCallback((s: Schedule | null) => {
-    if (s) pushHistory();
+    if (s) pushHash();
     setDetailSchedule(s);
-  }, [pushHistory]);
+  }, [pushHash]);
 
   const openProfileUser = useCallback((u: User | null) => {
-    if (u) pushHistory();
+    if (u) pushHash();
     setProfileUser(u);
-  }, [pushHistory]);
+  }, [pushHash]);
 
   const switchTab = useCallback((tab: TabMode) => {
     if (tab !== stateRef.current.activeTab) {
       prevTabRef.current = stateRef.current.activeTab;
-      pushHistory();
+      pushHash();
       setActiveTab(tab);
-      setShowMemberFilter(false); // 탭 변경 시 필터 닫기
+      setShowMemberFilter(false);
     }
-  }, [pushHistory]);
+  }, [pushHash]);
 
   useEffect(() => {
-    const handlePop = (e: PopStateEvent) => {
+    // 초기 hash 설정
+    window.location.hash = "s0";
+
+    const handleHashChange = () => {
+      if (isHandlingPop.current) return;
+      isHandlingPop.current = true;
+
       const s = stateRef.current;
-      // depth 감소
-      if (historyDepthRef.current > 0) historyDepthRef.current--;
 
       // 열려있는 모달을 순서대로 닫기
-      if (s.detailSchedule) { setDetailSchedule(null); return; }
-      if (s.showDayPopup) { setShowDayPopup(false); return; }
-      if (s.showNotifications) { setShowNotifications(false); return; }
-      if (s.showScheduleForm) { setShowScheduleForm(false); setEditingSchedule(null); return; }
-      if (s.showMemberManager) { setShowMemberManager(false); return; }
-      if (s.showAdminPanel) { setShowAdminPanel(false); return; }
-      if (s.showSearch) { setShowSearch(false); return; }
-      if (s.showMemberFilter) { setShowMemberFilter(false); return; }
-      if (s.profileUser) { setProfileUser(null); return; }
-      // 모달 없으면 이전 탭으로
-      if (s.activeTab !== "calendar") {
+      if (s.detailSchedule) { setDetailSchedule(null); }
+      else if (s.showDayPopup) { setShowDayPopup(false); }
+      else if (s.showNotifications) { setShowNotifications(false); }
+      else if (s.showScheduleForm) { setShowScheduleForm(false); setEditingSchedule(null); }
+      else if (s.showMemberManager) { setShowMemberManager(false); }
+      else if (s.showAdminPanel) { setShowAdminPanel(false); }
+      else if (s.showSearch) { setShowSearch(false); }
+      else if (s.showMemberFilter) { setShowMemberFilter(false); }
+      else if (s.profileUser) { setProfileUser(null); }
+      else if (s.activeTab !== "calendar") {
+        // 이전 탭으로
         setActiveTab(prevTabRef.current || "calendar");
-        return;
+      } else {
+        // 캘린더이고 아무것도 안 열려있음 → 나가지 않게 다시 hash push
+        hashCounter.current++;
+        window.location.hash = `s${hashCounter.current}`;
       }
-      // 캘린더 탭이고 아무것도 안 열려있으면 → 뒤로 나가지 않게 복원
-      e.preventDefault();
-      pushHistory();
+
+      // hash 카운터 동기화
+      const match = window.location.hash.match(/s(\d+)/);
+      if (match) hashCounter.current = parseInt(match[1]);
+
+      setTimeout(() => { isHandlingPop.current = false; }, 50);
     };
-    // 앱 시작 시 기본 히스토리 1회
-    pushHistory();
-    window.addEventListener("popstate", handlePop);
-    return () => window.removeEventListener("popstate", handlePop);
+
+    window.addEventListener("hashchange", handleHashChange);
+    return () => window.removeEventListener("hashchange", handleHashChange);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Splash screen
