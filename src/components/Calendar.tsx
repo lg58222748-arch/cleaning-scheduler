@@ -232,7 +232,7 @@ export default function Calendar({
                 <button
                   key={dateStr}
                   onClick={() => !isSnapping && onSelectDate(d)}
-                  className={`px-0.5 pt-0.5 pb-0 text-left relative flex flex-col ${
+                  className={`px-0.5 pt-0.5 pb-0 relative flex flex-col items-center ${
                     isSelected ? "bg-blue-50 ring-2 ring-blue-400 ring-inset" : "active:bg-gray-50"
                   } ${!isCurrentMonth ? "opacity-40" : ""}`}
                 >
@@ -249,14 +249,14 @@ export default function Calendar({
                       const fullName = s.title;
                       const schedColor = s.color || "#FDDCCC";
                       return (
-                        <div key={s.id} className="text-[8px] leading-[1.2] px-0.5 py-0.5 rounded font-medium overflow-hidden mb-0.5"
+                        <div key={s.id} className="text-xs leading-[1.2] px-0.5 py-0.5 rounded font-medium overflow-hidden mb-0.5"
                           style={{ backgroundColor: schedColor, color: "#555", maxHeight: "2.6em", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const }}>
                           {fullName}
                         </div>
                       );
                     })}
                     {daySchedules.length > 2 && (
-                      <div className="absolute bottom-0 right-0 text-[8px] text-gray-400 font-medium">+{daySchedules.length - 2}</div>
+                      <div className="absolute bottom-0 right-0 text-xs text-gray-400 font-medium">+{daySchedules.length - 2}</div>
                     )}
                   </div>
                 </button>

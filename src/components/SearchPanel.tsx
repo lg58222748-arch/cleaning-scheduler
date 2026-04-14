@@ -19,6 +19,7 @@ export default function SearchPanel({ onSelectSchedule, onClose }: SearchPanelPr
 
   useEffect(() => {
     inputRef.current?.focus();
+    return () => { if (timerRef.current) clearTimeout(timerRef.current); };
   }, []);
 
   function handleSearch(q: string) {

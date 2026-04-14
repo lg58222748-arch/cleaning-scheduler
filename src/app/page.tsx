@@ -154,8 +154,25 @@ export default function Home() {
     return () => window.removeEventListener("beforeinstallprompt", handler);
   }, []);
 
-  // 뒤로가기 버튼 처리 - 모달/팝업/탭 전환을 히스토리로 관리
+  // 뒤로가기 버튼 처리 - ref로 최신 state 추적 (매 렌더 히스토리 push 방지)
   const prevTabRef = useRef<TabMode>("calendar");
+  const stateRef = useRef({
+    detailSchedule: null as Schedule | null,
+    showDayPopup: false,
+    showNotifications: false,
+    showScheduleForm: false,
+    showMemberManager: false,
+    showAdminPanel: false,
+    showSearch: false,
+    profileUser: null as User | null,
+    activeTab: "calendar" as TabMode,
+  });
+
+  // 매 렌더마다 ref 업데이트 (이벤트 핸들러에서 최신값 참조)
+  stateRef.current = {
+    detailSchedule, showDayPopup, showNotifications, showScheduleForm,
+    showMemberManager, showAdminPanel, showSearch, profileUser, activeTab,
+  };
 
   // 모달/팝업 열 때 히스토리 push
   const openModal = useCallback((setter: (v: boolean) => void) => {
@@ -174,37 +191,38 @@ export default function Home() {
   }, []);
 
   const switchTab = useCallback((tab: TabMode) => {
-    if (tab !== activeTab) {
-      prevTabRef.current = activeTab;
-      history.pushState({ tab: activeTab }, "");
+    if (tab !== stateRef.current.activeTab) {
+      prevTabRef.current = stateRef.current.activeTab;
+      history.pushState({ tab: stateRef.current.activeTab }, "");
       setActiveTab(tab);
     }
-  }, [activeTab]);
+  }, []);
 
   useEffect(() => {
     const handlePop = () => {
-      // 열려있는 모달을 순서대로 닫기 (히스토리 push 없이)
-      if (detailSchedule) { setDetailSchedule(null); return; }
-      if (showDayPopup) { setShowDayPopup(false); return; }
-      if (showNotifications) { setShowNotifications(false); return; }
-      if (showScheduleForm) { setShowScheduleForm(false); setEditingSchedule(null); return; }
-      if (showMemberManager) { setShowMemberManager(false); return; }
-      if (showAdminPanel) { setShowAdminPanel(false); return; }
-      if (showSearch) { setShowSearch(false); return; }
-      if (profileUser) { setProfileUser(null); return; }
+      const s = stateRef.current;
+      // 열려있는 모달을 순서대로 닫기
+      if (s.detailSchedule) { setDetailSchedule(null); return; }
+      if (s.showDayPopup) { setShowDayPopup(false); return; }
+      if (s.showNotifications) { setShowNotifications(false); return; }
+      if (s.showScheduleForm) { setShowScheduleForm(false); setEditingSchedule(null); return; }
+      if (s.showMemberManager) { setShowMemberManager(false); return; }
+      if (s.showAdminPanel) { setShowAdminPanel(false); return; }
+      if (s.showSearch) { setShowSearch(false); return; }
+      if (s.profileUser) { setProfileUser(null); return; }
       // 모달 없으면 이전 탭으로
-      if (activeTab !== "calendar") {
+      if (s.activeTab !== "calendar") {
         setActiveTab(prevTabRef.current || "calendar");
         return;
       }
       // 캘린더 탭이면 앱 나가지 않도록 히스토리 복원
       history.pushState(null, "");
     };
-    // 앱 시작 시 기본 히스토리 추가
+    // 앱 시작 시 기본 히스토리 1회만 추가
     history.pushState(null, "");
     window.addEventListener("popstate", handlePop);
     return () => window.removeEventListener("popstate", handlePop);
-  }); // 매 렌더마다 최신 state 참조
+  }, []); // 1회만 등록
 
   // Splash screen
   if (showSplash) {

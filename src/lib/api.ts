@@ -2,10 +2,30 @@ import { Member, Schedule, SwapRequest } from "@/types";
 
 const BASE = "";
 
+// 안전한 fetch 래퍼 - 네트워크 오류/비정상 응답 처리
+async function safeFetch(url: string, options?: RequestInit): Promise<Response> {
+  try {
+    const res = await fetch(url, options);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return res;
+  } catch (e) {
+    console.error(`API 오류 [${options?.method || "GET"} ${url}]:`, e);
+    throw e;
+  }
+}
+
+async function safeJson<T>(url: string, fallback: T, options?: RequestInit): Promise<T> {
+  try {
+    const res = await safeFetch(url, options);
+    return await res.json();
+  } catch {
+    return fallback;
+  }
+}
+
 // Members
 export async function fetchMembers(): Promise<Member[]> {
-  const res = await fetch(`${BASE}/api/members`);
-  return res.json();
+  return safeJson(`${BASE}/api/members`, []);
 }
 
 export async function createMember(data: { name: string; phone?: string; availableDays?: number[] }): Promise<Member> {
@@ -33,13 +53,11 @@ export async function deleteMember(id: string): Promise<void> {
 // Schedules
 export async function fetchSchedules(start?: string, end?: string): Promise<Schedule[]> {
   const params = start && end ? `?start=${start}&end=${end}` : "";
-  const res = await fetch(`${BASE}/api/schedules${params}`);
-  return res.json();
+  return safeJson(`${BASE}/api/schedules${params}`, []);
 }
 
 export async function searchSchedules(query: string): Promise<Schedule[]> {
-  const res = await fetch(`${BASE}/api/schedules?q=${encodeURIComponent(query)}`);
-  return res.json();
+  return safeJson(`${BASE}/api/schedules?q=${encodeURIComponent(query)}`, []);
 }
 
 export async function softDeleteSchedule(id: string): Promise<void> {
@@ -60,8 +78,7 @@ export async function deleteAllSchedules(): Promise<{ deleted: number }> {
 }
 
 export async function fetchDeletedSchedules(): Promise<Schedule[]> {
-  const res = await fetch(`${BASE}/api/schedules?deleted=true`);
-  return res.json();
+  return safeJson(`${BASE}/api/schedules?deleted=true`, []);
 }
 
 export async function restoreScheduleApi(id: string): Promise<void> {
@@ -91,8 +108,7 @@ export async function createSchedule(data: Omit<Schedule, "id" | "status">): Pro
 }
 
 export async function fetchUnassignedSchedules(): Promise<Schedule[]> {
-  const res = await fetch(`${BASE}/api/schedules?unassigned=true`);
-  return res.json();
+  return safeJson(`${BASE}/api/schedules?unassigned=true`, []);
 }
 
 export async function assignScheduleApi(scheduleId: string, memberId: string, memberName: string): Promise<Schedule> {
@@ -137,8 +153,7 @@ export async function deleteSchedule(id: string): Promise<void> {
 
 // Swap
 export async function fetchSwapRequests(): Promise<SwapRequest[]> {
-  const res = await fetch(`${BASE}/api/schedules/swap`);
-  return res.json();
+  return safeJson(`${BASE}/api/schedules/swap`, []);
 }
 
 export async function createSwapRequest(fromScheduleId: string, toScheduleId: string): Promise<SwapRequest> {
@@ -200,8 +215,7 @@ export async function fetchGoogleEvents(accessToken: string, timeMin: string, ti
 
 // Notifications
 export async function fetchNotifications(): Promise<{ notifications: import("@/types").Notification[]; unreadCount: number }> {
-  const res = await fetch(`${BASE}/api/notifications`);
-  return res.json();
+  return safeJson(`${BASE}/api/notifications`, { notifications: [], unreadCount: 0 });
 }
 
 export async function markNotificationRead(id: string): Promise<void> {
@@ -222,8 +236,7 @@ export async function markAllNotificationsRead(): Promise<void> {
 
 // Comments
 export async function fetchComments(scheduleId: string): Promise<import("@/types").Comment[]> {
-  const res = await fetch(`${BASE}/api/comments?scheduleId=${scheduleId}`);
-  return res.json();
+  return safeJson(`${BASE}/api/comments?scheduleId=${scheduleId}`, []);
 }
 
 export async function createComment(scheduleId: string, authorName: string, content: string): Promise<import("@/types").Comment> {
@@ -268,8 +281,7 @@ export async function registerApi(data: {
 
 // Users (Admin)
 export async function fetchUsers(): Promise<{ users: import("@/types").User[]; pendingUsers: import("@/types").User[] }> {
-  const res = await fetch(`${BASE}/api/users`);
-  return res.json();
+  return safeJson(`${BASE}/api/users`, { users: [], pendingUsers: [] });
 }
 
 export async function approveUserApi(userId: string): Promise<void> {
