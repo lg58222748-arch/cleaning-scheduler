@@ -212,7 +212,7 @@ export default function ScheduleDetail({
     <div ref={detailRef} className="fixed inset-0 bg-white z-50 flex flex-col animate-[modalIn_0.15s_ease-out]">
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Header */}
-        <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+        <div className="px-4 py-1.5 border-b border-gray-100 flex items-center justify-between">
           <button onClick={onClose} className="p-1.5 active:bg-gray-100 rounded-lg">
             <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -258,7 +258,7 @@ export default function ScheduleDetail({
                 }
                 setActiveTab(tab);
               }}
-              className={`flex-1 py-2.5 text-sm font-medium text-center transition-colors ${
+              className={`flex-1 py-1.5 text-sm font-medium text-center transition-colors ${
                 activeTab === tab
                   ? "text-blue-500 border-b-2 border-blue-500"
                   : "text-gray-400"
