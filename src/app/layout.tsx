@@ -40,7 +40,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ko" className={`${geistSans.variable} h-full`}>
-      <body className="min-h-full font-sans antialiased">{children}</body>
+      <body className="min-h-full font-sans antialiased" style={{ overscrollBehavior: "none" }}>{children}</body>
     </html>
   );
 }

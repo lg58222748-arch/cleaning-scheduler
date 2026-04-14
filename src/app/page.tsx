@@ -243,8 +243,6 @@ export default function Home() {
   }, [pushHash]);
 
   // ★ 뒤로가기 + 당겨서 새로고침 방지
-  const [showExitToast, setShowExitToast] = useState(false);
-  const lastBackTime = useRef(0);
 
   useEffect(() => {
     // 당겨서 새로고침 차단
@@ -268,19 +266,14 @@ export default function Home() {
       return false; // 아무것도 안 열려있음
     };
 
-    // 두 번 눌러 종료 로직
+    // 종료 확인 팝업
     const handleBackPress = () => {
       const handled = doBack();
       if (!handled) {
-        // 아무것도 안 열려있음 → 2초 내 두 번 누르면 종료 허용
-        const now = Date.now();
-        if (now - lastBackTime.current < 2000) {
-          // 앱 종료 허용 (아무것도 안 함 → 브라우저/앱이 닫힘)
-          return false;
+        // 아무것도 안 열려있음 → 종료 확인
+        if (confirm("앱을 종료하시겠습니까?")) {
+          return false; // 종료 허용
         }
-        lastBackTime.current = now;
-        setShowExitToast(true);
-        setTimeout(() => setShowExitToast(false), 2000);
         return true; // 종료 방지
       }
       return true;
@@ -508,12 +501,6 @@ export default function Home() {
 
   return (
     <div className="h-screen bg-white pb-16 flex flex-col overflow-hidden">
-      {/* 뒤로가기 종료 안내 토스트 */}
-      {showExitToast && (
-        <div className="fixed bottom-20 left-1/2 -translate-x-1/2 bg-gray-800 text-white text-sm px-6 py-3 rounded-full z-[999] animate-[modalIn_0.2s_ease-out]">
-          한 번 더 누르면 종료됩니다
-        </div>
-      )}
       {/* 카카오톡 인앱브라우저 감지 → 외부 브라우저 이동 */}
       {isInApp && (
         <div className="fixed inset-0 bg-black/80 z-[100] flex items-center justify-center p-6">
@@ -1046,7 +1033,7 @@ export default function Home() {
                       key={s.id}
                       className="rounded-2xl cursor-pointer active:scale-[0.97] transition-transform"
                       style={{ backgroundColor: schedColor }}
-                      onClick={() => { setShowDayPopup(false); consumeHash(); swapMode ? handleSwapSelect(s) : (() => { setDetailMode("calendar"); openDetailSchedule(s); })(); }}
+                      onClick={() => { setShowDayPopup(false); swapMode ? (consumeHash(), handleSwapSelect(s)) : (() => { setDetailMode("calendar"); /* dayPopup 해시를 detail 해시로 교체 */ if (hashStackRef.current.length > 0) hashStackRef.current.pop(); setDetailSchedule(s); pushHash("d"); })(); }}
                     >
                       <div className="px-4 py-4 flex items-center gap-3">
                         <span className="text-xl">📅</span>
