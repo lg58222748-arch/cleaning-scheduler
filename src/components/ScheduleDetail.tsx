@@ -225,7 +225,8 @@ export default function ScheduleDetail({
 
         {/* Tab content */}
         <div className="flex-1 overflow-y-auto">
-          {/* 고객/관리사 정보 - 모든 탭 공통 */}
+          {/* 고객/관리사 정보 - 검수/정산 탭에서만 */}
+          {activeTab !== "info" && (
           <div className="px-4 pt-3 pb-1 space-y-2">
             {(() => {
               const note = schedule.note || "";
@@ -275,6 +276,7 @@ export default function ScheduleDetail({
               </div>
             )}
           </div>
+          )}
 
           {activeTab === "info" && (
             <>
@@ -349,7 +351,7 @@ export default function ScheduleDetail({
                     <textarea
                       value={noteText}
                       onChange={(e) => { setNoteText(e.target.value); setNoteChanged(true); }}
-                      className="w-full text-sm text-gray-700 leading-relaxed bg-transparent outline-none resize-none flex-1 min-h-[120px]"
+                      className="w-full text-xs text-gray-700 leading-relaxed bg-transparent outline-none resize-none flex-1 min-h-[120px]"
                       placeholder="내용을 입력하세요..."
                     />
                   </div>
@@ -436,7 +438,7 @@ export default function ScheduleDetail({
                 const reason = prompt("반환 사유를 입력하세요:");
                 if (reason !== null) { onUnassign(schedule.id, reason || "사유 없음"); onClose(); }
               }}
-              className="flex-1 py-3 bg-orange-500 text-white rounded-xl text-sm font-bold active:bg-orange-600"
+              className="flex-1 py-2 bg-orange-500 text-white rounded-xl text-xs font-bold active:bg-orange-600"
             >
               반환
             </button>
@@ -474,13 +476,13 @@ export default function ScheduleDetail({
               if (titleText === schedule.title && !noteChanged) onClose();
             }}
             disabled={saving}
-            className="flex-1 py-3 bg-blue-500 text-white rounded-xl text-sm font-bold active:bg-blue-600 disabled:opacity-50"
+            className="flex-1 py-2 bg-blue-500 text-white rounded-xl text-xs font-bold active:bg-blue-600 disabled:opacity-50"
           >
             {saving ? "저장 중..." : "저장"}
           </button>
           <button
             onClick={onClose}
-            className="flex-1 py-3 bg-gray-100 text-gray-600 rounded-xl text-sm font-bold active:bg-gray-200"
+            className="flex-1 py-2 bg-gray-100 text-gray-600 rounded-xl text-xs font-bold active:bg-gray-200"
           >
             취소
           </button>
