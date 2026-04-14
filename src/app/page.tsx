@@ -6,7 +6,7 @@ import Calendar from "@/components/Calendar";
 import ScheduleForm from "@/components/ScheduleForm";
 import MemberManager from "@/components/MemberManager";
 import SwapPanel from "@/components/SwapPanel";
-import GoogleCalendarSync, { GoogleEvent } from "@/components/GoogleCalendarSync";
+// GoogleCalendarSync 제거 - 직접 등록으로 전환
 import NotificationPanel from "@/components/NotificationPanel";
 import ScheduleDetail from "@/components/ScheduleDetail";
 import LoginPage from "@/components/LoginPage";
@@ -14,6 +14,7 @@ import AdminPanel from "@/components/AdminPanel";
 import AssignTab from "@/components/AssignTab";
 import SearchPanel from "@/components/SearchPanel";
 import ManageTab from "@/components/ManageTab";
+import SalesTab from "@/components/SalesTab";
 import {
   fetchMembers,
   createMember,
@@ -43,7 +44,7 @@ import {
 import { format, startOfMonth, endOfMonth, addMonths, subMonths } from "date-fns";
 import { ko } from "date-fns/locale";
 
-type TabMode = "calendar" | "manage" | "assign" | "members";
+type TabMode = "calendar" | "manage" | "assign" | "members" | "sales";
 
 // localStorage에서 로그인 정보 복원
 function getSavedUser(): User | null {
@@ -68,7 +69,7 @@ export default function Home() {
   const [showSwapPanel, setShowSwapPanel] = useState(false);
   const [swapMode, setSwapMode] = useState(false);
   const [swapFirstSchedule, setSwapFirstSchedule] = useState<Schedule | null>(null);
-  const [showGoogleSync, setShowGoogleSync] = useState(false);
+  // showGoogleSync 제거됨
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [showNotifications, setShowNotifications] = useState(false);
@@ -134,6 +135,7 @@ export default function Home() {
   }
 
   const isAdmin = currentUser.role === "admin";
+  const isSales = currentUser.role === "sales" || isAdmin;
 
   // Members — 낙관적 업데이트
   async function handleAddMember(data: { name: string; phone: string; availableDays: number[] }) {
@@ -224,33 +226,7 @@ export default function Home() {
     setUnreadCount(0);
   }
 
-  // Google Calendar Import - 5개씩 병렬 배치로 빠르게
-  async function handleGoogleImport(events: GoogleEvent[]) {
-    setShowGoogleSync(false);
-    setActiveTab("assign");
-
-    const batch = 5;
-    for (let i = 0; i < events.length; i += batch) {
-      const chunk = events.slice(i, i + batch);
-      await Promise.all(chunk.map((event) => {
-        const startDt = event.start.dateTime
-          ? new Date(event.start.dateTime)
-          : new Date(event.start.date + "T09:00:00");
-        const endDt = event.end.dateTime
-          ? new Date(event.end.dateTime)
-          : new Date(event.end.date + "T12:00:00");
-        return addUnassignedSchedule({
-          title: event.summary || "캘린더 일정",
-          date: format(startDt, "yyyy-MM-dd"),
-          startTime: format(startDt, "HH:mm"),
-          endTime: format(endDt, "HH:mm"),
-          note: event.description || "",
-          googleEventId: event.id,
-        });
-      }));
-    }
-    loadData(undefined, true);
-  }
+  // Google Calendar 제거됨 - 직접 등록/영업탭으로 대체
 
   // Derived - schedules는 이미 배정된 것만 (DB레벨 분리)
   const myLinkedMember = members.find((m) => m.linkedUsername === currentUser.username);
@@ -325,7 +301,7 @@ export default function Home() {
       <header className="bg-white border-b border-gray-200 sticky top-0 z-40">
         <div className="px-4 flex items-center justify-between h-14">
           <div className="flex items-center gap-1.5 min-w-0">
-            <h1 className="text-sm font-bold text-gray-800 truncate">일정관리</h1>
+            <h1 className="text-sm font-bold text-gray-800 truncate">새집느낌</h1>
             <span className="text-[10px] px-1.5 py-0.5 bg-blue-100 text-blue-600 rounded-full font-medium shrink-0">{currentUser.name}</span>
           </div>
           <div className="flex items-center shrink-0">
@@ -366,12 +342,7 @@ export default function Home() {
         </div>
       </header>
 
-      {/* Google Calendar Sync */}
-      {showGoogleSync && (
-        <div className="px-4 pt-3">
-          <GoogleCalendarSync onImport={handleGoogleImport} />
-        </div>
-      )}
+      {/* Google Calendar 제거됨 */}
 
       {/* Swap mode banner */}
       {swapMode && (
@@ -471,10 +442,15 @@ export default function Home() {
               </div>
             </div>
 
-            {/* Google Calendar section - 관리자만 */}
-            {isAdmin && <GoogleCalendarSync onImport={handleGoogleImport} />}
           </div>
         </div>
+
+        {/* Sales tab */}
+        {isSales && (
+          <div className="h-full" style={{ display: activeTab === "sales" ? "block" : "none" }}>
+            <SalesTab userName={currentUser.name} onCreated={() => loadData(undefined, true)} />
+          </div>
+        )}
       </main>
 
       {/* Bottom tab bar - mobile style */}
@@ -527,6 +503,20 @@ export default function Home() {
             </svg>
             <span className="text-[10px] font-medium">팀원</span>
           </button>
+
+          {isSales && (
+            <button
+              onClick={() => setActiveTab("sales")}
+              className={`flex flex-col items-center justify-center gap-0.5 w-16 h-full ${
+                activeTab === "sales" ? "text-blue-500" : "text-gray-400"
+              }`}
+            >
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={activeTab === "sales" ? 2.5 : 1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              <span className="text-[10px] font-medium">영업</span>
+            </button>
+          )}
 
           <button
             onClick={() => setActiveTab("manage")}

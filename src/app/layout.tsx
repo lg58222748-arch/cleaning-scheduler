@@ -8,13 +8,13 @@ const geistSans = Geist({
 });
 
 export const metadata: Metadata = {
-  title: "청소팀 일정관리",
-  description: "청소 팀장 일정 배정 및 변경 관리 시스템",
+  title: "새집느낌 통합 관리앱",
+  description: "새집느낌 일정·검수·정산·영업 통합 관리",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "청소팀 일정관리",
+    title: "새집느낌",
   },
 };
 

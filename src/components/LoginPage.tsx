@@ -72,8 +72,8 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
             </svg>
           </div>
-          <h1 className="text-xl font-bold text-white">청소팀 일정관리</h1>
-          <p className="text-blue-100 text-sm mt-1">새집느낌 관리 시스템</p>
+          <h1 className="text-xl font-bold text-white">새집느낌 통합 관리앱</h1>
+          <p className="text-blue-100 text-sm mt-1">일정 · 검수 · 정산 · 영업</p>
         </div>
 
         {/* Tab toggle */}

@@ -63,7 +63,7 @@ export interface Comment {
 }
 
 // ===== 회원/관리사 =====
-export type UserRole = "admin" | "manager" | "pending";
+export type UserRole = "admin" | "manager" | "sales" | "pending";
 export type UserStatus = "pending" | "approved" | "rejected";
 
 export interface User {
