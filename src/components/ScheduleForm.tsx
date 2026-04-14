@@ -89,14 +89,20 @@ export default function ScheduleForm({
   const activeMembers = members.filter((m) => m.active);
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md animate-[modalIn_0.2s_ease-out] max-h-[90vh] overflow-y-auto">
-        <div className="px-6 py-4 border-b border-gray-100">
-          <h3 className="text-lg font-bold text-gray-800">
-            {editingSchedule ? "일정 수정" : "새 일정 배정"}
-          </h3>
-        </div>
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+    <div className="fixed inset-0 bg-white z-50 flex flex-col animate-[modalIn_0.15s_ease-out]">
+      <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+        <button type="button" onClick={onCancel} className="p-1.5 active:bg-gray-100 rounded-lg">
+          <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+          </svg>
+        </button>
+        <h3 className="text-base font-bold text-gray-800">
+          {editingSchedule ? "일정 수정" : "새 일정"}
+        </h3>
+        <div className="w-8" />
+      </div>
+      <div className="flex-1 overflow-y-auto">
+        <form onSubmit={handleSubmit} className="p-5 space-y-4" id="scheduleForm">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               담당 팀원
@@ -213,22 +219,25 @@ export default function ScheduleForm({
             />
           </div>
 
-          <div className="flex gap-3 pt-2">
-            <button
-              type="button"
-              onClick={onCancel}
-              className="flex-1 px-4 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium"
-            >
-              취소
-            </button>
-            <button
-              type="submit"
-              className="flex-1 px-4 py-2.5 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors font-medium"
-            >
-              {editingSchedule ? "수정" : "배정"}
-            </button>
-          </div>
+          <div className="h-20" /> {/* 하단 버튼 공간 확보 */}
         </form>
+      </div>
+      {/* 하단 고정 네비게이터 */}
+      <div className="border-t border-gray-200 px-5 py-4 flex gap-3 bg-white">
+        <button
+          type="button"
+          onClick={onCancel}
+          className="flex-1 py-3 text-base font-bold text-gray-500 active:text-gray-700"
+        >
+          취소
+        </button>
+        <button
+          type="submit"
+          form="scheduleForm"
+          className="flex-1 py-3 text-base font-bold text-blue-600 active:text-blue-800"
+        >
+          저장
+        </button>
       </div>
     </div>
   );
