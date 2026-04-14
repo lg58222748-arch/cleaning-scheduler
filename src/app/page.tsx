@@ -306,12 +306,12 @@ export default function Home() {
     } | undefined;
     const onNav = (e: Record<string, unknown>) => {
       if (e.navigationType === "traverse" && e.canIntercept) {
-        const prevent = handleBackPress();
-        if (prevent) {
-          (e.intercept as (o: { handler: () => Promise<void> }) => void)({
-            handler: async () => {}
-          });
-        }
+        // 무조건 가로채기
+        (e.intercept as (o: { handler: () => Promise<void> }) => void)({
+          handler: async () => {
+            handleBackPress();
+          }
+        });
       }
     };
     if (nav) nav.addEventListener("navigate", onNav);
