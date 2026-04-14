@@ -503,7 +503,7 @@ export default function Home() {
     .sort((a, b) => a.startTime.localeCompare(b.startTime));
 
   return (
-    <div className="h-screen bg-white pb-16 flex flex-col overflow-hidden">
+    <div className="h-[100dvh] bg-white pb-14 flex flex-col overflow-hidden">
       {/* 카카오톡 인앱브라우저 감지 → 외부 브라우저 이동 */}
       {isInApp && (
         <div className="fixed inset-0 bg-black/80 z-[100] flex items-center justify-center p-6">
@@ -576,7 +576,7 @@ export default function Home() {
       )}
       {/* Compact mobile header */}
       <header className="bg-white border-b border-gray-200 sticky top-0 z-40">
-        <div className="px-4 flex items-center justify-between h-14">
+        <div className="px-4 flex items-center justify-between h-11">
           <div className="flex items-center gap-1.5 min-w-0">
             <h1 className="text-sm font-bold text-gray-800 truncate">새집느낌 파트너</h1>
             <span className="text-xs px-1.5 py-0.5 bg-blue-100 text-blue-600 rounded-full font-medium shrink-0">{currentUser.name}</span>
@@ -889,7 +889,7 @@ export default function Home() {
 
       {/* Bottom tab bar - mobile style */}
       <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-40 safe-area-bottom">
-        <div className="flex items-center justify-around h-16 max-w-lg mx-auto">
+        <div className="flex items-center justify-around h-14 max-w-lg mx-auto">
           {/* 영업 */}
           {canSales && (
             <button
