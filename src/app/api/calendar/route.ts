@@ -15,7 +15,7 @@ export async function GET(req: NextRequest) {
 
     const redirectUri = process.env.GOOGLE_REDIRECT_URI || "http://localhost:3000/api/calendar/callback";
     const scope = encodeURIComponent("https://www.googleapis.com/auth/calendar.readonly");
-    const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${scope}&access_type=offline&prompt=consent`;
+    const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${scope}&access_type=offline&prompt=select_account`;
 
     // 팝업 대신 리디렉트로 이동 (disallowed_useragent 해결)
     return Response.redirect(authUrl);
@@ -28,7 +28,7 @@ export async function GET(req: NextRequest) {
     }
     const redirectUri = process.env.GOOGLE_REDIRECT_URI || "http://localhost:3000/api/calendar/callback";
     const scope = encodeURIComponent("https://www.googleapis.com/auth/calendar.readonly");
-    const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${scope}&access_type=offline&prompt=consent`;
+    const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${scope}&access_type=offline&prompt=select_account`;
     return Response.json({ authUrl });
   }
 
