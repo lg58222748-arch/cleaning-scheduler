@@ -980,7 +980,7 @@ export default function Home() {
         />
       )}
       {showAdminPanel && (
-        <AdminPanel onClose={() => setShowAdminPanel(false)} />
+        <AdminPanel onClose={() => setShowAdminPanel(false)} onRefresh={() => loadData(undefined, true)} />
       )}
       {showSearch && (
         <SearchPanel
