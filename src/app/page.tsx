@@ -56,7 +56,7 @@ type TabMode = "calendar" | "manage" | "assign" | "members" | "sales";
 export default function Home() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [appReady, setAppReady] = useState(false);
-  const [showSplash, setShowSplash] = useState(true);
+  const [showSplash, setShowSplash] = useState(false);
 
   // 클라이언트에서만 localStorage 복원
   useEffect(() => {
@@ -64,12 +64,15 @@ export default function Home() {
       const saved = localStorage.getItem("currentUser");
       if (saved) setCurrentUser(JSON.parse(saved));
     } catch {}
-    // 스플래시 1초 후 페이드아웃
-    const t = setTimeout(() => {
-      setShowSplash(false);
+    // 스플래시: 세션당 최초 1회만
+    if (!sessionStorage.getItem("splashShown")) {
+      sessionStorage.setItem("splashShown", "1");
+      setShowSplash(true);
+      const t = setTimeout(() => { setShowSplash(false); setAppReady(true); }, 1000);
+      return () => clearTimeout(t);
+    } else {
       setAppReady(true);
-    }, 1000);
-    return () => clearTimeout(t);
+    }
   }, []);
   const [members, setMembers] = useState<Member[]>([]);
   const [schedules, setSchedules] = useState<Schedule[]>([]);
@@ -200,7 +203,6 @@ export default function Home() {
   }, []);
 
   // ★ 안드로이드 PWA 하드웨어 뒤로가기
-  const [backDebug, setBackDebug] = useState("");
 
   useEffect(() => {
     // 공통 뒤로가기 핸들러
@@ -496,12 +498,6 @@ export default function Home() {
           </button>
         </div>
       )}
-      {/* 디버그: 뒤로가기 감지 확인 (테스트 후 제거) */}
-      {/* 디버그 (테스트 후 제거) */}
-      <div className="bg-green-500 text-white text-xs text-center py-1 z-50 flex items-center justify-center gap-2">
-        <span>{backDebug || "대기중"}</span>
-        <button onClick={() => history.back()} className="px-2 py-0.5 bg-white text-green-700 rounded text-xs font-bold">뒤로테스트</button>
-      </div>
       {/* Compact mobile header */}
       <header className="bg-white border-b border-gray-200 sticky top-0 z-40">
         <div className="px-4 flex items-center justify-between h-14">
