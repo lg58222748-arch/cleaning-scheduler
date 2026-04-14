@@ -199,18 +199,13 @@ export default function Home() {
     }
   }, []);
 
-  // ★ 안드로이드 하드웨어 뒤로가기 방어
+  // ★ 안드로이드 PWA 하드웨어 뒤로가기
   const [backDebug, setBackDebug] = useState("");
 
   useEffect(() => {
-    // 히스토리 버퍼
-    for (let i = 0; i < 50; i++) {
-      history.pushState(null, "", `#p${i}`);
-    }
-    setBackDebug(`h=${history.length}`);
-
-    const handleBack = () => {
-      setBackDebug(`pop h=${history.length}`);
+    // 공통 뒤로가기 핸들러
+    const doBack = (source: string) => {
+      setBackDebug(`${source} ${new Date().toLocaleTimeString()}`);
       const s = stateRef.current;
       if (s.detailSchedule) {
         if (detailBackRef.current && detailBackRef.current()) {} else { setDetailSchedule(null); }
@@ -224,29 +219,44 @@ export default function Home() {
       else if (s.showMemberFilter) { setShowMemberFilter(false); }
       else if (s.profileUser) { setProfileUser(null); }
       else if (s.activeTab !== "calendar") { setActiveTab(prevTabRef.current || "calendar"); }
-      history.pushState(null, "", `#p${Date.now()}`);
-      history.pushState(null, "", `#p${Date.now() + 1}`);
     };
 
-    window.addEventListener("popstate", handleBack);
-    window.addEventListener("hashchange", handleBack);
+    // 방법 1: Navigation API (Android Chrome 102+ PWA에서 동작)
+    const nav = (window as unknown as Record<string, unknown>).navigation as {
+      addEventListener(type: string, fn: (e: Record<string, unknown>) => void): void;
+      removeEventListener(type: string, fn: (e: Record<string, unknown>) => void): void;
+    } | undefined;
 
-    // Android PWA: 뒤로가기로 앱이 백그라운드로 갈 때 → 다시 포그라운드 오면 복구
-    const handleVisibility = () => {
-      if (document.visibilityState === "visible") {
-        // 앱이 다시 보임 → 버퍼 재충전
-        for (let i = 0; i < 10; i++) {
-          history.pushState(null, "", `#p${Date.now() + i}`);
-        }
-        setBackDebug(`복구 h=${history.length}`);
+    const handleNavigate = (e: Record<string, unknown>) => {
+      // traverse = 뒤로가기/앞으로가기
+      if (e.navigationType === "traverse" && e.canIntercept) {
+        (e.intercept as (opts: { handler: () => Promise<void> }) => void)({
+          handler: async () => { doBack("nav-api"); }
+        });
       }
     };
-    document.addEventListener("visibilitychange", handleVisibility);
+
+    if (nav) {
+      nav.addEventListener("navigate", handleNavigate);
+      setBackDebug("Navigation API 지원됨");
+    } else {
+      setBackDebug("Navigation API 없음 - popstate 사용");
+    }
+
+    // 방법 2: popstate (Navigation API 미지원 시 fallback)
+    for (let i = 0; i < 50; i++) {
+      history.pushState(null, "", window.location.pathname);
+    }
+
+    const handlePop = () => {
+      doBack("popstate");
+      history.pushState(null, "", window.location.pathname);
+    };
+    window.addEventListener("popstate", handlePop);
 
     return () => {
-      window.removeEventListener("popstate", handleBack);
-      window.removeEventListener("hashchange", handleBack);
-      document.removeEventListener("visibilitychange", handleVisibility);
+      window.removeEventListener("popstate", handlePop);
+      if (nav) nav.removeEventListener("navigate", handleNavigate);
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
