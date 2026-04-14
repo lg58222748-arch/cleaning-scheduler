@@ -184,13 +184,14 @@ export default function ScheduleSettlement({ scheduleId, scheduleNote, customerN
       <div>
         <select
           value={paymentMethod}
-          onChange={(e) => !isCompleted && setPaymentMethod(e.target.value as PaymentMethod)}
+          onChange={(e) => setPaymentMethod(e.target.value as PaymentMethod)}
           disabled={isCompleted}
-          className="w-full px-3 py-3 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-400 bg-white disabled:bg-gray-50"
+          className="w-full px-3 py-3 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-400 bg-white disabled:bg-gray-50 appearance-none"
+          style={{ fontSize: "14px" }}
         >
-          <option value="transfer">💳 계좌이체</option>
-          <option value="cash">💵 현금결제</option>
-          <option value="card">💳 카드결제</option>
+          <option value="transfer">계좌이체</option>
+          <option value="cash">현금결제</option>
+          <option value="card">카드결제</option>
         </select>
       </div>
 
