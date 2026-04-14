@@ -96,44 +96,7 @@ export default function Home() {
   }, [selectedDate]);
 
   useEffect(() => {
-    if (currentUser) {
-      loadData(undefined, true);
-      // 관리자: 구글 캘린더 자동 동기화
-      if (currentUser.role === "admin") {
-        const refreshToken = typeof window !== "undefined" ? localStorage.getItem("google_refresh_token") : null;
-        if (refreshToken) {
-          autoSyncGoogleCalendar(refreshToken).then(async (result) => {
-            if (result.items && result.items.length > 0) {
-              let imported = 0;
-              for (const event of result.items) {
-                const startDt = event.start.dateTime
-                  ? new Date(event.start.dateTime)
-                  : new Date(event.start.date + "T09:00:00");
-                const endDt = event.end.dateTime
-                  ? new Date(event.end.dateTime)
-                  : new Date(event.end.date + "T12:00:00");
-                const res = await addUnassignedSchedule({
-                  title: event.summary || "캘린더 일정",
-                  date: format(startDt, "yyyy-MM-dd"),
-                  startTime: format(startDt, "HH:mm"),
-                  endTime: format(endDt, "HH:mm"),
-                  note: event.description || "",
-                  googleEventId: event.id,
-                });
-                if (res && res.id) imported++;
-              }
-              if (imported > 0) {
-                loadData(undefined, true); // 새 일정 반영
-              }
-            }
-            // 새 access_token 저장
-            if (result.newAccessToken) {
-              sessionStorage.setItem("google_access_token", result.newAccessToken);
-            }
-          }).catch(() => {}); // 실패해도 무시
-        }
-      }
-    }
+    if (currentUser) loadData(undefined, true);
   }, [currentUser]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // PWA 서비스워커 등록 + 설치 배너
@@ -250,27 +213,32 @@ export default function Home() {
     setUnreadCount(0);
   }
 
-  // Google Calendar Import - 미배정 상태로 대기 목록에 추가
-  function handleGoogleImport(events: GoogleEvent[]) {
-    events.forEach(async (event) => {
-      const startDt = event.start.dateTime
-        ? new Date(event.start.dateTime)
-        : new Date(event.start.date + "T09:00:00");
-      const endDt = event.end.dateTime
-        ? new Date(event.end.dateTime)
-        : new Date(event.end.date + "T12:00:00");
-      await addUnassignedSchedule({
-        title: event.summary || "캘린더 일정",
-        date: format(startDt, "yyyy-MM-dd"),
-        startTime: format(startDt, "HH:mm"),
-        endTime: format(endDt, "HH:mm"),
-        note: event.description || "",
-        googleEventId: event.id,
-      });
-    });
+  // Google Calendar Import - 5개씩 병렬 배치로 빠르게
+  async function handleGoogleImport(events: GoogleEvent[]) {
     setShowGoogleSync(false);
     setActiveTab("assign");
-    setTimeout(() => loadData(undefined, true), 500);
+
+    const batch = 5;
+    for (let i = 0; i < events.length; i += batch) {
+      const chunk = events.slice(i, i + batch);
+      await Promise.all(chunk.map((event) => {
+        const startDt = event.start.dateTime
+          ? new Date(event.start.dateTime)
+          : new Date(event.start.date + "T09:00:00");
+        const endDt = event.end.dateTime
+          ? new Date(event.end.dateTime)
+          : new Date(event.end.date + "T12:00:00");
+        return addUnassignedSchedule({
+          title: event.summary || "캘린더 일정",
+          date: format(startDt, "yyyy-MM-dd"),
+          startTime: format(startDt, "HH:mm"),
+          endTime: format(endDt, "HH:mm"),
+          note: event.description || "",
+          googleEventId: event.id,
+        });
+      }));
+    }
+    loadData(undefined, true);
   }
 
   // Derived - schedules는 이미 배정된 것만 (DB레벨 분리)
