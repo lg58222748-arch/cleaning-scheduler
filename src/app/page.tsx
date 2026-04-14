@@ -219,7 +219,10 @@ export default function Home() {
     const doBack = () => {
       const s = stateRef.current;
       if (s.detailSchedule) {
-        if (detailBackRef.current && detailBackRef.current()) {} else { setDetailSchedule(null); }
+        if (detailBackRef.current && detailBackRef.current()) {
+          // 탭 내부 이동 처리됨 → 해시 보충 (탭은 해시 안 쌓으니까)
+          pushHash("d");
+        } else { setDetailSchedule(null); }
       }
       else if (s.showDayPopup) { setShowDayPopup(false); }
       else if (s.showNotifications) { setShowNotifications(false); }
