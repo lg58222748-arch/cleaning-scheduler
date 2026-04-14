@@ -207,7 +207,7 @@ export default function Home() {
   useEffect(() => {
     // 공통 뒤로가기 핸들러
     const doBack = (source: string) => {
-      setBackDebug(`${source} ${new Date().toLocaleTimeString()}`);
+
       const s = stateRef.current;
       if (s.detailSchedule) {
         if (detailBackRef.current && detailBackRef.current()) {} else { setDetailSchedule(null); }
