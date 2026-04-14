@@ -213,7 +213,8 @@ export default function Home() {
 
       if (s.detailSchedule) {
         if (detailBackRef.current && detailBackRef.current()) {
-          // detail 내부 탭 뒤로가기 처리됨
+          // detail 내부 탭 뒤로가기 처리됨 → 히스토리 보충
+          history.pushState({ guard: true }, "");
         } else {
           setDetailSchedule(null);
         }
