@@ -200,19 +200,19 @@ export default function Home() {
   }, []);
 
   // ★ 안드로이드 하드웨어 뒤로가기 방어
-  // 디버그: 뒤로가기 감지 여부 확인용
   const [backDebug, setBackDebug] = useState("");
+  const backCountRef = useRef(0);
 
   useEffect(() => {
-    // history 버퍼: URL 해시를 사용 (pushState보다 안드로이드 PWA에서 확실)
-    // 해시 변경은 페이지 리로드 없이 히스토리 추가
-    const baseHash = window.location.hash;
-    for (let i = 0; i < 30; i++) {
-      history.pushState(null, "", `#b${i}`);
-    }
+    // 해시를 직접 변경하여 히스토리 추가 (pushState보다 확실)
+    const initialLen = history.length;
+    window.location.hash = "app";
+    setBackDebug(`초기: history=${initialLen}, 현재=${history.length}`);
 
-    const handlePop = () => {
-      setBackDebug(`뒤로가기 감지 ${Date.now()}`);
+    // popstate + hashchange 모두 감지
+    const handleBack = () => {
+      backCountRef.current++;
+      setBackDebug(`감지! #${backCountRef.current} h=${history.length}`);
 
       const s = stateRef.current;
       if (s.detailSchedule) {
@@ -234,12 +234,18 @@ export default function Home() {
         setActiveTab(prevTabRef.current || "calendar");
       }
 
-      // 항상 보충
-      history.pushState(null, "", `#b${Date.now()}`);
+      // 해시 복원 (다음 뒤로가기를 위해)
+      setTimeout(() => {
+        window.location.hash = "app";
+      }, 50);
     };
 
-    window.addEventListener("popstate", handlePop);
-    return () => window.removeEventListener("popstate", handlePop);
+    window.addEventListener("popstate", handleBack);
+    window.addEventListener("hashchange", handleBack);
+    return () => {
+      window.removeEventListener("popstate", handleBack);
+      window.removeEventListener("hashchange", handleBack);
+    };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // 스플래시: 로고만 크게, 1초 표시
