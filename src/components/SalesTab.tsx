@@ -146,14 +146,39 @@ export default function SalesTab({ userName, onCreated }: SalesTabProps) {
 
     let name = "", phone = "", addr = "", wish = "", note = "";
 
-    // 1차: 양식 번호로 파싱 (1)성함 : 홍길동)
+    // 1차: 양식 번호로 파싱
+    let parsedSvcFromText = "";
+    let parsedPyeongFromText = "";
     for (const line of lines) {
       const m1 = line.match(/1\)\s*성함\s*[:：]\s*(.+)/); if (m1 && m1[1].trim()) name = m1[1].trim();
       const m2 = line.match(/2\)\s*주소\s*[:：]\s*(.+)/); if (m2 && m2[1].trim()) addr = m2[1].trim();
       const m3 = line.match(/3\)\s*연락처\s*[:：]\s*(.+)/); if (m3 && m3[1].trim()) phone = m3[1].trim();
       const m4 = line.match(/4\)\s*.*날짜\s*[:：]?\s*(.+)/); if (m4 && m4[1].trim()) wish = m4[1].trim();
       const m5 = line.match(/5\)\s*.*특이사항\s*[:：]?\s*(.+)/); if (m5 && m5[1].trim()) note = m5[1].trim();
+      // 서비스/평수도 양식에서 추출
+      const m6 = line.match(/6\)\s*서비스\s*종류\s*[:：]\s*(.+)/); if (m6) parsedSvcFromText = m6[1].trim();
+      const m7 = line.match(/7\)\s*평수\s*[:：]\s*(.+)/); if (m7) parsedPyeongFromText = m7[1].trim();
     }
+
+    // Step1에서 서비스 선택 안 했으면 양식에서 추출한 서비스로 설정
+    if (services.length === 0 && parsedSvcFromText) {
+      const svcNames = parsedSvcFromText.split(/[,，\s]+/).filter(Boolean);
+      setServices(svcNames.map((n) => {
+        // 양식에서 견적/예약금도 추출
+        let quote = "", deposit = "";
+        let inSvc = false;
+        for (const line of lines) {
+          if (line.includes(`► ${n}`)) { inSvc = true; continue; }
+          if (inSvc && line.includes("►")) break;
+          if (inSvc) {
+            const qm = line.match(/견적금액.*[:：]\s*([\d,]+)/); if (qm) quote = qm[1].replace(/,/g, "");
+            const dm = line.match(/예\s*약\s*금.*[:：]\s*([\d,]+)/); if (dm) deposit = dm[1].replace(/,/g, "");
+          }
+        }
+        return { name: n, quote, deposit };
+      }));
+    }
+    if (!pyeong && parsedPyeongFromText) setPyeong(parsedPyeongFromText);
 
     // 2차: 양식 뒤 자유형식 답변 추출
     // 마지막 "*" 줄 이후의 내용물을 모두 수집
