@@ -55,7 +55,7 @@ type TabMode = "calendar" | "manage" | "assign" | "members" | "sales";
 
 export default function Home() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const [showSplash, setShowSplash] = useState(true);
+  const [showSplash, setShowSplash] = useState(false);
 
   // 클라이언트에서만 localStorage 복원 (hydration mismatch 방지)
   useEffect(() => {
@@ -63,8 +63,14 @@ export default function Home() {
       const saved = localStorage.getItem("currentUser");
       if (saved) setCurrentUser(JSON.parse(saved));
     } catch {}
-    const timer = setTimeout(() => setShowSplash(false), 1500);
-    return () => clearTimeout(timer);
+    // 스플래시: 세션당 최초 1회만
+    const alreadyShown = sessionStorage.getItem("splashShown");
+    if (!alreadyShown) {
+      setShowSplash(true);
+      sessionStorage.setItem("splashShown", "1");
+      const timer = setTimeout(() => setShowSplash(false), 1500);
+      return () => clearTimeout(timer);
+    }
   }, []);
   const [members, setMembers] = useState<Member[]>([]);
   const [schedules, setSchedules] = useState<Schedule[]>([]);
