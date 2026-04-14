@@ -56,6 +56,7 @@ type TabMode = "calendar" | "manage" | "assign" | "members" | "sales";
 export default function Home() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [appReady, setAppReady] = useState(false);
+  const [showSplash, setShowSplash] = useState(true);
 
   // 클라이언트에서만 localStorage 복원
   useEffect(() => {
@@ -63,7 +64,12 @@ export default function Home() {
       const saved = localStorage.getItem("currentUser");
       if (saved) setCurrentUser(JSON.parse(saved));
     } catch {}
-    setAppReady(true);
+    // 스플래시 1초 후 앱 표시
+    const t = setTimeout(() => {
+      setShowSplash(false);
+      setAppReady(true);
+    }, 1000);
+    return () => clearTimeout(t);
   }, []);
   const [members, setMembers] = useState<Member[]>([]);
   const [schedules, setSchedules] = useState<Schedule[]>([]);
@@ -289,6 +295,15 @@ export default function Home() {
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // 스플래시: 1초, 로고 이미지 배경과 동일 색상
+  if (showSplash) {
+    return (
+      <div className="fixed inset-0 bg-[#3a9ad9] flex flex-col items-center justify-center">
+        <img src="/logo.png" alt="새집느낌" className="w-72 h-72 object-cover" style={{ borderRadius: 0 }} />
+        <span className="text-3xl font-bold text-white mt-4 tracking-wider">새집느낌 파트너</span>
+      </div>
+    );
+  }
   if (!appReady) return null;
 
   // Login gate - must be AFTER all hooks
