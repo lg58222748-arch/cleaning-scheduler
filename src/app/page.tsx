@@ -242,26 +242,15 @@ export default function Home() {
     }
   }, [pushHash]);
 
-  // ★ 뒤로가기 감지 (Navigation API + hashchange)
+  // ★ 뒤로가기 + 당겨서 새로고침 방지
   useEffect(() => {
-    // 현재 열린 것이 있는지 확인
-    const hasOpenOverlay = (): boolean => {
-      const s = stateRef.current;
-      return !!(s.detailSchedule || s.showDayPopup || s.showNotifications ||
-        s.showScheduleForm || s.showMemberManager || s.showAdminPanel ||
-        s.showSearch || s.showMemberFilter || s.profileUser || s.activeTab !== "calendar");
-    };
+    // 당겨서 새로고침 차단
+    document.body.style.overscrollBehavior = "none";
 
-    // 뒤로가기 핵심 로직: 열린 것 하나 닫기 (해시 push 없음)
     const doBack = () => {
       const s = stateRef.current;
       if (s.detailSchedule) {
-        // 디테일 내부 탭 히스토리가 있으면 그것만 pop
-        if (detailBackRef.current && detailBackRef.current()) {
-          // 내부 탭 복귀 성공 - 디테일은 유지
-          return;
-        }
-        // 내부 탭 없으면 디테일 자체 닫기
+        if (detailBackRef.current && detailBackRef.current()) return;
         setDetailSchedule(null);
       }
       else if (s.showDayPopup) { setShowDayPopup(false); }
@@ -275,49 +264,52 @@ export default function Home() {
       else if (s.activeTab !== "calendar") { setActiveTab("calendar"); tabHashPushed.current = false; }
     };
 
-    // 해시 스택 정리 (모든 해시 제거, 깨끗한 URL 복원)
-    const clearAllHashes = () => {
-      hashStackRef.current = [];
-      if (window.location.hash) {
-        history.replaceState(null, "", window.location.pathname);
-      }
-    };
-
-    // 1. Navigation API (Android PWA에서 하드웨어 뒤로가기 감지)
+    // Navigation API: 무조건 가로채기
     const nav = (window as unknown as Record<string, unknown>).navigation as {
       addEventListener(t: string, fn: (e: Record<string, unknown>) => void): void;
       removeEventListener(t: string, fn: (e: Record<string, unknown>) => void): void;
     } | undefined;
     const onNav = (e: Record<string, unknown>) => {
       if (e.navigationType === "traverse" && e.canIntercept) {
-        // 무조건 가로채기 → 앱 절대 안 꺼짐
         (e.intercept as (o: { handler: () => Promise<void> }) => void)({
           handler: async () => {
-            if (hashStackRef.current.length > 0) hashStackRef.current.pop();
             doBack();
+            // 항상 해시 유지 (앱 탈출 방지)
+            if (!window.location.hash || window.location.hash === "#") {
+              window.location.hash = "home";
+            }
           }
         });
       }
     };
     if (nav) nav.addEventListener("navigate", onNav);
 
-    // 2. hashchange fallback (브라우저 탭에서 동작)
-    const onHashChange = () => {
-      const current = window.location.hash.slice(1);
+    // 앱 시작 시 해시 벽 생성: /#home 을 베이스로 설정
+    if (!window.location.hash || window.location.hash === "#") {
+      history.replaceState(null, "", "#home");
+    }
+
+    // hashchange/popstate fallback
+    const onHashPop = () => {
+      const h = window.location.hash;
+      // 해시가 없어졌으면(앱 밖으로 나가려는 중) → 즉시 복구
+      if (!h || h === "#") {
+        history.pushState(null, "", "#home");
+        return;
+      }
+      const current = h.slice(1);
       const top = hashStackRef.current[hashStackRef.current.length - 1];
-      if (current === top) return; // forward 이동은 무시
+      if (current === top) return;
       if (hashStackRef.current.length > 0) hashStackRef.current.pop();
       doBack();
-      // 모두 닫혔으면 해시 정리
-      if (!hasOpenOverlay()) clearAllHashes();
     };
-    window.addEventListener("hashchange", onHashChange);
-    window.addEventListener("popstate", onHashChange);
+    window.addEventListener("hashchange", onHashPop);
+    window.addEventListener("popstate", onHashPop);
 
     return () => {
       if (nav) nav.removeEventListener("navigate", onNav);
-      window.removeEventListener("hashchange", onHashChange);
-      window.removeEventListener("popstate", onHashChange);
+      window.removeEventListener("hashchange", onHashPop);
+      window.removeEventListener("popstate", onHashPop);
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
