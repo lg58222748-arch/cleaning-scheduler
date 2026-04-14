@@ -6,13 +6,16 @@ import { fetchSettlement, saveSettlement } from "@/lib/api";
 
 interface ScheduleSettlementProps {
   scheduleId: string;
+  scheduleNote?: string;
+  customerNameFromSchedule?: string;
+  customerPhoneFromSchedule?: string;
 }
 
 function formatWon(n: number): string {
   return n.toLocaleString("ko") + "원";
 }
 
-export default function ScheduleSettlement({ scheduleId }: ScheduleSettlementProps) {
+export default function ScheduleSettlement({ scheduleId, scheduleNote, customerNameFromSchedule, customerPhoneFromSchedule }: ScheduleSettlementProps) {
   const [s, setS] = useState<Settlement | null>(null);
   const [quote, setQuote] = useState("");
   const [deposit, setDeposit] = useState("");
@@ -29,17 +32,28 @@ export default function ScheduleSettlement({ scheduleId }: ScheduleSettlementPro
     const data = await fetchSettlement(scheduleId);
     if (data) {
       setS(data);
-      setQuote(data.quote > 0 ? String(data.quote) : "");
-      setDeposit(data.deposit > 0 ? String(data.deposit) : "");
+      // 이미 값이 있으면 기존값, 없으면 영업 양식(note)에서 파싱
+      const hasExisting = data.quote > 0 || data.deposit > 0;
+      if (hasExisting) {
+        setQuote(String(data.quote));
+        setDeposit(String(data.deposit));
+      } else if (scheduleNote) {
+        // note에서 견적금액/예약금 파싱
+        const qMatch = scheduleNote.match(/견적금액.*[:：]\s*([\d,]+)/);
+        const dMatch = scheduleNote.match(/예\s*약\s*금.*[:：]\s*([\d,]+)/);
+        if (qMatch) setQuote(qMatch[1].replace(/,/g, ""));
+        if (dMatch) setDeposit(dMatch[1].replace(/,/g, ""));
+      }
       setExtraCharge(data.extraCharge > 0 ? String(data.extraCharge) : "");
       setPaymentMethod(data.paymentMethod);
       setCashReceipt(data.cashReceipt);
-      setCustomerName(data.customerName);
-      setCustomerPhone(data.customerPhone);
+      // 고객명/연락처도 기존값 없으면 일정 정보에서 가져오기
+      setCustomerName(data.customerName || customerNameFromSchedule || "");
+      setCustomerPhone(data.customerPhone || customerPhoneFromSchedule || "");
       setNote(data.note);
     }
     setLoading(false);
-  }, [scheduleId]);
+  }, [scheduleId, scheduleNote, customerNameFromSchedule, customerPhoneFromSchedule]);
 
   useEffect(() => { loadSettlement(); }, [loadSettlement]);
 

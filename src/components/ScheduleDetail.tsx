@@ -366,7 +366,12 @@ export default function ScheduleDetail({
             {preloadChecklist && <ScheduleChecklist scheduleId={schedule.id} onComplete={() => setActiveTab("settlement")} />}
           </div>
           <div style={{ display: activeTab === "settlement" ? "block" : "none" }}>
-            {preloadSettlement && <ScheduleSettlement scheduleId={schedule.id} />}
+            {preloadSettlement && <ScheduleSettlement
+              scheduleId={schedule.id}
+              scheduleNote={schedule.note}
+              customerNameFromSchedule={schedule.note?.match(/1\)성함\s*[:：]\s*(.+)/)?.[1]?.trim()}
+              customerPhoneFromSchedule={schedule.note?.match(/3\)연락처\s*[:：]\s*(.+)/)?.[1]?.trim()}
+            />}
           </div>
         </div>
       </div>
