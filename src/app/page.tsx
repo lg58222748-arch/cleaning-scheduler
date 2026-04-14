@@ -298,9 +298,9 @@ export default function Home() {
   // 스플래시: 1초, 로고 이미지 배경과 동일 색상
   if (showSplash) {
     return (
-      <div className="fixed inset-0 bg-[#3a9ad9] flex flex-col items-center justify-center">
-        <img src="/logo.png" alt="새집느낌" className="w-72 h-72 object-cover" style={{ borderRadius: 0 }} />
-        <span className="text-3xl font-bold text-white mt-4 tracking-wider">새집느낌 파트너</span>
+      <div className="fixed inset-0 bg-white flex flex-col items-center justify-center">
+        <img src="/logo.jpg" alt="새집느낌" className="w-64 h-64 object-contain" />
+        <span className="text-2xl font-bold text-[#3a9ad9] mt-2 tracking-wider">파트너</span>
       </div>
     );
   }

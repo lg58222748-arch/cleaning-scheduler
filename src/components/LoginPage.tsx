@@ -68,7 +68,7 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
       <div className="bg-white rounded-2xl shadow-lg w-full max-w-sm overflow-hidden">
         {/* Header */}
         <div className="bg-[#3a9ad9] px-6 py-8 text-center">
-          <img src="/logo.png" alt="새집느낌" className="w-24 h-24 mx-auto mb-2 rounded-2xl" />
+          <img src="/logo.jpg" alt="새집느낌" className="w-24 h-24 mx-auto mb-2 rounded-2xl" />
           <h1 className="text-xl font-bold text-white">새집느낌 파트너</h1>
           <p className="text-blue-100 text-sm mt-1">일정 · 검수 · 정산 · 영업</p>
         </div>
