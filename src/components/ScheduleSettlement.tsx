@@ -43,6 +43,9 @@ export default function ScheduleSettlement({ scheduleId }: ScheduleSettlementPro
 
   useEffect(() => { loadSettlement(); }, [loadSettlement]);
 
+  const [showShareModal, setShowShareModal] = useState(false);
+  const [copied, setCopied] = useState(false);
+
   async function handleSave(status: "draft" | "completed" = "draft") {
     const data = await saveSettlement(scheduleId, {
       quote: parseInt(quote) || 0,
@@ -51,6 +54,73 @@ export default function ScheduleSettlement({ scheduleId }: ScheduleSettlementPro
       paymentMethod, cashReceipt, customerName, customerPhone, note, status,
     });
     setS(data);
+    if (status === "completed") setShowShareModal(true);
+  }
+
+  function getShareText() {
+    const pm = paymentMethod === "transfer" ? "계좌이체" : paymentMethod === "cash" ? "현금결제" : "카드결제";
+    const lines = [
+      "━━━━━━━━━━━━━━━",
+      "🏠 새집느낌 정산서",
+      "━━━━━━━━━━━━━━━",
+      "",
+      `📋 결제방식: ${pm}`,
+      `📝 현금영수증: ${cashReceipt ? "신청" : "미신청 (자진발급)"}`,
+      "",
+      "─── 상담받은 견적 ───",
+      `견적 금액: ${formatWon(q)}`,
+      `예약금: ${formatWon(d)}`,
+      "",
+      "─── 현장 정산 ───",
+      `잔금: ${formatWon(balance)}`,
+      `현장 추가금: ${formatWon(e)}`,
+      "",
+      "─── 정산 내역 ───",
+      `전체 부가세(10%): ${formatWon(vatTotal)}`,
+      `현장 결제 금액: ${formatWon(fieldPayment)}`,
+      "",
+      "━━━━━━━━━━━━━━━",
+      `💰 최종 결제 금액: ${formatWon(total)}`,
+      "━━━━━━━━━━━━━━━",
+      "",
+      `총 서비스 금액: ${formatWon(serviceTotal)} (부가세 별도)`,
+      `총 서비스 금액: ${formatWon(serviceTotalVat)} (부가세 포함)`,
+    ];
+    if (cashReceipt) {
+      lines.push("", "✅ 현금영수증 신청 확인되었습니다.");
+    } else {
+      lines.push("", "📌 현금영수증 미신청 → 자진발급 처리됩니다.");
+    }
+    lines.push("", "감사합니다! 🙏", "새집느낌");
+    return lines.join("\n");
+  }
+
+  async function handleCopy() {
+    const text = getShareText();
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // fallback
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand("copy");
+      document.body.removeChild(ta);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  }
+
+  async function handleShare() {
+    const text = getShareText();
+    if (navigator.share) {
+      try { await navigator.share({ title: "새집느낌 정산서", text }); } catch {}
+    } else {
+      handleCopy();
+    }
   }
 
   // 원본 계산법
@@ -233,6 +303,47 @@ export default function ScheduleSettlement({ scheduleId }: ScheduleSettlementPro
           </div>
         </div>
       </div>
+
+      {/* 정산서 공유 버튼 (완료 후) */}
+      {isCompleted && (
+        <div className="flex gap-2">
+          <button onClick={handleCopy} className="flex-1 py-3 bg-gray-100 text-gray-700 rounded-xl text-sm font-bold active:bg-gray-200">
+            {copied ? "✅ 복사됨!" : "📋 정산서 복사"}
+          </button>
+          <button onClick={handleShare} className="flex-1 py-3 rounded-xl text-sm font-bold text-white active:opacity-90"
+            style={{ background: "#FEE500", color: "#3C1E1E" }}>
+            📤 공유하기
+          </button>
+        </div>
+      )}
+
+      {/* 정산 완료 공유 모달 */}
+      {showShareModal && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-end justify-center" onClick={(e) => { if (e.target === e.currentTarget) setShowShareModal(false); }}>
+          <div className="bg-white rounded-t-2xl w-full max-w-md p-5 pb-8 animate-[modalIn_0.2s_ease-out]">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-base font-bold">💰 정산 완료</h3>
+              <button onClick={() => setShowShareModal(false)} className="text-gray-400 text-xl">&times;</button>
+            </div>
+
+            {/* 미리보기 */}
+            <div className="bg-gray-50 rounded-xl p-4 mb-4 max-h-[40vh] overflow-y-auto">
+              <pre className="text-xs text-gray-700 whitespace-pre-wrap font-sans leading-relaxed">{getShareText()}</pre>
+            </div>
+
+            <div className="space-y-2">
+              <button onClick={handleCopy} className="w-full py-3 bg-gray-100 rounded-xl text-sm font-bold active:bg-gray-200">
+                {copied ? "✅ 복사 완료!" : "📋 텍스트 복사 (카톡/문자에 붙여넣기)"}
+              </button>
+              <button onClick={handleShare} className="w-full py-3 rounded-xl text-sm font-bold active:opacity-90"
+                style={{ background: "#FEE500", color: "#3C1E1E" }}>
+                📤 공유하기 (카톡/문자 등)
+              </button>
+            </div>
+            <div className="text-[11px] text-gray-400 text-center mt-3">💡 복사 후 카카오톡이나 문자에 붙여넣기 하세요</div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
