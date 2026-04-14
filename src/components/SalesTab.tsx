@@ -365,12 +365,12 @@ export default function SalesTab({ userName, onCreated }: SalesTabProps) {
             <label className="text-xs font-bold text-green-700 mb-2 block">견적 정보</label>
             <div className="flex gap-2 mb-3">
               <div className="flex-1">
-                <label className="text-[10px] text-gray-400 mb-0.5 block">평수</label>
+                <label className="text-[11px] text-gray-400 mb-0.5 block">평수</label>
                 <input value={pyeong} onChange={(e) => setPyeong(e.target.value)} placeholder="예) 34평" type="tel"
                   className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:border-green-500" />
               </div>
               <div className="flex-1">
-                <label className="text-[10px] text-gray-400 mb-0.5 block">타입</label>
+                <label className="text-[11px] text-gray-400 mb-0.5 block">타입</label>
                 <select value={buildType} onChange={(e) => setBuildType(e.target.value)}
                   className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none bg-white focus:border-green-500">
                   <option value="선택">선택</option>
@@ -388,17 +388,17 @@ export default function SalesTab({ userName, onCreated }: SalesTabProps) {
                 </div>
                 <div className="flex gap-2">
                   <div className="flex-1">
-                    <label className="text-[10px] text-gray-400 block">견적금액</label>
+                    <label className="text-[11px] text-gray-400 block">견적금액</label>
                     <input value={s.quote} onChange={(e) => updateService(s.name, "quote", e.target.value)} placeholder="예) 418000원" type="tel"
                       className="w-full px-2 py-1.5 border border-gray-200 rounded text-sm outline-none focus:border-green-500" />
                   </div>
                   <div className="flex-1">
-                    <label className="text-[10px] text-gray-400 block">예약금</label>
+                    <label className="text-[11px] text-gray-400 block">예약금</label>
                     <input value={s.deposit} onChange={(e) => updateService(s.name, "deposit", e.target.value)} placeholder="예) 108000원" type="tel"
                       className="w-full px-2 py-1.5 border border-gray-200 rounded text-sm outline-none focus:border-green-500" />
                   </div>
                   <div className="flex-1">
-                    <label className="text-[10px] text-gray-400 block">잔금 (자동)</label>
+                    <label className="text-[11px] text-gray-400 block">잔금 (자동)</label>
                     <div className="px-2 py-1.5 bg-gray-50 rounded text-sm text-blue-700 font-bold">
                       {getBalance(s) > 0 ? getBalance(s).toLocaleString() : "0"}
                     </div>
@@ -436,7 +436,7 @@ export default function SalesTab({ userName, onCreated }: SalesTabProps) {
           {/* 미리보기 */}
           <div className="bg-green-50 border border-green-200 rounded-xl p-3">
             <div className="text-xs font-bold text-green-700 mb-2">고객에게 보낼 양식 미리보기</div>
-            <pre className="text-[11px] text-gray-700 whitespace-pre-wrap font-sans leading-relaxed max-h-[250px] md:max-h-none overflow-y-auto">{getFormText()}</pre>
+            <pre className="text-[13px] text-gray-700 whitespace-pre-wrap font-sans leading-relaxed max-h-[250px] md:max-h-none overflow-y-auto">{getFormText()}</pre>
           </div>
 
           {/* 버튼 */}
@@ -496,15 +496,15 @@ export default function SalesTab({ userName, onCreated }: SalesTabProps) {
               <div className="border border-green-200 rounded-xl p-3 space-y-2">
                 <div className="text-xs font-bold text-green-700 mb-1">파싱 결과 확인 · 수정</div>
                 <div className="flex gap-2">
-                  <div className="flex-1"><label className="text-[10px] text-gray-400">1) 성함</label><input value={parsedName} onChange={(e) => setParsedName(e.target.value)} className="w-full px-2 py-1.5 border border-gray-200 rounded text-sm outline-none" /></div>
-                  <div className="flex-1"><label className="text-[10px] text-gray-400">3) 연락처</label><input value={parsedPhone} onChange={(e) => setParsedPhone(e.target.value)} className="w-full px-2 py-1.5 border border-gray-200 rounded text-sm outline-none" /></div>
+                  <div className="flex-1"><label className="text-[11px] text-gray-400">1) 성함</label><input value={parsedName} onChange={(e) => setParsedName(e.target.value)} className="w-full px-2 py-1.5 border border-gray-200 rounded text-sm outline-none" /></div>
+                  <div className="flex-1"><label className="text-[11px] text-gray-400">3) 연락처</label><input value={parsedPhone} onChange={(e) => setParsedPhone(e.target.value)} className="w-full px-2 py-1.5 border border-gray-200 rounded text-sm outline-none" /></div>
                 </div>
-                <div><label className="text-[10px] text-gray-400">2) 주소</label><input value={parsedAddr} onChange={(e) => setParsedAddr(e.target.value)} className="w-full px-2 py-1.5 border border-gray-200 rounded text-sm outline-none" /></div>
+                <div><label className="text-[11px] text-gray-400">2) 주소</label><input value={parsedAddr} onChange={(e) => setParsedAddr(e.target.value)} className="w-full px-2 py-1.5 border border-gray-200 rounded text-sm outline-none" /></div>
                 <div className="flex gap-2">
-                  <div className="flex-1"><label className="text-[10px] text-gray-400">4) 청소희망날짜</label><input value={parsedWishDate} onChange={(e) => setParsedWishDate(e.target.value)} className="w-full px-2 py-1.5 border border-gray-200 rounded text-sm outline-none" /></div>
-                  <div className="flex-1"><label className="text-[10px] text-gray-400">7) 평수</label><input value={parsedPyeong} onChange={(e) => setParsedPyeong(e.target.value)} className="w-full px-2 py-1.5 border border-gray-200 rounded text-sm outline-none" /></div>
+                  <div className="flex-1"><label className="text-[11px] text-gray-400">4) 청소희망날짜</label><input value={parsedWishDate} onChange={(e) => setParsedWishDate(e.target.value)} className="w-full px-2 py-1.5 border border-gray-200 rounded text-sm outline-none" /></div>
+                  <div className="flex-1"><label className="text-[11px] text-gray-400">7) 평수</label><input value={parsedPyeong} onChange={(e) => setParsedPyeong(e.target.value)} className="w-full px-2 py-1.5 border border-gray-200 rounded text-sm outline-none" /></div>
                 </div>
-                <div><label className="text-[10px] text-gray-400">5) 특이사항</label><textarea value={parsedNote} onChange={(e) => setParsedNote(e.target.value)} rows={2} className="w-full px-2 py-1.5 border border-gray-200 rounded text-sm outline-none resize-none" /></div>
+                <div><label className="text-[11px] text-gray-400">5) 특이사항</label><textarea value={parsedNote} onChange={(e) => setParsedNote(e.target.value)} rows={2} className="w-full px-2 py-1.5 border border-gray-200 rounded text-sm outline-none resize-none" /></div>
               </div>
 
               {/* 캘린더 제목 */}
@@ -593,7 +593,7 @@ export default function SalesTab({ userName, onCreated }: SalesTabProps) {
                       className="w-full py-2.5 rounded-lg text-sm font-bold text-white disabled:opacity-50" style={{ background: "linear-gradient(135deg, #0f4c81, #1a6bb5)" }}>
                       {saving ? "저장 중..." : `6. 📅 캘린더 저장 (${schedules.length}건)`}
                     </button>
-                    {postDone.length < 5 && <p className="text-[10px] text-gray-400 text-center mt-1">위 5개 항목을 모두 복사해야 저장이 활성화됩니다</p>}
+                    {postDone.length < 5 && <p className="text-[11px] text-gray-400 text-center mt-1">위 5개 항목을 모두 복사해야 저장이 활성화됩니다</p>}
                   </div>
 
                   {postDone.length >= 5 && saving === false && (
@@ -729,7 +729,7 @@ function SavedBookings({ onLoad, onSave }: {
             <div key={i} className="flex items-center gap-2 bg-gray-50 rounded-lg px-3 py-2">
               <div className="flex-1 min-w-0 cursor-pointer" onClick={() => onLoad(item)}>
                 <div className="text-sm font-medium text-gray-800 truncate">{item.parsedName || "이름없음"} · {item.parsedAddr || "주소없음"}</div>
-                <div className="text-[10px] text-gray-400">{item.services?.map((s) => s.name).join(", ")} · {new Date(item.savedAt).toLocaleDateString("ko")}</div>
+                <div className="text-[11px] text-gray-400">{item.services?.map((s) => s.name).join(", ")} · {new Date(item.savedAt).toLocaleDateString("ko")}</div>
               </div>
               <button onClick={() => deleteItem(i)} className="text-red-400 text-xs shrink-0">✕</button>
             </div>
