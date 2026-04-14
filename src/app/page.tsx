@@ -163,16 +163,12 @@ export default function Home() {
     if (editingSchedule) {
       setSchedules((prev) => prev.map((s) => s.id === editingSchedule.id ? { ...s, ...data } : s));
       await apiUpdateSchedule(editingSchedule.id, data);
-    } else if (!data.memberId) {
-      // 미배정 → 배정탭으로
+    } else {
+      // 항상 배정탭(미배정)으로 등록
       const newSchedule = await addUnassignedSchedule({
-        title: data.title, date: data.date, startTime: data.startTime, endTime: data.endTime, note: data.note || "",
+        title: data.title, date: data.date, startTime: data.startTime, endTime: data.endTime, note: data.note || "", color: data.color,
       });
       if (newSchedule?.id) setUnassignedSchedules((prev) => [...prev, newSchedule]);
-    } else {
-      // 팀원 배정됨 → 달력으로
-      const newSchedule = await createSchedule(data);
-      setSchedules((prev) => [...prev, newSchedule]);
     }
     loadData(undefined, true);
   }

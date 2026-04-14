@@ -113,7 +113,7 @@ export async function unassignScheduleApi(scheduleId: string): Promise<Schedule>
   return res.json();
 }
 
-export async function addUnassignedSchedule(data: { title: string; date: string; startTime?: string; endTime?: string; note?: string; googleEventId?: string }): Promise<Schedule> {
+export async function addUnassignedSchedule(data: { title: string; date: string; startTime?: string; endTime?: string; note?: string; googleEventId?: string; color?: string }): Promise<Schedule> {
   const res = await fetch(`${BASE}/api/schedules`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
