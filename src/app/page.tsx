@@ -55,10 +55,7 @@ type TabMode = "calendar" | "manage" | "assign" | "members" | "sales";
 
 export default function Home() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const [showSplash, setShowSplash] = useState(() => {
-    if (typeof window === "undefined") return false;
-    return !sessionStorage.getItem("splashShown");
-  });
+  const [showSplash, setShowSplash] = useState(false);
 
   // 클라이언트에서만 localStorage 복원 (hydration mismatch 방지)
   useEffect(() => {
@@ -69,6 +66,7 @@ export default function Home() {
     // 스플래시: 세션당 최초 1회만
     if (!sessionStorage.getItem("splashShown")) {
       sessionStorage.setItem("splashShown", "1");
+      setShowSplash(true);
       const timer = setTimeout(() => setShowSplash(false), 1500);
       return () => clearTimeout(timer);
     }
@@ -199,50 +197,44 @@ export default function Home() {
     }
   }, []);
 
-  // 뒤로가기: 항상 히스토리 2개를 유지하여 뒤로가기 가로챔
+  // 뒤로가기: 히스토리 버퍼를 깊게 쌓아서 앱 종료 방지
   useEffect(() => {
-    // 초기 히스토리 2개 쌓기 (뒤로가기 가로채기용)
-    history.replaceState({ guard: true }, "");
-    history.pushState({ app: true }, "");
+    // 히스토리 10개 쌓기 (뒤로가기 여유분)
+    for (let i = 0; i < 10; i++) {
+      history.pushState({ appDepth: i }, "");
+    }
 
     const handlePop = () => {
       const s = stateRef.current;
-      let handled = false;
 
       // 열려있는 모달을 순서대로 닫기
-      if (s.detailSchedule) { setDetailSchedule(null); handled = true; }
-      else if (s.showDayPopup) { setShowDayPopup(false); handled = true; }
-      else if (s.showNotifications) { setShowNotifications(false); handled = true; }
-      else if (s.showScheduleForm) { setShowScheduleForm(false); setEditingSchedule(null); handled = true; }
-      else if (s.showMemberManager) { setShowMemberManager(false); handled = true; }
-      else if (s.showAdminPanel) { setShowAdminPanel(false); handled = true; }
-      else if (s.showSearch) { setShowSearch(false); handled = true; }
-      else if (s.showMemberFilter) { setShowMemberFilter(false); handled = true; }
-      else if (s.profileUser) { setProfileUser(null); handled = true; }
+      if (s.detailSchedule) { setDetailSchedule(null); }
+      else if (s.showDayPopup) { setShowDayPopup(false); }
+      else if (s.showNotifications) { setShowNotifications(false); }
+      else if (s.showScheduleForm) { setShowScheduleForm(false); setEditingSchedule(null); }
+      else if (s.showMemberManager) { setShowMemberManager(false); }
+      else if (s.showAdminPanel) { setShowAdminPanel(false); }
+      else if (s.showSearch) { setShowSearch(false); }
+      else if (s.showMemberFilter) { setShowMemberFilter(false); }
+      else if (s.profileUser) { setProfileUser(null); }
       else if (s.activeTab !== "calendar") {
         setActiveTab(prevTabRef.current || "calendar");
-        handled = true;
       }
+      // 아무것도 안 열려있으면 아무 일도 안 함 (히스토리 버퍼가 소진될 뿐)
 
-      // 항상 히스토리 복원 (다음 뒤로가기를 위해)
-      history.pushState({ app: true }, "");
-
-      if (!handled) {
-        // 아무것도 안 열려있고 캘린더면 → 아무 일도 안 함
-      }
+      // 히스토리 1개 다시 보충 (버퍼 유지)
+      history.pushState({ appDepth: Date.now() }, "");
     };
 
     window.addEventListener("popstate", handlePop);
     return () => window.removeEventListener("popstate", handlePop);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Splash screen
+  // Splash overlay (조건부 return 대신 오버레이로 처리 → 깜빡임 방지)
   if (showSplash) {
     return (
       <div className="fixed inset-0 bg-[#3a9ad9] flex items-center justify-center z-[200]">
-        <div className="text-center animate-pulse">
-          <img src="/logo.png" alt="새집느낌" className="w-40 h-40 mx-auto rounded-3xl" />
-        </div>
+        <img src="/logo.png" alt="새집느낌" className="w-40 h-40 rounded-3xl" />
       </div>
     );
   }
