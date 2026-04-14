@@ -96,6 +96,8 @@ export default function Home() {
   const [profileUser, setProfileUser] = useState<User | null>(null);
   const [showDayPopup, setShowDayPopup] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
+  const [showMemberFilter, setShowMemberFilter] = useState(false);
+  const [selectedMemberIds, setSelectedMemberIds] = useState<Set<string>>(new Set()); // 빈 Set = 전체 보기
   const [returnAlerts, setReturnAlerts] = useState<{ id: string; title: string; date: string; reason: string }[]>([]);
 
   const loadData = useCallback(async (monthDate?: Date, fullRefresh = false) => {
@@ -154,8 +156,9 @@ export default function Home() {
     return () => window.removeEventListener("beforeinstallprompt", handler);
   }, []);
 
-  // 뒤로가기 버튼 처리 - ref로 최신 state 추적 (매 렌더 히스토리 push 방지)
+  // 뒤로가기 버튼 처리 - 히스토리 스택 카운터 방식
   const prevTabRef = useRef<TabMode>("calendar");
+  const historyDepthRef = useRef(0);
   const stateRef = useRef({
     detailSchedule: null as Schedule | null,
     showDayPopup: false,
@@ -164,43 +167,52 @@ export default function Home() {
     showMemberManager: false,
     showAdminPanel: false,
     showSearch: false,
+    showMemberFilter: false,
     profileUser: null as User | null,
     activeTab: "calendar" as TabMode,
   });
 
-  // 매 렌더마다 ref 업데이트 (이벤트 핸들러에서 최신값 참조)
   stateRef.current = {
     detailSchedule, showDayPopup, showNotifications, showScheduleForm,
-    showMemberManager, showAdminPanel, showSearch, profileUser, activeTab,
+    showMemberManager, showAdminPanel, showSearch, showMemberFilter,
+    profileUser, activeTab,
   };
 
-  // 모달/팝업 열 때 히스토리 push
-  const openModal = useCallback((setter: (v: boolean) => void) => {
-    history.pushState({ modal: true }, "");
-    setter(true);
+  // 히스토리 push + depth 추적
+  const pushHistory = useCallback(() => {
+    historyDepthRef.current++;
+    history.pushState({ depth: historyDepthRef.current }, "");
   }, []);
+
+  const openModal = useCallback((setter: (v: boolean) => void) => {
+    pushHistory();
+    setter(true);
+  }, [pushHistory]);
 
   const openDetailSchedule = useCallback((s: Schedule | null) => {
-    if (s) history.pushState({ modal: true }, "");
+    if (s) pushHistory();
     setDetailSchedule(s);
-  }, []);
+  }, [pushHistory]);
 
   const openProfileUser = useCallback((u: User | null) => {
-    if (u) history.pushState({ modal: true }, "");
+    if (u) pushHistory();
     setProfileUser(u);
-  }, []);
+  }, [pushHistory]);
 
   const switchTab = useCallback((tab: TabMode) => {
     if (tab !== stateRef.current.activeTab) {
       prevTabRef.current = stateRef.current.activeTab;
-      history.pushState({ tab: stateRef.current.activeTab }, "");
+      pushHistory();
       setActiveTab(tab);
     }
-  }, []);
+  }, [pushHistory]);
 
   useEffect(() => {
-    const handlePop = () => {
+    const handlePop = (e: PopStateEvent) => {
       const s = stateRef.current;
+      // depth 감소
+      if (historyDepthRef.current > 0) historyDepthRef.current--;
+
       // 열려있는 모달을 순서대로 닫기
       if (s.detailSchedule) { setDetailSchedule(null); return; }
       if (s.showDayPopup) { setShowDayPopup(false); return; }
@@ -209,20 +221,22 @@ export default function Home() {
       if (s.showMemberManager) { setShowMemberManager(false); return; }
       if (s.showAdminPanel) { setShowAdminPanel(false); return; }
       if (s.showSearch) { setShowSearch(false); return; }
+      if (s.showMemberFilter) { setShowMemberFilter(false); return; }
       if (s.profileUser) { setProfileUser(null); return; }
       // 모달 없으면 이전 탭으로
       if (s.activeTab !== "calendar") {
         setActiveTab(prevTabRef.current || "calendar");
         return;
       }
-      // 캘린더 탭이면 앱 나가지 않도록 히스토리 복원
-      history.pushState(null, "");
+      // 캘린더 탭이고 아무것도 안 열려있으면 → 뒤로 나가지 않게 복원
+      e.preventDefault();
+      pushHistory();
     };
-    // 앱 시작 시 기본 히스토리 1회만 추가
-    history.pushState(null, "");
+    // 앱 시작 시 기본 히스토리 1회
+    pushHistory();
     window.addEventListener("popstate", handlePop);
     return () => window.removeEventListener("popstate", handlePop);
-  }, []); // 1회만 등록
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Splash screen
   if (showSplash) {
@@ -358,7 +372,7 @@ export default function Home() {
 
   // Derived - schedules는 이미 배정된 것만 (DB레벨 분리)
   const myLinkedMember = members.find((m) => m.linkedUsername === currentUser.username);
-  const calendarSchedules = canManageAdvanced
+  const baseCalendarSchedules = canManageAdvanced
     ? schedules
     : schedules.filter((s) =>
         s.memberName === currentUser.name ||
@@ -366,6 +380,10 @@ export default function Home() {
         s.assignedTo === currentUser.id ||
         (myLinkedMember && s.memberId === myLinkedMember.id)
       );
+  // 팀원 필터 적용
+  const calendarSchedules = selectedMemberIds.size > 0
+    ? baseCalendarSchedules.filter((s) => selectedMemberIds.has(s.memberId))
+    : baseCalendarSchedules;
   const dateStr = format(selectedDate, "yyyy-MM-dd");
   const daySchedules = calendarSchedules
     .filter((s) => s.date === dateStr)
@@ -461,6 +479,22 @@ export default function Home() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
               </svg>
             </button>
+            {/* Member filter - 관리자만 */}
+            {canManageAdvanced && activeTab === "calendar" && (
+              <button
+                onClick={() => { showMemberFilter ? setShowMemberFilter(false) : openModal(setShowMemberFilter); }}
+                className={`p-2 rounded-lg relative ${showMemberFilter || selectedMemberIds.size > 0 ? "text-blue-500 bg-blue-50" : "text-gray-400 active:bg-blue-50"}`}
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z" />
+                </svg>
+                {selectedMemberIds.size > 0 && (
+                  <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-blue-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center">
+                    {selectedMemberIds.size}
+                  </span>
+                )}
+              </button>
+            )}
             {/* Notification bell */}
             <button
               onClick={() => { setShowDayPopup(false); openModal(setShowNotifications); }}
@@ -489,7 +523,63 @@ export default function Home() {
         </div>
       </header>
 
-      {/* Google Calendar 제거됨 */}
+      {/* 팀원 필터 패널 */}
+      {showMemberFilter && canManageAdvanced && (
+        <div className="bg-white border-b border-gray-200 px-4 py-3 z-30 max-h-[50vh] overflow-y-auto">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-bold text-gray-700">팀원 필터</span>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setSelectedMemberIds(new Set())}
+                className="text-xs text-blue-500 font-medium"
+              >
+                전체 보기
+              </button>
+              <button
+                onClick={() => setShowMemberFilter(false)}
+                className="text-xs text-gray-400"
+              >
+                닫기
+              </button>
+            </div>
+          </div>
+          <div className="space-y-1">
+            {members.filter(m => m.active).map((m) => {
+              const isSelected = selectedMemberIds.has(m.id);
+              const memberColor = m.color || "#3B82F6";
+              return (
+                <button
+                  key={m.id}
+                  onClick={() => {
+                    setSelectedMemberIds((prev) => {
+                      const next = new Set(prev);
+                      if (next.has(m.id)) next.delete(m.id);
+                      else next.add(m.id);
+                      return next;
+                    });
+                  }}
+                  className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg active:bg-gray-50"
+                >
+                  <div
+                    className="w-5 h-5 rounded flex items-center justify-center border-2 shrink-0"
+                    style={{
+                      borderColor: memberColor,
+                      backgroundColor: isSelected ? memberColor : "transparent",
+                    }}
+                  >
+                    {isSelected && (
+                      <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                      </svg>
+                    )}
+                  </div>
+                  <span className="text-sm text-gray-800">{m.name}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Swap mode banner */}
       {swapMode && (
