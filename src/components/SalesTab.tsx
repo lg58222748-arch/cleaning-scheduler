@@ -457,6 +457,20 @@ export default function SalesTab({ userName, onCreated }: SalesTabProps) {
       {/* ===== STEP 2 ===== */}
       {step === 2 && (
         <div className="p-4 space-y-4">
+          {/* 예약 보관함 */}
+          <SavedBookings onLoad={(data) => {
+            if (data.services) setServices(data.services);
+            if (data.parsedName) setParsedName(data.parsedName);
+            if (data.parsedPhone) setParsedPhone(data.parsedPhone);
+            if (data.parsedAddr) setParsedAddr(data.parsedAddr);
+            if (data.parsedWishDate) setParsedWishDate(data.parsedWishDate);
+            if (data.confirmMsg) setConfirmMsg(data.confirmMsg);
+            if (data.customerText) setCustomerText(data.customerText);
+            setParsedPyeong(data.pyeong || pyeong);
+          }} onSave={() => ({
+            services, parsedName, parsedPhone, parsedAddr, parsedWishDate, confirmMsg, userName, customerText, pyeong,
+          })} />
+
           {/* 고객 답장 붙여넣기 */}
           <div>
             <label className="text-xs font-bold text-green-700 mb-1 block">고객 답장 붙여넣기</label>
@@ -587,21 +601,6 @@ export default function SalesTab({ userName, onCreated }: SalesTabProps) {
       {/* ===== STEP 3 · 안내 양식 ===== */}
       {step === 3 && (
         <div className="p-4 space-y-3">
-          {/* 예약 보관함 */}
-          <div>
-            <div className="text-xs font-bold text-green-700 mb-2">📂 예약 보관함</div>
-            <SavedBookings onLoad={(data) => {
-              if (data.services) setServices(data.services);
-              if (data.parsedName) setParsedName(data.parsedName);
-              if (data.parsedPhone) setParsedPhone(data.parsedPhone);
-              if (data.parsedAddr) setParsedAddr(data.parsedAddr);
-              if (data.confirmMsg) setConfirmMsg(data.confirmMsg);
-              setStep(2);
-            }} currentData={{ services, parsedName, parsedPhone, parsedAddr, parsedWishDate, confirmMsg, userName }} />
-          </div>
-
-          <hr className="border-gray-100" />
-
           {/* 안내 양식 모음 */}
           <div className="text-xs font-bold text-green-700 mb-2">📋 안내 양식 모음</div>
           {TEMPLATES.map((tpl, i) => (
@@ -660,14 +659,18 @@ interface BookingData {
   parsedWishDate?: string;
   confirmMsg: string;
   userName: string;
+  customerText?: string;
+  pyeong?: string;
   savedAt: string;
 }
 
-function SavedBookings({ onLoad, currentData }: { onLoad: (data: BookingData) => void; currentData: Omit<BookingData, "savedAt"> }) {
+function SavedBookings({ onLoad, onSave }: {
+  onLoad: (data: BookingData) => void;
+  onSave: () => Omit<BookingData, "savedAt">;
+}) {
   const [items, setItems] = useState<BookingData[]>([]);
   const [showList, setShowList] = useState(false);
 
-  // localStorage에서 불러오기
   function loadItems() {
     try {
       const saved = localStorage.getItem("savedBookings");
@@ -676,15 +679,17 @@ function SavedBookings({ onLoad, currentData }: { onLoad: (data: BookingData) =>
   }
 
   function saveCurrentBooking() {
+    const currentData = onSave();
     if (!currentData.parsedName && !currentData.confirmMsg) {
-      alert("저장할 예약 내용이 없습니다. STEP 2에서 파싱 후 저장해주세요.");
+      alert("저장할 예약 내용이 없습니다. 파싱 후 저장해주세요.");
       return;
     }
     const newItem: BookingData = { ...currentData, savedAt: new Date().toISOString() };
-    const updated = [newItem, ...items].slice(0, 50); // 최대 50건
+    loadItems();
+    const updated = [newItem, ...items].slice(0, 50);
     setItems(updated);
     localStorage.setItem("savedBookings", JSON.stringify(updated));
-    alert("예약 저장 완료!");
+    alert("임시 저장 완료!");
   }
 
   function deleteItem(idx: number) {
