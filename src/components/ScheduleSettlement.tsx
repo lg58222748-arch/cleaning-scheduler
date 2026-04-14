@@ -104,52 +104,37 @@ export default function ScheduleSettlement({ scheduleId, scheduleNote, customerN
     const dateStr = `${now.getFullYear()}.${String(now.getMonth() + 1).padStart(2, "0")}.${String(now.getDate()).padStart(2, "0")} ${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
     const memberDisplay = memberBranch ? `${memberBranch} 관리점 ${memberName}` : memberName;
 
-    const lines = [
-      "새집느낌 정산서",
-      "━━━━━━━━━━━━━━━",
-      "",
-      "── 고객 정보 ──",
-      `고객명: ${customerName || "-"}님`,
-      `연락처: ${customerPhone || "-"}`,
-      "",
-      "── 관리사 정보 ──",
-      `담당: ${memberDisplay || "-"}`,
-      "",
-      "── 결제 정보 ──",
-      `결제방식: ${pm}`,
-      `현금영수증: ${cashReceipt ? "신청" : "미신청"}`,
-    ];
+    const lines: string[] = [];
+    // 관리사 정보 (맨 위)
+    if (memberDisplay) lines.push(`${memberDisplay} 관리사`);
+    lines.push("");
+    lines.push("새집느낌 정산서");
+    lines.push("──── 고객 정보 ────");
+    lines.push(`고객명: ${customerName || "-"}님`);
+    lines.push(`연락처: ${customerPhone || "-"}`);
+    lines.push(`결제방식: ${pm}`);
+    lines.push(`현금영수증: ${cashReceipt ? "신청" : "미신청"}`);
 
     if (depositorName || bankName || accountNumber) {
-      lines.push("");
-      lines.push("── 계좌 정보 ──");
+      lines.push("──── 계좌 정보 ────");
       if (depositorName) lines.push(`입금주: ${depositorName}`);
       if (bankName) lines.push(`은행명: ${bankName}`);
       if (accountNumber) lines.push(`계좌번호: ${accountNumber}`);
     }
 
-    lines.push("");
-    lines.push("── 비용 참고사항 ──");
+    lines.push("──── 비용 참고사항 ────");
     lines.push(`공급가액: ${formatWon(q)}`);
     lines.push(`예약금(선납완료): ${formatWon(d)}`);
     lines.push(`잔금: ${formatWon(balance)}`);
     lines.push(`현장 추가금: ${formatWon(e)}`);
-    lines.push("");
-    lines.push("── 최종 결제 안내 ──");
+    lines.push("──── 최종 결제 안내 ────");
     lines.push(receiptMsg);
-
-    if (cashReceipt) {
-      lines.push("");
-      lines.push(`현장 결제 금액: ${formatWon(fieldPayment)}`);
-      lines.push(`전체 부가세(10%): ${formatWon(vatTotal)}`);
-    }
-
     lines.push("");
     lines.push(`최종 결제 금액: ${formatWon(total)}`);
     lines.push("");
     lines.push("이용해주셔서 너무 감사드립니다.");
     lines.push("━━━━━━━━━━━━━━━");
-    lines.push(`${dateStr} 새집느낌`);
+    lines.push(`${dateStr} · 새집느낌`);
     return lines.join("\n");
   }
 
