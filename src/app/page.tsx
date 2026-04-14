@@ -37,6 +37,7 @@ import {
   fetchNotifications,
   markNotificationRead as apiMarkRead,
   markAllNotificationsRead as apiMarkAllRead,
+  autoSyncGoogleCalendar,
 } from "@/lib/api";
 import { format, startOfMonth, endOfMonth, addMonths, subMonths } from "date-fns";
 import { ko } from "date-fns/locale";
@@ -94,7 +95,44 @@ export default function Home() {
   }, [selectedDate]);
 
   useEffect(() => {
-    if (currentUser) loadData(undefined, true);
+    if (currentUser) {
+      loadData(undefined, true);
+      // 관리자: 구글 캘린더 자동 동기화
+      if (currentUser.role === "admin") {
+        const refreshToken = typeof window !== "undefined" ? localStorage.getItem("google_refresh_token") : null;
+        if (refreshToken) {
+          autoSyncGoogleCalendar(refreshToken).then(async (result) => {
+            if (result.items && result.items.length > 0) {
+              let imported = 0;
+              for (const event of result.items) {
+                const startDt = event.start.dateTime
+                  ? new Date(event.start.dateTime)
+                  : new Date(event.start.date + "T09:00:00");
+                const endDt = event.end.dateTime
+                  ? new Date(event.end.dateTime)
+                  : new Date(event.end.date + "T12:00:00");
+                const res = await addUnassignedSchedule({
+                  title: event.summary || "캘린더 일정",
+                  date: format(startDt, "yyyy-MM-dd"),
+                  startTime: format(startDt, "HH:mm"),
+                  endTime: format(endDt, "HH:mm"),
+                  note: event.description || "",
+                  googleEventId: event.id,
+                });
+                if (res && res.id) imported++;
+              }
+              if (imported > 0) {
+                loadData(undefined, true); // 새 일정 반영
+              }
+            }
+            // 새 access_token 저장
+            if (result.newAccessToken) {
+              sessionStorage.setItem("google_access_token", result.newAccessToken);
+            }
+          }).catch(() => {}); // 실패해도 무시
+        }
+      }
+    }
   }, [currentUser]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // PWA 서비스워커 등록 + 설치 배너

@@ -42,6 +42,7 @@ export async function GET(req: NextRequest) {
 <body>
 <script>
   sessionStorage.setItem("google_access_token", "${tokenData.access_token}");
+  ${tokenData.refresh_token ? `localStorage.setItem("google_refresh_token", "${tokenData.refresh_token}");` : ""}
   ${tokenData.refresh_token ? `sessionStorage.setItem("google_refresh_token", "${tokenData.refresh_token}");` : ""}
   window.location.href = "/?google_token=${tokenData.access_token}";
 </script>

@@ -172,6 +172,23 @@ export async function getGoogleAuthUrl(): Promise<{ authUrl?: string; error?: st
   return res.json();
 }
 
+export async function autoSyncGoogleCalendar(refreshToken: string): Promise<{ items?: GoogleEvent[]; error?: string; needReauth?: boolean; newAccessToken?: string }> {
+  const res = await fetch(`${BASE}/api/calendar`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ action: "auto-sync", refreshToken }),
+  });
+  return res.json();
+}
+
+interface GoogleEvent {
+  id: string;
+  summary: string;
+  start: { dateTime?: string; date?: string };
+  end: { dateTime?: string; date?: string };
+  description?: string;
+}
+
 export async function fetchGoogleEvents(accessToken: string, timeMin: string, timeMax: string) {
   const res = await fetch(`${BASE}/api/calendar`, {
     method: "POST",
