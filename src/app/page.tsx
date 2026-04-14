@@ -65,6 +65,7 @@ export default function Home() {
   const [showAdminPanel, setShowAdminPanel] = useState(false);
   const [showDayPopup, setShowDayPopup] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
+  const [returnAlert, setReturnAlert] = useState<{ title: string; date: string } | null>(null);
 
   const loadData = useCallback(async (monthDate?: Date, fullRefresh = false) => {
     const d = monthDate || selectedDate;
@@ -152,7 +153,6 @@ export default function Home() {
     setUnassignedSchedules((prev) => prev.filter((s) => s.id !== id));
     await softDeleteSchedule(id);
   }
-  const [returnAlert, setReturnAlert] = useState<{ title: string; date: string } | null>(null);
 
   async function handleUnassignSchedule(id: string) {
     const target = schedules.find((s) => s.id === id);
