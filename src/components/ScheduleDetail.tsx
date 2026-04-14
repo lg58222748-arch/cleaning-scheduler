@@ -488,7 +488,9 @@ export default function ScheduleDetail({
           <button
             onClick={async () => {
               if (titleText.includes("/미입금")) {
-                const newTitle = titleText.replace(/\/미입금/g, "");
+                // note에서 원래 제목 복원
+                const originalMatch = schedule.note?.match(/원래제목:\s*(.+)/);
+                const newTitle = originalMatch ? originalMatch[1].trim() : titleText.replace(/\/미입금/g, "");
                 schedule.title = newTitle;
                 setTitleText(newTitle);
                 await apiUpdateSchedule(schedule.id, { title: newTitle });

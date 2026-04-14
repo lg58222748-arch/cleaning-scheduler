@@ -298,15 +298,17 @@ export default function SalesTab({ userName, onCreated }: SalesTabProps) {
       const sched = schedules[i];
       const svc = services[i];
       if (!svc) continue;
-      const title = `U${parsedName}/${parsedAddr?.split(" ").slice(0, 2).join("")}/${userName} [${i + 1}/${schedules.length}]/${svc.name}/미입금`;
-      const calTitle = sched.time && sched.time !== "선택" ? `[${sched.time}] ${title}` : title;
+      const originalTitle = `U${parsedName}/${parsedAddr?.split(" ").slice(0, 2).join("")}/${userName} [${i + 1}/${schedules.length}]/${svc.name}`;
+      const calOriginal = sched.time && sched.time !== "선택" ? `[${sched.time}] ${originalTitle}` : originalTitle;
+      // 미입금 상태: 고객이름/미입금
+      const displayTitle = `${parsedName}/미입금`;
 
       await addUnassignedSchedule({
-        title: calTitle,
+        title: displayTitle,
         date: sched.date || new Date().toISOString().slice(0, 10),
         startTime: sched.time === "오전" ? "07:00" : sched.time === "오후" ? "13:00" : "09:00",
         endTime: sched.time === "오전" ? "12:00" : sched.time === "오후" ? "18:00" : "18:00",
-        note: confirmMsg,
+        note: `원래제목: ${calOriginal}\n${confirmMsg}`,
       });
     }
     setSaving(false);
