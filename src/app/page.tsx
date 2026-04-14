@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import dynamic from "next/dynamic";
 import { Member, Schedule, SwapRequest, Notification, User, UserRole } from "@/types";
 import Calendar from "@/components/Calendar";
@@ -154,10 +154,36 @@ export default function Home() {
     return () => window.removeEventListener("beforeinstallprompt", handler);
   }, []);
 
-  // 뒤로가기 버튼 처리 - 팝업/모달 닫기
+  // 뒤로가기 버튼 처리 - 모달/팝업/탭 전환을 히스토리로 관리
+  const prevTabRef = useRef<TabMode>("calendar");
+
+  // 모달/팝업 열 때 히스토리 push
+  const openModal = useCallback((setter: (v: boolean) => void) => {
+    history.pushState({ modal: true }, "");
+    setter(true);
+  }, []);
+
+  const openDetailSchedule = useCallback((s: Schedule | null) => {
+    if (s) history.pushState({ modal: true }, "");
+    setDetailSchedule(s);
+  }, []);
+
+  const openProfileUser = useCallback((u: User | null) => {
+    if (u) history.pushState({ modal: true }, "");
+    setProfileUser(u);
+  }, []);
+
+  const switchTab = useCallback((tab: TabMode) => {
+    if (tab !== activeTab) {
+      prevTabRef.current = activeTab;
+      history.pushState({ tab: activeTab }, "");
+      setActiveTab(tab);
+    }
+  }, [activeTab]);
+
   useEffect(() => {
     const handlePop = () => {
-      // 열려있는 모달을 순서대로 닫기
+      // 열려있는 모달을 순서대로 닫기 (히스토리 push 없이)
       if (detailSchedule) { setDetailSchedule(null); return; }
       if (showDayPopup) { setShowDayPopup(false); return; }
       if (showNotifications) { setShowNotifications(false); return; }
@@ -166,7 +192,12 @@ export default function Home() {
       if (showAdminPanel) { setShowAdminPanel(false); return; }
       if (showSearch) { setShowSearch(false); return; }
       if (profileUser) { setProfileUser(null); return; }
-      // 아무 팝업도 없으면 히스토리 복원
+      // 모달 없으면 이전 탭으로
+      if (activeTab !== "calendar") {
+        setActiveTab(prevTabRef.current || "calendar");
+        return;
+      }
+      // 캘린더 탭이면 앱 나가지 않도록 히스토리 복원
       history.pushState(null, "");
     };
     // 앱 시작 시 기본 히스토리 추가
@@ -260,7 +291,7 @@ export default function Home() {
   }
   function handleEditSchedule(schedule: Schedule) {
     setEditingSchedule(schedule);
-    setShowScheduleForm(true);
+    openModal(setShowScheduleForm);
   }
 
   // Swap select
@@ -390,7 +421,7 @@ export default function Home() {
           {returnAlerts.length > 5 && (
             <div className="px-3 py-1 text-xs opacity-80 text-center">+{returnAlerts.length - 5}건 더</div>
           )}
-          <button onClick={() => { setReturnAlerts([]); setActiveTab("assign"); }} className="w-full py-1.5 text-xs font-medium bg-orange-600/50 active:bg-orange-600">
+          <button onClick={() => { setReturnAlerts([]); switchTab("assign"); }} className="w-full py-1.5 text-xs font-medium bg-orange-600/50 active:bg-orange-600">
             배정탭에서 처리 →
           </button>
         </div>
@@ -405,7 +436,7 @@ export default function Home() {
           <div className="flex items-center shrink-0">
             {/* Search */}
             <button
-              onClick={() => setShowSearch(true)}
+              onClick={() => openModal(setShowSearch)}
               className="p-2 text-gray-400 active:bg-blue-50 rounded-lg"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -414,7 +445,7 @@ export default function Home() {
             </button>
             {/* Notification bell */}
             <button
-              onClick={() => { setShowDayPopup(false); setShowNotifications(true); }}
+              onClick={() => { setShowDayPopup(false); openModal(setShowNotifications); }}
               className="p-2 text-gray-400 active:bg-yellow-50 rounded-lg relative"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -428,7 +459,7 @@ export default function Home() {
             </button>
             {/* Admin button */}
             {canManageAdvanced && (
-              <button onClick={() => setShowAdminPanel(true)} className="p-2 text-gray-400 active:bg-purple-50 rounded-lg">
+              <button onClick={() => openModal(setShowAdminPanel)} className="p-2 text-gray-400 active:bg-purple-50 rounded-lg">
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
               </button>
             )}
@@ -468,7 +499,7 @@ export default function Home() {
             schedules={calendarSchedules}
             members={members}
             selectedDate={selectedDate}
-            onSelectDate={(d) => { setSelectedDate(d); setShowDayPopup(true); }}
+            onSelectDate={(d) => { setSelectedDate(d); openModal(setShowDayPopup); }}
             onMonthChange={(d) => loadData(d)}
           />
         </div>
@@ -494,7 +525,7 @@ export default function Home() {
               setUnassignedSchedules((prev) => prev.filter((s) => s.id !== id));
             }} onOpenDetail={(s) => {
               setDetailMode("assign");
-              setDetailSchedule(s);
+              openDetailSchedule(s);
             }} />
           </div>
         )}
@@ -548,7 +579,7 @@ export default function Home() {
                             <option value="scheduler">일정관리자</option>
                             <option value="ceo">대표</option>
                           </select>
-                          <button onClick={() => setProfileUser(u)} className="p-1.5 active:bg-gray-100 rounded-lg border border-gray-200">
+                          <button onClick={() => openProfileUser(u)} className="p-1.5 active:bg-gray-100 rounded-lg border border-gray-200">
                             <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                           </button>
                           <button onClick={() => {
@@ -586,7 +617,7 @@ export default function Home() {
       {/* FAB + 버튼 - 달력/배정에서만 */}
       {(activeTab === "calendar" || activeTab === "assign") && canAssign && (
         <button
-          onClick={() => { setEditingSchedule(null); setShowScheduleForm(true); }}
+          onClick={() => { setEditingSchedule(null); openModal(setShowScheduleForm); }}
           className="fixed bottom-20 right-4 w-12 h-12 bg-blue-500 rounded-full flex items-center justify-center shadow-lg active:bg-blue-600 z-30"
         >
           <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -601,7 +632,7 @@ export default function Home() {
           {/* 영업 */}
           {canSales && (
             <button
-              onClick={() => setActiveTab("sales")}
+              onClick={() => switchTab("sales")}
               className={`flex flex-col items-center justify-center gap-0.5 w-16 h-full ${
                 activeTab === "sales" ? "text-blue-500" : "text-gray-400"
               }`}
@@ -616,7 +647,7 @@ export default function Home() {
           {/* 배정 */}
           {canAssign && (
             <button
-              onClick={() => setActiveTab("assign")}
+              onClick={() => switchTab("assign")}
               className={`flex flex-col items-center justify-center gap-0.5 w-16 h-full ${
                 activeTab === "assign" ? "text-blue-500" : "text-gray-400"
               }`}
@@ -630,7 +661,7 @@ export default function Home() {
 
           {/* 달력 */}
           <button
-            onClick={() => setActiveTab("calendar")}
+            onClick={() => switchTab("calendar")}
             className={`flex flex-col items-center justify-center gap-0.5 w-16 h-full ${
               activeTab === "calendar" ? "text-blue-500" : "text-gray-400"
             }`}
@@ -643,7 +674,7 @@ export default function Home() {
 
           {/* 팀원 */}
           <button
-            onClick={() => setActiveTab("members")}
+            onClick={() => switchTab("members")}
             className={`flex flex-col items-center justify-center gap-0.5 w-16 h-full ${
               activeTab === "members" ? "text-blue-500" : "text-gray-400"
             }`}
@@ -657,7 +688,7 @@ export default function Home() {
           {/* 관리 */}
           {canManage && (
           <button
-            onClick={() => setActiveTab("manage")}
+            onClick={() => switchTab("manage")}
             className={`flex flex-col items-center justify-center gap-0.5 w-16 h-full ${
               activeTab === "manage" ? "text-blue-500" : "text-gray-400"
             }`}
@@ -720,7 +751,7 @@ export default function Home() {
                 <span className="text-sm text-gray-500">{format(selectedDate, "EEEE", { locale: ko })}</span>
               </div>
               <button
-                onClick={() => { setShowDayPopup(false); setEditingSchedule(null); setShowScheduleForm(true); }}
+                onClick={() => { setShowDayPopup(false); setEditingSchedule(null); openModal(setShowScheduleForm); }}
                 className="w-9 h-9 bg-gray-100 rounded-full flex items-center justify-center active:bg-blue-100"
               >
                 <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -744,7 +775,7 @@ export default function Home() {
                       key={s.id}
                       className="rounded-2xl cursor-pointer active:scale-[0.97] transition-transform"
                       style={{ backgroundColor: schedColor }}
-                      onClick={() => { setShowDayPopup(false); swapMode ? handleSwapSelect(s) : (() => { setDetailMode("calendar"); setDetailSchedule(s); })(); }}
+                      onClick={() => { setShowDayPopup(false); swapMode ? handleSwapSelect(s) : (() => { setDetailMode("calendar"); openDetailSchedule(s); })(); }}
                     >
                       <div className="px-4 py-4 flex items-center gap-3">
                         <span className="text-xl">📅</span>
@@ -793,7 +824,7 @@ export default function Home() {
       )}
       {showSearch && (
         <SearchPanel
-          onSelectSchedule={(s) => { setShowSearch(false); setDetailMode("calendar"); setDetailSchedule(s); }}
+          onSelectSchedule={(s) => { setShowSearch(false); setDetailMode("calendar"); openDetailSchedule(s); }}
           onClose={() => setShowSearch(false)}
         />
       )}
