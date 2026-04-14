@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useRef, useCallback } from "react";
 import { Schedule, Member } from "@/types";
-import { assignScheduleApi } from "@/lib/api";
+import { assignScheduleApi, softDeleteSchedule, fetchDeletedSchedules, restoreScheduleApi, emptyTrashApi } from "@/lib/api";
 import {
   format,
   startOfMonth,
@@ -20,10 +20,10 @@ interface AssignTabProps {
   members: Member[];
   schedules: Schedule[];
   onAssigned: (scheduleId: string, memberId: string, memberName: string) => void;
+  onDeleted?: (id: string) => void;
 }
 
-export default function AssignTab({ members, schedules, onAssigned }: AssignTabProps) {
-  // schedules prop이 이미 미배정만 담고 있음
+export default function AssignTab({ members, schedules, onAssigned, onDeleted }: AssignTabProps) {
   const unassigned = schedules;
 
   const [currentMonth, setCurrentMonth] = useState(new Date());
@@ -31,6 +31,9 @@ export default function AssignTab({ members, schedules, onAssigned }: AssignTabP
   const [showDayPopup, setShowDayPopup] = useState(false);
   const [selectedSchedule, setSelectedSchedule] = useState<Schedule | null>(null);
   const [selectedMemberId, setSelectedMemberId] = useState("");
+  const [showTrash, setShowTrash] = useState(false);
+  const [trashItems, setTrashItems] = useState<Schedule[]>([]);
+  const [trashLoading, setTrashLoading] = useState(false);
   const [slideDir, setSlideDir] = useState<"" | "left" | "right">("");
   const [animating, setAnimating] = useState(false);
   const touchStartX = useRef(0);
@@ -48,6 +51,30 @@ export default function AssignTab({ members, schedules, onAssigned }: AssignTabP
     requestAnimationFrame(() => {
       onAssigned(schedule.id, member.id, member.name);
     });
+  }
+
+  function handleDelete(id: string) {
+    softDeleteSchedule(id);
+    onDeleted?.(id);
+    setShowDayPopup(false);
+    setSelectedSchedule(null);
+  }
+
+  async function loadTrash() {
+    setTrashLoading(true);
+    const data = await fetchDeletedSchedules();
+    setTrashItems(data);
+    setTrashLoading(false);
+  }
+
+  async function handleRestore(id: string) {
+    setTrashItems((prev) => prev.filter((s) => s.id !== id));
+    await restoreScheduleApi(id);
+  }
+
+  async function handleEmptyTrash() {
+    await emptyTrashApi();
+    setTrashItems([]);
   }
 
   const activeMembers = useMemo(() => members.filter((m) => m.active), [members]);
@@ -127,9 +154,14 @@ export default function AssignTab({ members, schedules, onAssigned }: AssignTabP
             <h2 className="text-base font-bold text-gray-800">{format(currentMonth, "yyyy년 M월", { locale: ko })}</h2>
             <p className="text-[10px] text-orange-500 font-medium">미배정 {unassigned.length}건</p>
           </div>
-          <button onClick={() => animateMonth("left", addMonths(currentMonth, 1))} className="p-2 active:bg-gray-100 rounded-lg">
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
-          </button>
+          <div className="flex items-center gap-1">
+            <button onClick={() => { setShowTrash(true); loadTrash(); }} className="p-2 active:bg-gray-100 rounded-lg">
+              <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+            </button>
+            <button onClick={() => animateMonth("left", addMonths(currentMonth, 1))} className="p-2 active:bg-gray-100 rounded-lg">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+            </button>
+          </div>
         </div>
 
         {/* 요일 */}
@@ -254,6 +286,9 @@ export default function AssignTab({ members, schedules, onAssigned }: AssignTabP
                           >
                             배정
                           </button>
+                          <button onClick={() => handleDelete(s.id)} className="p-2 active:bg-red-50 rounded-xl shrink-0">
+                            <svg className="w-5 h-5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                          </button>
                         </div>
                       </div>
                     )}
@@ -261,6 +296,44 @@ export default function AssignTab({ members, schedules, onAssigned }: AssignTabP
                 );
               })}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* 휴지통 모달 */}
+      {showTrash && (
+        <div className="fixed inset-0 bg-white z-50 flex flex-col animate-[modalIn_0.15s_ease-out]">
+          <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+            <button onClick={() => setShowTrash(false)} className="p-1.5 active:bg-gray-100 rounded-lg">
+              <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
+            </button>
+            <h3 className="text-base font-bold text-gray-800">휴지통에 있는 일정</h3>
+            <button onClick={handleEmptyTrash} className="text-xs text-red-500 font-bold active:text-red-700">비우기</button>
+          </div>
+          <div className="text-xs text-gray-400 px-4 py-2">30일 후 삭제됩니다</div>
+          <div className="flex-1 overflow-y-auto">
+            {trashLoading ? (
+              <div className="py-12 text-center text-gray-400 text-sm">로딩 중...</div>
+            ) : trashItems.length === 0 ? (
+              <div className="py-12 text-center text-gray-400 text-sm">휴지통이 비어있습니다</div>
+            ) : (
+              <div className="divide-y divide-gray-100">
+                {trashItems.map((s) => (
+                  <div key={s.id} className="px-4 py-3 flex items-center gap-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm text-gray-800 truncate">{s.title.replace(/^\[.+?\]\s*/, "")}</div>
+                      <div className="text-xs text-gray-400">{s.date} · {s.memberName}</div>
+                    </div>
+                    <button onClick={() => handleRestore(s.id)} className="p-1.5 active:bg-blue-50 rounded-lg" title="복원">
+                      <svg className="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" /></svg>
+                    </button>
+                    <button onClick={async () => { setTrashItems((prev) => prev.filter((t) => t.id !== s.id)); }} className="p-1.5 active:bg-red-50 rounded-lg" title="영구삭제">
+                      <svg className="w-5 h-5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       )}

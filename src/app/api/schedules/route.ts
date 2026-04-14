@@ -86,6 +86,7 @@ export async function POST(req: NextRequest) {
       googleEventId: body.googleEventId,
       note: body.note || "",
     });
+    if (!schedule) return Response.json({ error: "duplicate or failed" }, { status: 200 });
     return Response.json(schedule, { status: 201 });
   }
 

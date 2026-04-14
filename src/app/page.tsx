@@ -424,6 +424,8 @@ export default function Home() {
               }
               // API는 백그라운드 (안 기다림)
               assignScheduleApi(scheduleId, memberId, memberName);
+            }} onDeleted={(id) => {
+              setUnassignedSchedules((prev) => prev.filter((s) => s.id !== id));
             }} />
           </div>
         )}

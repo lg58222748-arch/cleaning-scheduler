@@ -107,10 +107,11 @@ export async function addUnassignedSchedule(input: Omit<Schedule, "id" | "status
   // 중복 체크 2: 같은 제목+날짜
   const { data: dup } = await supabase.from("schedules").select("id").eq("title", input.title).eq("date", input.date).limit(1);
   if (dup && dup.length > 0) return null;
-  const { data } = await supabase.from("schedules").insert({
-    member_id: "", member_name: "미배정", title: input.title, location: input.location || "", date: input.date, start_time: input.startTime, end_time: input.endTime, status: "unassigned", google_event_id: input.googleEventId, note: input.note || "",
+  const { data, error } = await supabase.from("schedules").insert({
+    member_id: "", member_name: "미배정", title: input.title, location: input.location || "", date: input.date, start_time: input.startTime, end_time: input.endTime, status: "unassigned", google_event_id: input.googleEventId || null, note: input.note || "",
   }).select().single();
-  return rowToSchedule(data!);
+  if (error || !data) return null;
+  return rowToSchedule(data);
 }
 
 // 전체 일정 삭제 (관리자용)
