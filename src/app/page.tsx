@@ -478,6 +478,18 @@ export default function Home() {
         )}
       </main>
 
+      {/* FAB + 버튼 - 달력/배정에서만 */}
+      {(activeTab === "calendar" || activeTab === "assign") && isAdmin && (
+        <button
+          onClick={() => { setEditingSchedule(null); setShowScheduleForm(true); }}
+          className="fixed bottom-20 right-4 w-12 h-12 bg-blue-500 rounded-full flex items-center justify-center shadow-lg active:bg-blue-600 z-30"
+        >
+          <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
+          </svg>
+        </button>
+      )}
+
       {/* Bottom tab bar - mobile style */}
       <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-40 safe-area-bottom">
         <div className="flex items-center justify-around h-16 max-w-lg mx-auto">
