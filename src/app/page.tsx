@@ -380,9 +380,22 @@ export default function Home() {
         s.assignedTo === currentUser.id ||
         (myLinkedMember && s.memberId === myLinkedMember.id)
       );
-  // 팀원 필터 적용
+  // 팀원 필터 적용 (현장팀 User ID 기준, 이름으로도 매칭)
+  const selectedFilterNames = useMemo(() => {
+    if (selectedMemberIds.size === 0) return new Set<string>();
+    const names = new Set<string>();
+    allUsers.filter(u => u.role === "field").forEach(u => {
+      if (selectedMemberIds.has(u.id)) names.add(u.name);
+    });
+    return names;
+  }, [selectedMemberIds, allUsers]);
   const calendarSchedules = selectedMemberIds.size > 0
-    ? baseCalendarSchedules.filter((s) => selectedMemberIds.has(s.memberId))
+    ? baseCalendarSchedules.filter((s) =>
+        selectedMemberIds.has(s.assignedTo || "") ||
+        selectedMemberIds.has(s.memberId) ||
+        selectedFilterNames.has(s.assignedToName || "") ||
+        selectedFilterNames.has(s.memberName)
+      )
     : baseCalendarSchedules;
   const dateStr = format(selectedDate, "yyyy-MM-dd");
   const daySchedules = calendarSchedules
@@ -544,27 +557,51 @@ export default function Home() {
             </div>
           </div>
           <div className="space-y-1">
-            {members.filter(m => m.active).map((m) => {
-              const isSelected = selectedMemberIds.has(m.id);
-              const memberColor = m.color || "#3B82F6";
+            {/* 전체 버튼 */}
+            <button
+              onClick={() => setSelectedMemberIds(new Set())}
+              className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg active:bg-gray-50 ${selectedMemberIds.size === 0 ? "bg-blue-50" : ""}`}
+            >
+              <div
+                className="w-5 h-5 rounded flex items-center justify-center border-2 shrink-0"
+                style={{
+                  borderColor: "#3B82F6",
+                  backgroundColor: selectedMemberIds.size === 0 ? "#3B82F6" : "transparent",
+                }}
+              >
+                {selectedMemberIds.size === 0 && (
+                  <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                  </svg>
+                )}
+              </div>
+              <span className="text-sm text-gray-800 font-medium">전체</span>
+            </button>
+            {/* 현장팀 사용자 목록 */}
+            {allUsers.filter(u => u.role === "field").map((u) => {
+              const uid = u.id;
+              const isSelected = selectedMemberIds.has(uid);
+              const colors = ["#3B82F6", "#EF4444", "#10B981", "#F59E0B", "#8B5CF6", "#EC4899", "#06B6D4", "#F97316"];
+              const colorIdx = allUsers.filter(x => x.role === "field").indexOf(u);
+              const userColor = colors[colorIdx % colors.length];
               return (
                 <button
-                  key={m.id}
+                  key={uid}
                   onClick={() => {
                     setSelectedMemberIds((prev) => {
                       const next = new Set(prev);
-                      if (next.has(m.id)) next.delete(m.id);
-                      else next.add(m.id);
+                      if (next.has(uid)) next.delete(uid);
+                      else next.add(uid);
                       return next;
                     });
                   }}
-                  className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg active:bg-gray-50"
+                  className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg active:bg-gray-50 ${isSelected ? "bg-gray-50" : ""}`}
                 >
                   <div
                     className="w-5 h-5 rounded flex items-center justify-center border-2 shrink-0"
                     style={{
-                      borderColor: memberColor,
-                      backgroundColor: isSelected ? memberColor : "transparent",
+                      borderColor: userColor,
+                      backgroundColor: isSelected ? userColor : "transparent",
                     }}
                   >
                     {isSelected && (
@@ -573,7 +610,7 @@ export default function Home() {
                       </svg>
                     )}
                   </div>
-                  <span className="text-sm text-gray-800">{m.name}</span>
+                  <span className="text-sm text-gray-800">{u.name}</span>
                 </button>
               );
             })}
