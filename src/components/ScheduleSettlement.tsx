@@ -59,39 +59,29 @@ export default function ScheduleSettlement({ scheduleId }: ScheduleSettlementPro
 
   function getShareText() {
     const pm = paymentMethod === "transfer" ? "계좌이체" : paymentMethod === "cash" ? "현금결제" : "카드결제";
+    const now = new Date();
+    const dateStr = `${now.getFullYear()}.${String(now.getMonth() + 1).padStart(2, "0")}.${String(now.getDate()).padStart(2, "0")} ${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
     const lines = [
-      "━━━━━━━━━━━━━━━",
       "🏠 새집느낌 정산서",
-      "━━━━━━━━━━━━━━━",
-      "",
-      `📋 결제방식: ${pm}`,
-      `📝 현금영수증: ${cashReceipt ? "신청" : "미신청 (자진발급)"}`,
-      "",
-      "─── 상담받은 견적 ───",
-      `견적 금액: ${formatWon(q)}`,
-      `예약금: ${formatWon(d)}`,
-      "",
-      "─── 현장 정산 ───",
+      "──── 고객 정보 ────",
+      `고객명: ${customerName || "-"}님`,
+      `연락처: ${customerPhone || "-"}`,
+      `결제방식: ${pm}`,
+      `현금영수증: ${cashReceipt ? "신청" : "미신청"}`,
+      "──── 비용 참고사항 ────",
+      `공급가액: ${formatWon(q)}`,
+      `예약금(선납완료): ${formatWon(d)}`,
       `잔금: ${formatWon(balance)}`,
       `현장 추가금: ${formatWon(e)}`,
+      "──── 최종 결제 안내 ────",
+      receiptMsg,
       "",
-      "─── 정산 내역 ───",
-      `전체 부가세(10%): ${formatWon(vatTotal)}`,
-      `현장 결제 금액: ${formatWon(fieldPayment)}`,
-      "",
-      "━━━━━━━━━━━━━━━",
       `💰 최종 결제 금액: ${formatWon(total)}`,
-      "━━━━━━━━━━━━━━━",
       "",
-      `총 서비스 금액: ${formatWon(serviceTotal)} (부가세 별도)`,
-      `총 서비스 금액: ${formatWon(serviceTotalVat)} (부가세 포함)`,
+      "이용해주셔서 너무 감사드립니다.",
+      "━━━━━━━━━━━━━━━",
+      `${dateStr} · 새집느낌`,
     ];
-    if (cashReceipt) {
-      lines.push("", "✅ 현금영수증 신청 확인되었습니다.");
-    } else {
-      lines.push("", "📌 현금영수증 미신청 → 자진발급 처리됩니다.");
-    }
-    lines.push("", "감사합니다! 🙏", "새집느낌");
     return lines.join("\n");
   }
 
