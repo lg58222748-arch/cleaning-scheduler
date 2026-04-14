@@ -47,6 +47,7 @@ export default function Home() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [members, setMembers] = useState<Member[]>([]);
   const [schedules, setSchedules] = useState<Schedule[]>([]);
+  const [unassignedSchedules, setUnassignedSchedules] = useState<Schedule[]>([]);
   const [swapRequests, setSwapRequests] = useState<SwapRequest[]>([]);
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [activeTab, setActiveTab] = useState<TabMode>("calendar");
@@ -78,22 +79,16 @@ export default function Home() {
         fetchSwapRequests(),
         fetchNotifications(),
       ]);
-      // 범위 일정 + 미배정 합치기 (중복 제거)
-      const ids = new Set(rangeScheds.map((s: Schedule) => s.id));
-      const merged = [...rangeScheds, ...unassignedScheds.filter((s: Schedule) => !ids.has(s.id))];
       setMembers(m);
-      setSchedules(merged);
+      setSchedules(rangeScheds); // 달력용: 배정된 일정만
+      setUnassignedSchedules(unassignedScheds); // 배정탭용: 미배정만
       setSwapRequests(sw);
       setNotifications(notif.notifications);
       setUnreadCount(notif.unreadCount);
     } else {
-      // 월 이동 시에는 범위 일정 + 기존 미배정 유지
+      // 월 이동 시에는 배정된 일정만 빠르게
       const rangeScheds = await fetchSchedules(start, end);
-      setSchedules((prev) => {
-        const unassignedFromPrev = prev.filter((s) => s.status === "unassigned");
-        const ids = new Set(rangeScheds.map((s: Schedule) => s.id));
-        return [...rangeScheds, ...unassignedFromPrev.filter((s) => !ids.has(s.id))];
-      });
+      setSchedules(rangeScheds);
     }
   }, [selectedDate]);
 
@@ -154,10 +149,13 @@ export default function Home() {
   }
   async function handleDeleteSchedule(id: string) {
     setSchedules((prev) => prev.filter((s) => s.id !== id));
+    setUnassignedSchedules((prev) => prev.filter((s) => s.id !== id));
     await softDeleteSchedule(id);
   }
   async function handleUnassignSchedule(id: string) {
-    setSchedules((prev) => prev.map((s) => s.id === id ? { ...s, memberId: "", memberName: "미배정", status: "unassigned" as const } : s));
+    const target = schedules.find((s) => s.id === id);
+    setSchedules((prev) => prev.filter((s) => s.id !== id));
+    if (target) setUnassignedSchedules((prev) => [...prev, { ...target, memberId: "", memberName: "미배정", status: "unassigned" as const }]);
     await unassignScheduleApi(id);
   }
   function handleEditSchedule(schedule: Schedule) {
@@ -230,17 +228,15 @@ export default function Home() {
     setTimeout(() => loadData(undefined, true), 500);
   }
 
-  // Derived - 달력에는 배정된 것만 (미배정은 배정탭에서만)
+  // Derived - schedules는 이미 배정된 것만 (DB레벨 분리)
   const myLinkedMember = members.find((m) => m.linkedUsername === currentUser.username);
   const calendarSchedules = isAdmin
-    ? schedules.filter((s) => s.status !== "unassigned")
+    ? schedules
     : schedules.filter((s) =>
-        s.status !== "unassigned" && (
-          s.memberName === currentUser.name ||
-          s.assignedToName === currentUser.name ||
-          s.assignedTo === currentUser.id ||
-          (myLinkedMember && s.memberId === myLinkedMember.id)
-        )
+        s.memberName === currentUser.name ||
+        s.assignedToName === currentUser.name ||
+        s.assignedTo === currentUser.id ||
+        (myLinkedMember && s.memberId === myLinkedMember.id)
       );
   const dateStr = format(selectedDate, "yyyy-MM-dd");
   const daySchedules = calendarSchedules
@@ -369,7 +365,7 @@ export default function Home() {
 
         {/* Assign tab */}
         {activeTab === "assign" && (
-          <div className="h-full"><AssignTab members={members} schedules={schedules} onAssigned={() => loadData(undefined, true)} /></div>
+          <div className="h-full"><AssignTab members={members} schedules={unassignedSchedules} onAssigned={() => loadData(undefined, true)} /></div>
         )}
 
         {/* Members tab */}

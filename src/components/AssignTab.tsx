@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useRef } from "react";
+import { useState, useMemo, useRef, useCallback } from "react";
 import { Schedule, Member } from "@/types";
 import { assignScheduleApi } from "@/lib/api";
 import {
@@ -23,8 +23,8 @@ interface AssignTabProps {
 }
 
 export default function AssignTab({ members, schedules, onAssigned }: AssignTabProps) {
-  // 미배정만 필터 (API 호출 없이 즉시)
-  const unassigned = useMemo(() => schedules.filter((s) => s.status === "unassigned"), [schedules]);
+  // schedules prop이 이미 미배정만 담고 있음
+  const unassigned = schedules;
 
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
