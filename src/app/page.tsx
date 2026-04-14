@@ -796,6 +796,8 @@ export default function Home() {
                 </div>
               </div>
               {[
+                ["아이디", profileUser.username],
+                ["비밀번호", profileUser.password],
                 ["연락처", profileUser.phone],
                 ["주소", profileUser.address],
                 ["관리점", profileUser.branch ? `${profileUser.branch}[관리점]` : ""],
