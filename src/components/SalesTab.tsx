@@ -298,7 +298,8 @@ export default function SalesTab({ userName, onCreated }: SalesTabProps) {
       const sched = schedules[i];
       const svc = services[i];
       if (!svc) continue;
-      const originalTitle = `U${parsedName}/${parsedAddr?.split(" ").slice(0, 2).join("")}/${userName} [${i + 1}/${schedules.length}]/${svc.name}`;
+      const noteExtra = calendarNote ? `/${calendarNote}` : "";
+      const originalTitle = `U${parsedName}/${parsedAddr?.split(" ").slice(0, 2).join("")}/${userName} [${i + 1}/${schedules.length}]/${svc.name}${noteExtra}`;
       const calOriginal = sched.time && sched.time !== "선택" ? `[${sched.time}] ${originalTitle}` : originalTitle;
       // 미입금 상태: 고객이름/미입금
       const displayTitle = `${parsedName}/미입금`;
@@ -554,6 +555,24 @@ export default function SalesTab({ userName, onCreated }: SalesTabProps) {
                 </div>
                 <input value={calendarNote} onChange={(e) => setCalendarNote(e.target.value)} placeholder="캘린더 제목 특이사항 (선택) 예) 카톡(아이디),영업폰"
                   style={{ fontSize: "12px" }} className="w-full px-3 py-2 border border-gray-200 rounded-lg outline-none focus:border-green-500" />
+              </div>
+
+              {/* 제목 예시 미리보기 */}
+              <div className="bg-gray-50 border border-gray-200 rounded-xl p-3 mb-2">
+                <span className="text-xs font-bold text-gray-600 block mb-1.5">저장될 제목 예시</span>
+                <div className="space-y-1">
+                  <div className="text-xs text-red-500 font-medium">미입금: {parsedName || "이름"}/미입금</div>
+                  {services.map((s, i) => {
+                    const noteExtra = calendarNote ? `/${calendarNote}` : "";
+                    const time = schedules[i]?.time;
+                    const timePrefix = time && time !== "선택" ? `[${time}] ` : "";
+                    return (
+                      <div key={s.name} className="text-xs text-green-700 font-medium">
+                        입금완료: {timePrefix}U{parsedName || "이름"}/{parsedAddr?.split(" ").slice(0, 2).join("") || "지역"}/{userName} [{i + 1}/{services.length}]/{s.name}{noteExtra}
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
 
               {/* 확정 메시지 미리보기 */}
