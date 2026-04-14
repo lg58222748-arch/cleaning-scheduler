@@ -74,7 +74,7 @@ export default function ScheduleSettlement({ scheduleId }: ScheduleSettlementPro
     : "현금영수증 미신청 확인했습니다. 안내드린 견적은 공급가액 기준이며, 부가세는 법적으로 부과되는 세금으로 저희가 추가로 받는 금액이 아닌 점 양해 부탁드립니다. 최종 금액 안내드리겠습니다. 현금영수증은 자진발급 처리됩니다. 감사합니다!";
 
   return (
-    <div className="space-y-4 px-4 pb-4">
+    <div className="space-y-4 px-4 pt-4 pb-4">
       {isCompleted && (
         <div className="p-3 bg-green-50 border border-green-200 rounded-xl text-xs text-green-700 text-center font-medium">
           정산 완료됨
