@@ -401,20 +401,6 @@ export default function ScheduleDetail({
         )}
         {/* 댓글 입력 */}
         <div className="flex items-center gap-2 px-4 py-2">
-          <select value={authorName} onChange={(e) => setAuthorName(e.target.value)} className="text-[11px] border border-gray-200 rounded-lg px-1.5 py-1.5 outline-none bg-white shrink-0">
-            {allUsers.length > 0 ? (
-              allUsers.map((u, i) => (
-                <option key={i} value={u.name}>{u.name}</option>
-              ))
-            ) : (
-              <>
-                <option value="팀장">팀장</option>
-                {members.filter(m => m.active).map((m) => (
-                  <option key={m.id} value={m.name}>{m.name}</option>
-                ))}
-              </>
-            )}
-          </select>
           <input value={newComment} onChange={(e) => setNewComment(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handleAddComment()} placeholder="댓글 입력..." className="flex-1 px-3 py-1.5 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-400" />
           <button onClick={handleAddComment} disabled={loading || !newComment.trim()} className="px-3 py-1.5 bg-blue-500 text-white rounded-lg text-xs font-medium active:bg-blue-600 disabled:opacity-50 shrink-0">등록</button>
         </div>
@@ -425,7 +411,7 @@ export default function ScheduleDetail({
               onChange={(e) => setAssignMemberId(e.target.value)}
               className="flex-1 px-3 py-2 border border-gray-300 rounded-xl text-sm outline-none bg-white focus:ring-2 focus:ring-orange-400"
             >
-              <option value="">팀장 선택</option>
+              <option value="">배정 팀장 선택</option>
               {members.filter(m => m.active).map((m) => (
                 <option key={m.id} value={m.id}>{m.name}</option>
               ))}
