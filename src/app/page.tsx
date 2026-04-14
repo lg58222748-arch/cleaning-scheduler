@@ -869,7 +869,7 @@ export default function Home() {
 
         {/* Sales tab */}
         {canSales && (
-          <div className="h-full" style={{ display: activeTab === "sales" ? "block" : "none" }}>
+          <div className="h-full overflow-y-auto" style={{ display: activeTab === "sales" ? "block" : "none" }}>
             <SalesTab userName={currentUser.name} onCreated={() => loadData(undefined, true)} />
           </div>
         )}
