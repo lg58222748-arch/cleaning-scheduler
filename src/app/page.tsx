@@ -124,7 +124,15 @@ export default function Home() {
   }, [selectedDate]);
 
   useEffect(() => {
-    if (currentUser) loadData(undefined, true);
+    if (currentUser) {
+      loadData(undefined, true);
+      // 역할별 기본 탭
+      const r = currentUser.role;
+      if (r === "sales") setActiveTab("sales");
+      else if (r === "scheduler") setActiveTab("assign");
+      else if (r === "field") setActiveTab("calendar");
+      else if (r === "ceo") setActiveTab("members");
+    }
   }, [currentUser]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // PWA 서비스워커 등록 + 설치 배너
