@@ -21,9 +21,10 @@ interface AssignTabProps {
   schedules: Schedule[];
   onAssigned: (scheduleId: string, memberId: string, memberName: string) => void;
   onDeleted?: (id: string) => void;
+  onOpenDetail?: (schedule: Schedule) => void;
 }
 
-export default function AssignTab({ members, schedules, onAssigned, onDeleted }: AssignTabProps) {
+export default function AssignTab({ members, schedules, onAssigned, onDeleted, onOpenDetail }: AssignTabProps) {
   const unassigned = schedules;
 
   const [currentMonth, setCurrentMonth] = useState(new Date());
@@ -204,7 +205,7 @@ export default function AssignTab({ members, schedules, onAssigned, onDeleted }:
                     </span>
                     <div className="overflow-hidden flex-1 w-full relative">
                       {dayScheds.slice(0, 2).map((s) => {
-                        const fullName = s.title.replace(/^\[.+?\]\s*/, "");
+                        const fullName = s.title;
                         return (
                           <div
                             key={s.id}
@@ -241,57 +242,29 @@ export default function AssignTab({ members, schedules, onAssigned, onDeleted }:
 
             <div className="px-4 pb-5 pt-1 space-y-2 max-h-[380px] overflow-y-auto">
               {daySchedules.map((s) => {
-                const titleDisplay = s.title.replace(/^\[.+?\]\s*/, "").split("/")[0].replace(/^U/, "") || s.title;
-                const isExpanded = selectedSchedule?.id === s.id;
+                const titleDisplay = s.title;
                 return (
                   <div key={s.id}>
                     <div
                       className="rounded-2xl cursor-pointer active:scale-[0.97] transition-transform bg-orange-100"
-                      onClick={() => { setSelectedSchedule(isExpanded ? null : s); setSelectedMemberId(""); }}
+                      onClick={() => {
+                        setShowDayPopup(false);
+                        setSelectedSchedule(null);
+                        setSelectedMemberId("");
+                        onOpenDetail?.(s);
+                      }}
                     >
                       <div className="px-4 py-3 flex items-center gap-3">
                         <span className="text-lg">📅</span>
                         <div className="flex-1 min-w-0">
                           <div className="text-sm font-bold text-gray-900 truncate">{titleDisplay}</div>
-                          <div className="text-xs text-gray-600 mt-0.5">하루 종일</div>
+                          <div className="text-xs text-gray-600 mt-0.5">{s.title.match(/^\[(.+?)\]/)?.[1] || "하루 종일"}</div>
                         </div>
-                        <svg className={`w-4 h-4 text-gray-400 shrink-0 transition-transform ${isExpanded ? "rotate-90" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg className="w-4 h-4 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                         </svg>
                       </div>
                     </div>
-                    {/* 펼침: 내용 + 배정 */}
-                    {isExpanded && (
-                      <div className="mt-1 mx-1 space-y-2">
-                        {s.note && (
-                          <div className="p-3 bg-white border border-orange-200 rounded-xl text-xs text-gray-700 whitespace-pre-wrap leading-relaxed max-h-[200px] overflow-y-auto">
-                            {s.note}
-                          </div>
-                        )}
-                        <div className="flex items-center gap-2">
-                          <select
-                            value={selectedMemberId}
-                            onChange={(e) => setSelectedMemberId(e.target.value)}
-                            className="flex-1 px-3 py-2 border border-orange-300 rounded-xl text-sm outline-none bg-white focus:ring-2 focus:ring-orange-400"
-                          >
-                            <option value="">팀장 선택</option>
-                            {activeMembers.map((m) => (
-                              <option key={m.id} value={m.id}>{m.name}</option>
-                            ))}
-                          </select>
-                          <button
-                            onClick={() => handleAssign(s)}
-                            disabled={!selectedMemberId}
-                            className="px-4 py-2 bg-orange-500 text-white rounded-xl text-sm font-medium active:bg-orange-600 disabled:opacity-40 shrink-0"
-                          >
-                            배정
-                          </button>
-                          <button onClick={() => handleDelete(s.id)} className="p-2 active:bg-red-50 rounded-xl shrink-0">
-                            <svg className="w-5 h-5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                          </button>
-                        </div>
-                      </div>
-                    )}
                   </div>
                 );
               })}

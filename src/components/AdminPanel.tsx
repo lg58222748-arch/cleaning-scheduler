@@ -30,7 +30,7 @@ export default function AdminPanel({ onClose }: AdminPanelProps) {
     loadUsers();
   }
 
-  const roleLabels: Record<string, string> = { admin: "관리자", manager: "관리사", pending: "대기" };
+  const roleLabels: Record<string, string> = { ceo: "대표", scheduler: "일정관리자", sales: "영업팀", field: "현장팀", pending: "대기", admin: "대표", manager: "현장팀" };
   const statusColors: Record<string, string> = {
     approved: "bg-green-100 text-green-700",
     pending: "bg-yellow-100 text-yellow-700",

@@ -63,7 +63,7 @@ export interface Comment {
 }
 
 // ===== 회원/관리사 =====
-export type UserRole = "admin" | "manager" | "sales" | "pending";
+export type UserRole = "ceo" | "scheduler" | "sales" | "field" | "pending";
 export type UserStatus = "pending" | "approved" | "rejected";
 
 export interface User {
@@ -75,6 +75,7 @@ export interface User {
   address: string;
   residentNumber: string; // 주민등록번호
   businessLicenseFile: string; // 파일명만 저장
+  branch: string; // 관리점 (예: "서울[관리점]")
   role: UserRole;
   status: UserStatus;
   createdAt: string;

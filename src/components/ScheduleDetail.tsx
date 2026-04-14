@@ -10,9 +10,13 @@ interface ScheduleDetailProps {
   schedule: Schedule;
   members: Member[];
   isAdmin?: boolean;
+  mode?: "calendar" | "assign";
+  currentUserName?: string;
+  allUsers?: { name: string }[];
   onEdit: (schedule: Schedule) => void;
   onDelete: (id: string) => void;
   onUnassign?: (id: string, reason: string) => void;
+  onAssign?: (scheduleId: string, memberId: string, memberName: string) => void;
   onClose: () => void;
   onUpdated?: () => void;
 }
@@ -23,19 +27,24 @@ export default function ScheduleDetail({
   schedule,
   members,
   isAdmin,
+  mode = "calendar",
+  currentUserName = "",
+  allUsers = [],
   onEdit,
   onDelete,
   onUnassign,
+  onAssign,
   onClose,
   onUpdated,
 }: ScheduleDetailProps) {
   const [activeTab, setActiveTab] = useState<DetailTab>("info");
   const [comments, setComments] = useState<Comment[]>([]);
   const [newComment, setNewComment] = useState("");
-  const [authorName, setAuthorName] = useState("팀장");
+  const [authorName, setAuthorName] = useState(currentUserName || "팀장");
   const [loading, setLoading] = useState(false);
   const [preloadChecklist, setPreloadChecklist] = useState(false);
   const [preloadSettlement, setPreloadSettlement] = useState(false);
+  const [showAllComments, setShowAllComments] = useState(false);
 
   // 인라인 편집 상태
   const [editingNote, setEditingNote] = useState(false);
@@ -45,6 +54,7 @@ export default function ScheduleDetail({
   const [saving, setSaving] = useState(false);
   const [noteChanged, setNoteChanged] = useState(false);
   const [schedColor, setSchedColor] = useState(schedule.color || "#FDDCCC");
+  const [assignMemberId, setAssignMemberId] = useState("");
 
   // 시간대 (제목 앞에 [오전] 등)
   const TIME_SLOTS = ["오전", "오후", "시무", "사이"] as const;
@@ -70,7 +80,7 @@ export default function ScheduleDetail({
       setPreloadChecklist(true);
       setPreloadSettlement(true);
     }, 100);
-    return () => clearTimeout(t);
+    return () => { clearTimeout(t); };
   }, [schedule.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function loadComments() {
@@ -168,15 +178,14 @@ export default function ScheduleDetail({
             </svg>
           </button>
           {editingTitle ? (
-            <div className="flex-1 mx-2 flex items-center gap-1">
+            <div className="flex-1 mx-2">
               <input
                 value={titleText}
-                onChange={(e) => setTitleText(e.target.value)}
-                className="flex-1 text-base font-bold text-gray-800 text-center border-b-2 border-blue-400 outline-none bg-transparent"
+                onChange={(e) => { setTitleText(e.target.value); setNoteChanged(true); }}
+                className="w-full text-sm font-bold text-gray-800 text-center border-b-2 border-blue-400 outline-none bg-transparent"
                 autoFocus
-                onKeyDown={(e) => e.key === "Enter" && handleSaveTitle()}
+                onBlur={() => setEditingTitle(false)}
               />
-              <button onClick={handleSaveTitle} disabled={saving} className="text-xs px-2 py-1 bg-blue-500 text-white rounded-lg">저장</button>
             </div>
           ) : (
             <h3
@@ -216,6 +225,57 @@ export default function ScheduleDetail({
 
         {/* Tab content */}
         <div className="flex-1 overflow-y-auto">
+          {/* 고객/관리사 정보 - 모든 탭 공통 */}
+          <div className="px-4 pt-3 pb-1 space-y-2">
+            {(() => {
+              const note = schedule.note || "";
+              const titleParts = schedule.title.replace(/^\[.+?\]\s*/, "").split("/");
+              const customerName = titleParts.find(p => /^U?.+$/.test(p) && p.length <= 10)?.replace(/^U/, "") || titleParts[0] || "";
+              const phoneMatch = note.match(/(01[0-9][-.\s]?\d{3,4}[-.\s]?\d{4})/);
+              const customerPhone = phoneMatch ? phoneMatch[1] : "";
+              const locationPart = titleParts.find(p => /[시구동]/.test(p)) || schedule.location || "";
+              if (customerName || customerPhone) {
+                return (
+                  <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 space-y-1.5">
+                    <div className="flex items-center gap-2 text-sm">
+                      <svg className="w-4 h-4 text-blue-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                      </svg>
+                      <span className="font-bold text-blue-800">고객: {customerName}</span>
+                      {customerPhone && <span className="text-blue-600 text-xs ml-auto">{customerPhone}</span>}
+                    </div>
+                    {locationPart && (
+                      <div className="flex items-center gap-2 text-xs text-blue-600">
+                        <svg className="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                        </svg>
+                        <span>{locationPart}</span>
+                      </div>
+                    )}
+                  </div>
+                );
+              }
+              return null;
+            })()}
+            {schedule.memberName && schedule.memberName !== "미배정" && (
+              <div className="bg-gray-50 border border-gray-200 rounded-xl p-3 space-y-1">
+                <div className="flex items-center gap-2 text-sm">
+                  <div className="w-6 h-6 rounded-full flex items-center justify-center text-white text-[10px] font-bold shrink-0" style={{ backgroundColor: memberColor }}>
+                    {schedule.memberName[0]}
+                  </div>
+                  <span className="font-medium text-gray-800">관리사: {schedule.memberName}</span>
+                </div>
+                {(() => {
+                  const member = members.find(m => m.id === schedule.memberId);
+                  const phone = member?.phone;
+                  return phone ? (
+                    <div className="text-xs text-gray-500 ml-8">{phone}</div>
+                  ) : null;
+                })()}
+              </div>
+            )}
+          </div>
+
           {activeTab === "info" && (
             <>
               <div className="px-4 py-3 space-y-3">
@@ -289,85 +349,144 @@ export default function ScheduleDetail({
                     <textarea
                       value={noteText}
                       onChange={(e) => { setNoteText(e.target.value); setNoteChanged(true); }}
-                      className="w-full text-sm text-gray-700 leading-relaxed bg-transparent outline-none resize-none flex-1 min-h-[400px]"
+                      className="w-full text-sm text-gray-700 leading-relaxed bg-transparent outline-none resize-none flex-1 min-h-[120px]"
                       placeholder="내용을 입력하세요..."
                     />
-                    {noteChanged && (
-                      <button
-                        onClick={handleSaveNote}
-                        disabled={saving}
-                        className="mt-1 px-4 py-2 bg-blue-500 text-white rounded-lg text-sm font-medium w-full disabled:opacity-50"
-                      >
-                        {saving ? "저장 중..." : "저장"}
-                      </button>
-                    )}
                   </div>
                 </div>
 
-                {/* 반환 */}
-                {isAdmin && schedule.status !== "unassigned" && onUnassign && (
-                  <div className="pt-2 border-t border-gray-100">
-                    <button onClick={() => {
-                      const reason = prompt("반환 사유를 입력하세요:");
-                      if (reason !== null) { onUnassign(schedule.id, reason || "사유 없음"); onClose(); }
-                    }} className="w-full px-3 py-2.5 bg-orange-50 text-orange-600 rounded-xl text-sm font-medium active:bg-orange-100">반환</button>
-                  </div>
-                )}
-              </div>
-
-              {/* Comments */}
-              <div className="border-t border-gray-100">
-                <div className="px-4 py-3">
-                  <h4 className="text-sm font-bold text-gray-800">
-                    댓글 {comments.length > 0 && <span className="text-gray-400 font-normal">({comments.length})</span>}
-                  </h4>
-                </div>
-                {comments.length > 0 && (
-                  <div className="px-4 space-y-3 pb-3">
-                    {comments.map((c) => (
-                      <div key={c.id} className="flex items-start gap-2.5">
-                        <div className="w-7 h-7 bg-gray-200 rounded-full flex items-center justify-center text-[10px] font-bold text-gray-600 shrink-0">{c.authorName[0]}</div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs font-medium text-gray-700">{c.authorName}</span>
-                            <span className="text-[10px] text-gray-400">{formatTime(c.createdAt)}</span>
-                          </div>
-                          <p className="text-sm text-gray-600 mt-0.5">{c.content}</p>
-                        </div>
-                        <button onClick={() => handleDeleteComment(c.id)} className="p-1 text-gray-300 active:text-red-500 shrink-0">
-                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-                <div className="px-4 pb-4">
-                  <div className="flex items-center gap-2 mb-2">
-                    <label className="text-xs text-gray-500">작성자:</label>
-                    <select value={authorName} onChange={(e) => setAuthorName(e.target.value)} className="text-xs border border-gray-200 rounded-lg px-2 py-1 outline-none">
-                      <option value="팀장">팀장</option>
-                      {members.filter(m => m.active).map((m) => (
-                        <option key={m.id} value={m.name}>{m.name}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="flex gap-2">
-                    <input value={newComment} onChange={(e) => setNewComment(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handleAddComment()} placeholder="댓글을 입력하세요..." className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-400" />
-                    <button onClick={handleAddComment} disabled={loading || !newComment.trim()} className="px-3 py-2 bg-blue-500 text-white rounded-lg text-sm font-medium active:bg-blue-600 disabled:opacity-50">등록</button>
-                  </div>
-                </div>
               </div>
             </>
           )}
 
           <div style={{ display: activeTab === "checklist" ? "block" : "none" }}>
-            {preloadChecklist && <ScheduleChecklist scheduleId={schedule.id} />}
+            {preloadChecklist && <ScheduleChecklist scheduleId={schedule.id} onComplete={() => setActiveTab("settlement")} />}
           </div>
           <div style={{ display: activeTab === "settlement" ? "block" : "none" }}>
             {preloadSettlement && <ScheduleSettlement scheduleId={schedule.id} />}
           </div>
         </div>
       </div>
+
+      {/* 하단 고정 - 정보탭에서만 표시 */}
+      {activeTab === "info" && (
+      <div className="border-t border-gray-200 bg-white safe-area-bottom">
+        {/* 댓글 */}
+        {comments.length > 0 && (
+          <div className="px-4 pt-2 max-h-[80px] overflow-y-auto border-b border-gray-100">
+            {comments.length > 2 && !showAllComments && (
+              <button onClick={() => setShowAllComments(true)} className="text-[11px] text-blue-500 font-medium mb-1 active:text-blue-700">
+                +{comments.length - 2}개 이전 댓글
+              </button>
+            )}
+            <div className="space-y-1.5 pb-1.5">
+              {(showAllComments ? comments : comments.slice(-2)).map((c) => (
+                <div key={c.id} className="flex items-start gap-1.5">
+                  <div className="w-5 h-5 bg-gray-200 rounded-full flex items-center justify-center text-[8px] font-bold text-gray-600 shrink-0 mt-0.5">{c.authorName[0]}</div>
+                  <div className="flex-1 min-w-0">
+                    <span className="text-[10px] font-medium text-gray-700">{c.authorName}</span>
+                    <span className="text-[9px] text-gray-400 ml-1">{formatTime(c.createdAt)}</span>
+                    <p className="text-[11px] text-gray-600 leading-tight">{c.content}</p>
+                  </div>
+                  <button onClick={() => handleDeleteComment(c.id)} className="p-0.5 text-gray-300 active:text-red-500 shrink-0">
+                    <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+        {/* 댓글 입력 */}
+        <div className="flex items-center gap-2 px-4 py-2">
+          <select value={authorName} onChange={(e) => setAuthorName(e.target.value)} className="text-[11px] border border-gray-200 rounded-lg px-1.5 py-1.5 outline-none bg-white shrink-0">
+            {allUsers.length > 0 ? (
+              allUsers.map((u, i) => (
+                <option key={i} value={u.name}>{u.name}</option>
+              ))
+            ) : (
+              <>
+                <option value="팀장">팀장</option>
+                {members.filter(m => m.active).map((m) => (
+                  <option key={m.id} value={m.name}>{m.name}</option>
+                ))}
+              </>
+            )}
+          </select>
+          <input value={newComment} onChange={(e) => setNewComment(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handleAddComment()} placeholder="댓글 입력..." className="flex-1 px-3 py-1.5 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-400" />
+          <button onClick={handleAddComment} disabled={loading || !newComment.trim()} className="px-3 py-1.5 bg-blue-500 text-white rounded-lg text-xs font-medium active:bg-blue-600 disabled:opacity-50 shrink-0">등록</button>
+        </div>
+        {mode === "assign" && (
+          <div className="flex items-center gap-2 px-4 pb-1">
+            <select
+              value={assignMemberId}
+              onChange={(e) => setAssignMemberId(e.target.value)}
+              className="flex-1 px-3 py-2 border border-gray-300 rounded-xl text-sm outline-none bg-white focus:ring-2 focus:ring-orange-400"
+            >
+              <option value="">팀장 선택</option>
+              {members.filter(m => m.active).map((m) => (
+                <option key={m.id} value={m.id}>{m.name}</option>
+              ))}
+            </select>
+          </div>
+        )}
+        <div className="flex gap-2 px-4 py-2">
+          {mode === "calendar" && isAdmin && schedule.status !== "unassigned" && onUnassign && (
+            <button
+              onClick={() => {
+                const reason = prompt("반환 사유를 입력하세요:");
+                if (reason !== null) { onUnassign(schedule.id, reason || "사유 없음"); onClose(); }
+              }}
+              className="flex-1 py-3 bg-orange-500 text-white rounded-xl text-sm font-bold active:bg-orange-600"
+            >
+              반환
+            </button>
+          )}
+          {mode === "assign" && (
+            <button
+              onClick={() => {
+                if (!assignMemberId || !onAssign) return;
+                const member = members.find(m => m.id === assignMemberId);
+                if (member) { onAssign(schedule.id, member.id, member.name); onClose(); }
+              }}
+              disabled={!assignMemberId}
+              className="flex-1 py-3 bg-orange-500 text-white rounded-xl text-sm font-bold active:bg-orange-600 disabled:opacity-40"
+            >
+              배정
+            </button>
+          )}
+          <button
+            onClick={async () => {
+              setSaving(true);
+              // 제목 변경 저장
+              if (titleText !== schedule.title) {
+                await apiUpdateSchedule(schedule.id, { title: titleText });
+                schedule.title = titleText;
+                setEditingTitle(false);
+              }
+              // 메모 변경 저장
+              if (noteChanged) {
+                await apiUpdateSchedule(schedule.id, { note: noteText });
+                schedule.note = noteText;
+                setNoteChanged(false);
+              }
+              setSaving(false);
+              onUpdated?.();
+              if (titleText === schedule.title && !noteChanged) onClose();
+            }}
+            disabled={saving}
+            className="flex-1 py-3 bg-blue-500 text-white rounded-xl text-sm font-bold active:bg-blue-600 disabled:opacity-50"
+          >
+            {saving ? "저장 중..." : "저장"}
+          </button>
+          <button
+            onClick={onClose}
+            className="flex-1 py-3 bg-gray-100 text-gray-600 rounded-xl text-sm font-bold active:bg-gray-200"
+          >
+            취소
+          </button>
+        </div>
+      </div>
+      )}
     </div>
   );
 }

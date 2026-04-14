@@ -17,6 +17,7 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
   const [address, setAddress] = useState("");
   const [residentNumber, setResidentNumber] = useState("");
   const [businessLicenseFile, setBusinessLicenseFile] = useState("");
+  const [branch, setBranch] = useState("");
   const [regUsername, setRegUsername] = useState("");
   const [regPassword, setRegPassword] = useState("");
   const [regPasswordConfirm, setRegPasswordConfirm] = useState("");
@@ -49,7 +50,7 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
     const result = await registerApi({
       username: regUsername.trim(), password: regPassword,
       name: name.trim(), phone: phone.trim(), address: address.trim(),
-      residentNumber: residentNumber.trim(), businessLicenseFile,
+      residentNumber: residentNumber.trim(), businessLicenseFile, branch: branch.trim(),
     });
     if (result.error) {
       setError(result.error);
@@ -171,6 +172,13 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">주소 *</label>
                 <input value={address} onChange={(e) => setAddress(e.target.value)} placeholder="활동 지역/주소" className={inputClass} />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">관리점 *</label>
+                <div className="flex items-center gap-1">
+                  <input value={branch} onChange={(e) => setBranch(e.target.value)} placeholder="지역명 (예: 서울, 인천)" className={`${inputClass} flex-1`} />
+                  <span className="text-sm text-gray-500 font-medium shrink-0">[관리점]</span>
+                </div>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">주민등록번호</label>

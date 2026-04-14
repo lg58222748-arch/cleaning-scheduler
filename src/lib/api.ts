@@ -256,7 +256,7 @@ export async function loginApi(username: string, password: string): Promise<{ er
 export async function registerApi(data: {
   username: string; password: string;
   name: string; phone: string; address: string;
-  residentNumber: string; businessLicenseFile: string;
+  residentNumber: string; businessLicenseFile: string; branch: string;
 }): Promise<{ error?: string } & Partial<import("@/types").User>> {
   const res = await fetch(`${BASE}/api/auth`, {
     method: "POST",
@@ -285,6 +285,14 @@ export async function rejectUserApi(userId: string): Promise<void> {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ action: "reject", userId }),
+  });
+}
+
+export async function changeUserRoleApi(userId: string, role: string): Promise<void> {
+  await fetch(`${BASE}/api/users`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ action: "changeRole", userId, role }),
   });
 }
 

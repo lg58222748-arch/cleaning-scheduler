@@ -123,6 +123,31 @@ export default function ScheduleSettlement({ scheduleId }: ScheduleSettlementPro
     }
   }
 
+  function handleSendSMS() {
+    const text = getShareText();
+    const phone = customerPhone.replace(/[^0-9]/g, "");
+    const encoded = encodeURIComponent(text);
+    // iOS는 &body=, Android는 ?body=
+    const isIOS = /iPhone|iPad/i.test(navigator.userAgent);
+    const smsUrl = phone
+      ? `sms:${phone}${isIOS ? "&" : "?"}body=${encoded}`
+      : `sms:${isIOS ? "&" : "?"}body=${encoded}`;
+    window.location.href = smsUrl;
+  }
+
+  function handleSendKakao() {
+    const text = getShareText();
+    // 카카오톡 공유 (커스텀 URL 스킴)
+    const encoded = encodeURIComponent(text);
+    // Web Share API로 카카오톡 선택 유도
+    if (navigator.share) {
+      navigator.share({ title: "새집느낌 정산서", text }).catch(() => {});
+    } else {
+      // fallback: 복사 후 안내
+      handleCopy();
+    }
+  }
+
   // 원본 계산법
   const q = parseInt(quote) || 0;
   const d = parseInt(deposit) || 0;
@@ -274,9 +299,7 @@ export default function ScheduleSettlement({ scheduleId }: ScheduleSettlementPro
           현금영수증 미신청
         </button>
       </div>
-      {!cashReceipt && (
-        <div className="text-xs text-gray-500 text-center">💡 미신청 시 자진발급 처리 (010-000-1234)</div>
-      )}
+      <div className="text-xs text-gray-500 text-center">💡 미신청 시 자진발급 처리 (010-000-1234)</div>
 
       {/* Actions */}
       {!isCompleted && (
@@ -294,7 +317,7 @@ export default function ScheduleSettlement({ scheduleId }: ScheduleSettlementPro
       {/* 고객 안내 멘트 */}
       <div className="border border-gray-200 rounded-xl p-4">
         <div className="text-xs font-bold text-blue-800 mb-2">📢 고객님 안내 멘트</div>
-        <div className="text-xs text-gray-600 leading-relaxed mb-3">{receiptMsg}</div>
+        <div className="text-xs text-gray-600 leading-relaxed mb-3 min-h-[60px]">{receiptMsg}</div>
         <div className="rounded-xl p-4 text-center" style={{ background: "linear-gradient(135deg, #0f4c81, #1a6bb5)", boxShadow: "0 4px 16px rgba(15,76,129,0.3)" }}>
           <div className="text-[11px] text-white/60 mb-1">최종 결제 금액</div>
           <div className="text-2xl font-extrabold text-white tracking-tight">{formatWon(total)}</div>
@@ -307,12 +330,12 @@ export default function ScheduleSettlement({ scheduleId }: ScheduleSettlementPro
       {/* 정산서 공유 버튼 (완료 후) */}
       {isCompleted && (
         <div className="flex gap-2">
-          <button onClick={handleCopy} className="flex-1 py-3 bg-gray-100 text-gray-700 rounded-xl text-sm font-bold active:bg-gray-200">
-            {copied ? "✅ 복사됨!" : "📋 정산서 복사"}
+          <button onClick={handleSendSMS} className="flex-1 py-3 bg-blue-500 text-white rounded-xl text-sm font-bold active:bg-blue-600">
+            문자 전송
           </button>
-          <button onClick={handleShare} className="flex-1 py-3 rounded-xl text-sm font-bold text-white active:opacity-90"
+          <button onClick={handleSendKakao} className="flex-1 py-3 rounded-xl text-sm font-bold active:opacity-90"
             style={{ background: "#FEE500", color: "#3C1E1E" }}>
-            📤 공유하기
+            카톡 전송
           </button>
         </div>
       )}
@@ -327,20 +350,25 @@ export default function ScheduleSettlement({ scheduleId }: ScheduleSettlementPro
             </div>
 
             {/* 미리보기 */}
-            <div className="bg-gray-50 rounded-xl p-4 mb-4 max-h-[40vh] overflow-y-auto">
+            <div className="bg-gray-50 rounded-xl p-4 mb-4 max-h-[35vh] overflow-y-auto">
               <pre className="text-xs text-gray-700 whitespace-pre-wrap font-sans leading-relaxed">{getShareText()}</pre>
             </div>
 
+            {/* 전송 방법 선택 */}
             <div className="space-y-2">
-              <button onClick={handleCopy} className="w-full py-3 bg-gray-100 rounded-xl text-sm font-bold active:bg-gray-200">
-                {copied ? "✅ 복사 완료!" : "📋 텍스트 복사 (카톡/문자에 붙여넣기)"}
+              <button onClick={handleSendSMS} className="w-full py-3.5 bg-blue-500 text-white rounded-xl text-sm font-bold active:bg-blue-600 flex items-center justify-center gap-2">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" /></svg>
+                문자로 보내기{customerPhone ? ` (${customerPhone})` : ""}
               </button>
-              <button onClick={handleShare} className="w-full py-3 rounded-xl text-sm font-bold active:opacity-90"
+              <button onClick={handleSendKakao} className="w-full py-3.5 rounded-xl text-sm font-bold active:opacity-90 flex items-center justify-center gap-2"
                 style={{ background: "#FEE500", color: "#3C1E1E" }}>
-                📤 공유하기 (카톡/문자 등)
+                <svg className="w-5 h-5" viewBox="0 0 24 24" fill="#3C1E1E"><path d="M12 3C6.48 3 2 6.58 2 10.94c0 2.81 1.86 5.27 4.66 6.67-.15.53-.96 3.4-.99 3.62 0 0-.02.17.09.23.11.07.24.01.24.01.32-.04 3.7-2.44 4.28-2.86.56.08 1.13.13 1.72.13 5.52 0 10-3.58 10-7.8C22 6.58 17.52 3 12 3z"/></svg>
+                카카오톡으로 보내기
+              </button>
+              <button onClick={() => setShowShareModal(false)} className="w-full py-3 bg-gray-100 text-gray-500 rounded-xl text-sm font-bold active:bg-gray-200">
+                닫기
               </button>
             </div>
-            <div className="text-[11px] text-gray-400 text-center mt-3">💡 복사 후 카카오톡이나 문자에 붙여넣기 하세요</div>
           </div>
         </div>
       )}

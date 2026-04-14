@@ -23,8 +23,13 @@ function rowToNotification(r: Record<string, unknown>): Notification {
 function rowToComment(r: Record<string, unknown>): Comment {
   return { id: String(r.id), scheduleId: String(r.schedule_id), authorName: String(r.author_name), content: String(r.content), createdAt: String(r.created_at) };
 }
+function mapRole(role: string): User["role"] {
+  if (role === "admin") return "ceo";
+  if (role === "manager") return "field";
+  return role as User["role"];
+}
 function rowToUser(r: Record<string, unknown>): User {
-  return { id: String(r.id), username: String(r.username), password: String(r.password), name: String(r.name), phone: String(r.phone || ""), address: String(r.address || ""), residentNumber: String(r.resident_number || ""), businessLicenseFile: String(r.business_license_file || ""), role: String(r.role) as User["role"], status: String(r.status) as User["status"], createdAt: String(r.created_at) };
+  return { id: String(r.id), username: String(r.username), password: String(r.password), name: String(r.name), phone: String(r.phone || ""), address: String(r.address || ""), residentNumber: String(r.resident_number || ""), businessLicenseFile: String(r.business_license_file || ""), branch: String(r.branch || ""), role: mapRole(String(r.role)), status: String(r.status) as User["status"], createdAt: String(r.created_at) };
 }
 function rowToSettlement(r: Record<string, unknown>): Settlement {
   return { id: String(r.id), scheduleId: String(r.schedule_id), quote: Number(r.quote), deposit: Number(r.deposit), balance: Number(r.balance), extraCharge: Number(r.extra_charge), subtotal: Number(r.subtotal), vat: Number(r.vat), totalAmount: Number(r.total_amount), paymentMethod: String(r.payment_method) as PaymentMethod, cashReceipt: Boolean(r.cash_receipt), bankInfo: String(r.bank_info), customerName: String(r.customer_name), customerPhone: String(r.customer_phone), note: String(r.note || ""), status: String(r.status) as "draft" | "completed", createdAt: String(r.created_at) };
@@ -289,7 +294,7 @@ export async function deleteComment(id: string): Promise<boolean> {
 
 // ===== Users =====
 export async function getUsers(): Promise<User[]> {
-  const { data } = await supabase.from("users").select("*").order("created_at");
+  const { data } = await supabase.from("users").select("*").eq("status", "approved").order("created_at");
   return (data || []).map(rowToUser);
 }
 
@@ -309,9 +314,9 @@ export async function getPendingUsers(): Promise<User[]> {
   return (data || []).map(rowToUser);
 }
 
-export async function registerUser(input: { username: string; password: string; name: string; phone: string; address: string; residentNumber: string; businessLicenseFile: string }): Promise<User> {
+export async function registerUser(input: { username: string; password: string; name: string; phone: string; address: string; residentNumber: string; businessLicenseFile: string; branch: string }): Promise<User> {
   const { data } = await supabase.from("users").insert({
-    username: input.username, password: input.password, name: input.name, phone: input.phone, address: input.address, resident_number: input.residentNumber, business_license_file: input.businessLicenseFile, role: "pending", status: "pending",
+    username: input.username, password: input.password, name: input.name, phone: input.phone, address: input.address, resident_number: input.residentNumber, business_license_file: input.businessLicenseFile, branch: input.branch, role: "pending", status: "pending",
   }).select().single();
   return rowToUser(data!);
 }
@@ -320,7 +325,7 @@ export async function approveUser(id: string): Promise<boolean> {
   // 유저 승인
   const { data: user } = await supabase.from("users").select("*").eq("id", id).single();
   if (!user) return false;
-  const { error } = await supabase.from("users").update({ status: "approved", role: "manager" }).eq("id", id);
+  const { error } = await supabase.from("users").update({ status: "approved", role: "field" }).eq("id", id);
   if (error) return false;
 
   // 팀원 목록에 자동 추가 (이미 있으면 스킵)
@@ -343,6 +348,11 @@ export async function approveUser(id: string): Promise<boolean> {
 
 export async function rejectUser(id: string): Promise<boolean> {
   const { error } = await supabase.from("users").update({ status: "rejected" }).eq("id", id);
+  return !error;
+}
+
+export async function changeUserRole(id: string, role: string): Promise<boolean> {
+  const { error } = await supabase.from("users").update({ role }).eq("id", id);
   return !error;
 }
 

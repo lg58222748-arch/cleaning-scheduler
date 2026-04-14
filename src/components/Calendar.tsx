@@ -246,7 +246,7 @@ export default function Calendar({
                   </span>
                   <div className="overflow-hidden flex-1 w-full relative">
                     {daySchedules.slice(0, 2).map((s) => {
-                      const fullName = s.title.replace(/^\[.+?\]\s*/, "");
+                      const fullName = s.title;
                       const schedColor = s.color || "#FDDCCC";
                       return (
                         <div key={s.id} className="text-[8px] leading-[1.2] py-0.5 rounded font-medium overflow-hidden break-all mb-0.5"

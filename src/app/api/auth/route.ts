@@ -35,6 +35,7 @@ export async function POST(req: NextRequest) {
       address: body.address,
       residentNumber: body.residentNumber,
       businessLicenseFile: body.businessLicenseFile || "",
+      branch: body.branch || "",
     });
     return Response.json(user, { status: 201 });
   }

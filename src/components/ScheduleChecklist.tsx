@@ -6,9 +6,10 @@ import { fetchChecklist, toggleChecklistItem, submitChecklistApi } from "@/lib/a
 
 interface ScheduleChecklistProps {
   scheduleId: string;
+  onComplete?: () => void;
 }
 
-export default function ScheduleChecklist({ scheduleId }: ScheduleChecklistProps) {
+export default function ScheduleChecklist({ scheduleId, onComplete }: ScheduleChecklistProps) {
   const [checklist, setChecklist] = useState<ChecklistType | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -19,6 +20,27 @@ export default function ScheduleChecklist({ scheduleId }: ScheduleChecklistProps
     const data = await fetchChecklist(scheduleId);
     setChecklist(data);
     setLoading(false);
+  }
+
+  function handleSelectAll(checked: boolean) {
+    if (!checklist) return;
+    const updated = {
+      ...checklist,
+      categories: checklist.categories.map((cat) => ({
+        ...cat,
+        items: cat.items.map((item) => ({ ...item, checked })),
+      })),
+    };
+    updated.completedCount = checked ? updated.totalCount : 0;
+    setChecklist(updated);
+    // API 호출: 모든 아이템 토글
+    for (const cat of checklist.categories) {
+      for (const item of cat.items) {
+        if (item.checked !== checked) {
+          toggleChecklistItem(scheduleId, item.id, checked);
+        }
+      }
+    }
   }
 
   function handleToggle(itemId: string, checked: boolean) {
@@ -115,18 +137,36 @@ export default function ScheduleChecklist({ scheduleId }: ScheduleChecklistProps
         })}
       </div>
 
-      {/* Submit button */}
-      {!checklist.submittedAt && (
-        <div className="px-4 pb-4">
-          <button
-            onClick={handleSubmit}
-            disabled={progress < 100}
-            className="w-full py-3 bg-green-500 text-white rounded-xl font-medium text-sm active:bg-green-600 disabled:opacity-40 disabled:cursor-not-allowed"
-          >
-            {progress < 100 ? `${checklist.totalCount - checklist.completedCount}개 항목 남음` : "검수 완료"}
-          </button>
-        </div>
-      )}
+      {/* 전체 선택 */}
+      <div className="px-4">
+        <label className="flex items-center gap-3 px-3 py-3 bg-blue-50 border border-blue-200 rounded-xl cursor-pointer active:bg-blue-100">
+          <input
+            type="checkbox"
+            checked={progress === 100}
+            onChange={(e) => handleSelectAll(e.target.checked)}
+            className="w-5 h-5 rounded border-gray-300 text-blue-500 focus:ring-blue-400 shrink-0"
+          />
+          <span className="text-sm font-bold text-blue-700">전체 선택</span>
+        </label>
+      </div>
+
+      {/* 검수 완료 버튼 */}
+      <div className="px-4 pb-4">
+        <button
+          onClick={async () => {
+            if (!checklist.submittedAt) await handleSubmit();
+            onComplete?.();
+          }}
+          disabled={progress < 100}
+          className={`w-full py-3 rounded-xl font-bold text-sm ${
+            checklist.submittedAt
+              ? "bg-blue-500 text-white active:bg-blue-600"
+              : "bg-green-500 text-white active:bg-green-600 disabled:opacity-40 disabled:cursor-not-allowed"
+          }`}
+        >
+          {checklist.submittedAt ? "정산으로 이동" : progress < 100 ? `${checklist.totalCount - checklist.completedCount}개 항목 남음` : "검수 완료"}
+        </button>
+      </div>
     </div>
   );
 }

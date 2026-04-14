@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Member, Schedule, SwapRequest, Notification, User } from "@/types";
+import { Member, Schedule, SwapRequest, Notification, User, UserRole } from "@/types";
 import Calendar from "@/components/Calendar";
 import ScheduleForm from "@/components/ScheduleForm";
 import MemberManager from "@/components/MemberManager";
@@ -40,6 +40,10 @@ import {
   markNotificationRead as apiMarkRead,
   markAllNotificationsRead as apiMarkAllRead,
   autoSyncGoogleCalendar,
+  fetchUsers,
+  approveUserApi,
+  rejectUserApi,
+  changeUserRoleApi,
 } from "@/lib/api";
 import { format, startOfMonth, endOfMonth, addMonths, subMonths } from "date-fns";
 import { ko } from "date-fns/locale";
@@ -73,7 +77,11 @@ export default function Home() {
   const [unreadCount, setUnreadCount] = useState(0);
   const [showNotifications, setShowNotifications] = useState(false);
   const [detailSchedule, setDetailSchedule] = useState<Schedule | null>(null);
+  const [detailMode, setDetailMode] = useState<"calendar" | "assign">("calendar");
   const [showAdminPanel, setShowAdminPanel] = useState(false);
+  const [allUsers, setAllUsers] = useState<User[]>([]);
+  const [pendingUsers, setPendingUsers] = useState<User[]>([]);
+  const [profileUser, setProfileUser] = useState<User | null>(null);
   const [showDayPopup, setShowDayPopup] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
   const [returnAlerts, setReturnAlerts] = useState<{ id: string; title: string; date: string; reason: string }[]>([]);
@@ -84,12 +92,13 @@ export default function Home() {
     const end = format(endOfMonth(addMonths(d, 1)), "yyyy-MM-dd");
 
     if (fullRefresh) {
-      const [m, rangeScheds, unassignedScheds, sw, notif] = await Promise.all([
+      const [m, rangeScheds, unassignedScheds, sw, notif, usersData] = await Promise.all([
         fetchMembers(),
         fetchSchedules(start, end),
         fetchUnassignedSchedules(),
         fetchSwapRequests(),
         fetchNotifications(),
+        fetchUsers(),
       ]);
       setMembers(m);
       setSchedules(rangeScheds); // 달력용: 배정된 일정만
@@ -97,6 +106,8 @@ export default function Home() {
       setSwapRequests(sw);
       setNotifications(notif.notifications);
       setUnreadCount(notif.unreadCount);
+      setAllUsers(usersData.users);
+      setPendingUsers(usersData.pendingUsers);
     } else {
       // 월 이동 시에는 배정된 일정만 빠르게
       const rangeScheds = await fetchSchedules(start, end);
@@ -131,6 +142,27 @@ export default function Home() {
     return () => window.removeEventListener("beforeinstallprompt", handler);
   }, []);
 
+  // 뒤로가기 버튼 처리 - 팝업/모달 닫기
+  useEffect(() => {
+    const handlePop = () => {
+      // 열려있는 모달을 순서대로 닫기
+      if (detailSchedule) { setDetailSchedule(null); return; }
+      if (showDayPopup) { setShowDayPopup(false); return; }
+      if (showNotifications) { setShowNotifications(false); return; }
+      if (showScheduleForm) { setShowScheduleForm(false); setEditingSchedule(null); return; }
+      if (showMemberManager) { setShowMemberManager(false); return; }
+      if (showAdminPanel) { setShowAdminPanel(false); return; }
+      if (showSearch) { setShowSearch(false); return; }
+      if (profileUser) { setProfileUser(null); return; }
+      // 아무 팝업도 없으면 히스토리 복원
+      history.pushState(null, "");
+    };
+    // 앱 시작 시 기본 히스토리 추가
+    history.pushState(null, "");
+    window.addEventListener("popstate", handlePop);
+    return () => window.removeEventListener("popstate", handlePop);
+  }); // 매 렌더마다 최신 state 참조
+
   // Login gate - must be AFTER all hooks
   if (!currentUser) {
     return <LoginPage onLogin={(user) => {
@@ -139,8 +171,14 @@ export default function Home() {
     }} />;
   }
 
-  const isAdmin = currentUser.role === "admin";
-  const isSales = currentUser.role === "sales" || isAdmin;
+  const role = currentUser.role;
+  const isAdmin = role === "ceo"; // 하위 호환
+  const isSales = role === "ceo" || role === "sales";
+  const canSales = role === "ceo" || role === "sales";
+  const canAssign = role === "ceo" || role === "scheduler" || role === "sales";
+  const canMembers = role === "ceo" || role === "scheduler";
+  const canManage = role === "ceo" || role === "field" || role === "scheduler";
+  const canManageAdvanced = role === "ceo";
 
   // Members — 낙관적 업데이트
   async function handleAddMember(data: { name: string; phone: string; availableDays: number[] }) {
@@ -248,7 +286,7 @@ export default function Home() {
 
   // Derived - schedules는 이미 배정된 것만 (DB레벨 분리)
   const myLinkedMember = members.find((m) => m.linkedUsername === currentUser.username);
-  const calendarSchedules = isAdmin
+  const calendarSchedules = canManageAdvanced
     ? schedules
     : schedules.filter((s) =>
         s.memberName === currentUser.name ||
@@ -312,7 +350,7 @@ export default function Home() {
         </div>
       )}
       {/* 반환 알림 배너 - 관리자만 */}
-      {isAdmin && returnAlerts.length > 0 && (
+      {canAssign && returnAlerts.length > 0 && (
         <div className="bg-orange-500 text-white z-50 animate-[slideDown_0.3s_ease-out]">
           {returnAlerts.slice(0, 5).map((alert) => (
             <div key={alert.id} className="px-3 py-1.5 flex items-center gap-2 border-b border-orange-400/30 last:border-0">
@@ -366,7 +404,7 @@ export default function Home() {
               )}
             </button>
             {/* Admin button */}
-            {isAdmin && (
+            {canManageAdvanced && (
               <button onClick={() => setShowAdminPanel(true)} className="p-2 text-gray-400 active:bg-purple-50 rounded-lg">
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
               </button>
@@ -413,10 +451,10 @@ export default function Home() {
         </div>
 
         <div style={{ display: activeTab === "manage" ? "block" : "none" }}>
-          <ManageTab isAdmin={isAdmin} onRefresh={() => loadData(undefined, true)} />
+          <ManageTab isAdmin={canManageAdvanced} onRefresh={() => loadData(undefined, true)} />
         </div>
 
-        {isAdmin && (
+        {canAssign && (
           <div className="h-full" style={{ display: activeTab === "assign" ? "block" : "none" }}>
             <AssignTab members={members} schedules={unassignedSchedules} onAssigned={(scheduleId, memberId, memberName) => {
               // 낙관적 업데이트: 즉시 UI 반영
@@ -431,61 +469,84 @@ export default function Home() {
               assignScheduleApi(scheduleId, memberId, memberName);
             }} onDeleted={(id) => {
               setUnassignedSchedules((prev) => prev.filter((s) => s.id !== id));
+            }} onOpenDetail={(s) => {
+              setDetailMode("assign");
+              setDetailSchedule(s);
             }} />
           </div>
         )}
 
-        {/* Members tab */}
+        {/* 팀원 탭 */}
         <div style={{ display: activeTab === "members" ? "block" : "none" }}>
-          <div className="space-y-3 p-3 h-full overflow-y-auto">
+          <div className="h-full overflow-y-auto p-3 space-y-3">
+            {/* 전체 팀원 */}
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="text-sm font-bold text-gray-800">팀원 목록</h3>
-                {isAdmin && (
-                  <button
-                    onClick={() => setShowMemberManager(true)}
-                    className="px-3 py-1.5 bg-blue-500 text-white rounded-lg text-xs font-medium"
-                  >
-                    관리
-                  </button>
-                )}
-              </div>
+              <h3 className="text-sm font-bold text-gray-800 mb-3">팀원 ({allUsers.length}{canManageAdvanced && pendingUsers.length > 0 ? ` + 대기 ${pendingUsers.length}` : ""})</h3>
               <div className="space-y-2.5">
-                {members.map((m) => (
-                  <div key={m.id} className="flex items-center gap-3">
-                    <div
-                      className="w-9 h-9 rounded-full flex items-center justify-center text-white font-bold text-xs shrink-0"
-                      style={{ backgroundColor: m.active ? m.color : "#9CA3AF" }}
-                    >
-                      {m.name[0]}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-sm font-medium text-gray-800">{m.name}</span>
-                        {!m.active && <span className="text-[10px] px-1.5 py-0.5 bg-gray-100 text-gray-500 rounded-full">비활성</span>}
+                {[...allUsers, ...(canManageAdvanced ? pendingUsers : [])].sort((a, b) => {
+                  if (a.username === currentUser.username) return -1;
+                  if (b.username === currentUser.username) return 1;
+                  return 0;
+                }).map((u) => {
+                  const isMe = u.username === currentUser.username;
+                  const roleLabels: Record<string, string> = { ceo: "대표", scheduler: "일정관리자", sales: "영업팀", field: "현장팀", pending: "대기" };
+                  const roleColors: Record<string, string> = { ceo: "bg-purple-100 text-purple-700", scheduler: "bg-blue-100 text-blue-700", sales: "bg-green-100 text-green-700", field: "bg-orange-100 text-orange-700", pending: "bg-gray-100 text-gray-500" };
+                  return (
+                    <div key={u.id} className={`border rounded-xl p-3 ${isMe ? "border-blue-300 bg-blue-50/30" : u.status === "pending" ? "border-orange-300 bg-orange-50/30" : "border-gray-200"}`}>
+                      <div className="flex items-center gap-3">
+                        <div className={`w-9 h-9 rounded-full flex items-center justify-center font-bold text-xs shrink-0 ${isMe ? "bg-blue-500 text-white" : u.status === "pending" ? "bg-orange-200 text-orange-700" : "bg-blue-100 text-blue-600"}`}>{u.name[0]}</div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="text-sm font-medium text-gray-800">{u.name}</span>
+                            {isMe && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-blue-500 text-white">본인</span>}
+                            {u.status === "pending"
+                              ? <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-orange-100 text-orange-700">승인대기</span>
+                              : <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${roleColors[u.role] || "bg-gray-100 text-gray-500"}`}>{roleLabels[u.role] || u.role}</span>
+                            }
+                          </div>
+                          <div className="text-xs text-gray-400">{u.phone || "연락처 없음"}{u.branch ? ` · ${u.branch}[관리점]` : ""}</div>
+                        </div>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          {canManageAdvanced && !isMe && u.status !== "pending" && (
+                            <select
+                              value={u.role}
+                              onChange={async (e) => {
+                                const newRole = e.target.value as UserRole;
+                                setAllUsers(prev => prev.map(x => x.id === u.id ? { ...x, role: newRole } : x));
+                                await changeUserRoleApi(u.id, newRole);
+                              }}
+                              className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 outline-none bg-white"
+                            >
+                              <option value="field">현장팀</option>
+                              <option value="sales">영업팀</option>
+                              <option value="scheduler">일정관리자</option>
+                              <option value="ceo">대표</option>
+                            </select>
+                          )}
+                          {canManageAdvanced && !isMe && u.status !== "pending" && (
+                            <button onClick={() => setProfileUser(u)} className="p-1.5 active:bg-gray-100 rounded-lg">
+                              <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                            </button>
+                          )}
+                        </div>
                       </div>
-                      <div className="text-xs text-gray-400">
-                        {m.phone || "연락처 없음"}
-                        {m.linkedUsername && <span className="ml-1 text-blue-500">@{m.linkedUsername}</span>}
-                      </div>
+                      {/* 승인 대기 - 대표만 승인/거절 */}
+                      {u.status === "pending" && canManageAdvanced && (
+                        <div className="flex gap-2 mt-2 pt-2 border-t border-gray-100">
+                          <button onClick={async () => { await approveUserApi(u.id); loadData(undefined, true); }} className="flex-1 py-2 bg-green-500 text-white rounded-lg text-xs font-bold active:bg-green-600">승인</button>
+                          <button onClick={async () => { await rejectUserApi(u.id); loadData(undefined, true); }} className="flex-1 py-2 bg-red-500 text-white rounded-lg text-xs font-bold active:bg-red-600">거절</button>
+                        </div>
+                      )}
                     </div>
-                    <div className="flex gap-0.5">
-                      {["일","월","화","수","목","금","토"].map((name, i) => (
-                        <span key={i} className={`text-[9px] w-4 h-4 flex items-center justify-center rounded-full ${m.availableDays.includes(i) ? "bg-blue-100 text-blue-600 font-medium" : "text-gray-300"}`}>
-                          {name}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
-
           </div>
         </div>
 
         {/* Sales tab */}
-        {isSales && (
+        {canSales && (
           <div className="h-full" style={{ display: activeTab === "sales" ? "block" : "none" }}>
             <SalesTab userName={currentUser.name} onCreated={() => loadData(undefined, true)} />
           </div>
@@ -493,7 +554,7 @@ export default function Home() {
       </main>
 
       {/* FAB + 버튼 - 달력/배정에서만 */}
-      {(activeTab === "calendar" || activeTab === "assign") && isAdmin && (
+      {(activeTab === "calendar" || activeTab === "assign") && canAssign && (
         <button
           onClick={() => { setEditingSchedule(null); setShowScheduleForm(true); }}
           className="fixed bottom-20 right-4 w-12 h-12 bg-blue-500 rounded-full flex items-center justify-center shadow-lg active:bg-blue-600 z-30"
@@ -508,7 +569,7 @@ export default function Home() {
       <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-40 safe-area-bottom">
         <div className="flex items-center justify-around h-16 max-w-lg mx-auto">
           {/* 영업 */}
-          {isSales && (
+          {canSales && (
             <button
               onClick={() => setActiveTab("sales")}
               className={`flex flex-col items-center justify-center gap-0.5 w-16 h-full ${
@@ -523,7 +584,7 @@ export default function Home() {
           )}
 
           {/* 배정 */}
-          {isAdmin && (
+          {canAssign && (
             <button
               onClick={() => setActiveTab("assign")}
               className={`flex flex-col items-center justify-center gap-0.5 w-16 h-full ${
@@ -564,6 +625,7 @@ export default function Home() {
           </button>
 
           {/* 관리 */}
+          {canManage && (
           <button
             onClick={() => setActiveTab("manage")}
             className={`flex flex-col items-center justify-center gap-0.5 w-16 h-full ${
@@ -573,8 +635,9 @@ export default function Home() {
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={activeTab === "manage" ? 2.5 : 1.5} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
             </svg>
-            <span className="text-[10px] font-medium">{isAdmin ? "관리" : "더보기"}</span>
+            <span className="text-[10px] font-medium">{canManageAdvanced ? "관리" : "더보기"}</span>
           </button>
+          )}
         </div>
       </nav>
 
@@ -616,8 +679,8 @@ export default function Home() {
           onClose={() => setShowNotifications(false)}
         />
       )}
-      {/* 날짜 클릭 팝업 - 삼성 캘린더 스타일 */}
-      {showDayPopup && (
+      {/* 날짜 클릭 팝업 - 삼성 캘린더 스타일 (달력탭에서만) */}
+      {showDayPopup && activeTab === "calendar" && (
         <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50 px-5" onClick={(e) => { if (e.target === e.currentTarget) setShowDayPopup(false); }}>
           <div className="bg-white rounded-3xl shadow-2xl w-full max-w-[380px] animate-[modalIn_0.15s_ease-out]">
             {/* 날짜 헤더 */}
@@ -651,13 +714,13 @@ export default function Home() {
                       key={s.id}
                       className="rounded-2xl cursor-pointer active:scale-[0.97] transition-transform"
                       style={{ backgroundColor: schedColor }}
-                      onClick={() => { setShowDayPopup(false); swapMode ? handleSwapSelect(s) : setDetailSchedule(s); }}
+                      onClick={() => { setShowDayPopup(false); swapMode ? handleSwapSelect(s) : (() => { setDetailMode("calendar"); setDetailSchedule(s); })(); }}
                     >
                       <div className="px-4 py-4 flex items-center gap-3">
                         <span className="text-xl">📅</span>
                         <div className="flex-1 min-w-0">
                           <div className="text-[15px] font-bold text-gray-900 truncate">{titleDisplay}</div>
-                          <div className="text-xs text-gray-600 mt-0.5">하루 종일</div>
+                          <div className="text-xs text-gray-600 mt-0.5">{s.title.match(/^\[(.+?)\]/)?.[1] || "하루 종일"}</div>
                         </div>
                         <svg className="w-4 h-4 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -675,10 +738,22 @@ export default function Home() {
         <ScheduleDetail
           schedule={detailSchedule}
           members={members}
-          isAdmin={isAdmin}
+          isAdmin={canAssign}
+          mode={detailMode}
+          currentUserName={currentUser.name}
+          allUsers={allUsers.map(u => ({ name: u.name }))}
           onEdit={(s) => { setDetailSchedule(null); handleEditSchedule(s); }}
           onDelete={(id) => { handleDeleteSchedule(id); setDetailSchedule(null); }}
           onUnassign={(id, reason) => { handleUnassignSchedule(id, reason); setDetailSchedule(null); }}
+          onAssign={(scheduleId, memberId, memberName) => {
+            const target = unassignedSchedules.find((s) => s.id === scheduleId);
+            if (target) {
+              setUnassignedSchedules((prev) => prev.filter((s) => s.id !== scheduleId));
+              setSchedules((prev) => [...prev, { ...target, memberId, memberName, status: "confirmed" as const }]);
+            }
+            assignScheduleApi(scheduleId, memberId, memberName);
+            setDetailSchedule(null);
+          }}
           onClose={() => setDetailSchedule(null)}
           onUpdated={() => loadData(undefined, true)}
         />
@@ -688,9 +763,43 @@ export default function Home() {
       )}
       {showSearch && (
         <SearchPanel
-          onSelectSchedule={(s) => { setShowSearch(false); setDetailSchedule(s); }}
+          onSelectSchedule={(s) => { setShowSearch(false); setDetailMode("calendar"); setDetailSchedule(s); }}
           onClose={() => setShowSearch(false)}
         />
+      )}
+      {/* 신상정보 팝업 */}
+      {profileUser && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center px-6" onClick={(e) => { if (e.target === e.currentTarget) setProfileUser(null); }}>
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm animate-[modalIn_0.15s_ease-out]">
+            <div className="px-5 pt-5 pb-3 flex items-center justify-between">
+              <h3 className="text-base font-bold text-gray-800">신상정보</h3>
+              <button onClick={() => setProfileUser(null)} className="p-1 active:bg-gray-100 rounded-lg">
+                <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
+            </div>
+            <div className="px-5 pb-5 space-y-3">
+              <div className="flex items-center gap-3 pb-3 border-b border-gray-100">
+                <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 font-bold text-lg">{profileUser.name[0]}</div>
+                <div>
+                  <div className="text-base font-bold text-gray-800">{profileUser.name}</div>
+                  <div className="text-xs text-gray-500">{profileUser.username}</div>
+                </div>
+              </div>
+              {[
+                ["연락처", profileUser.phone],
+                ["주소", profileUser.address],
+                ["관리점", profileUser.branch ? `${profileUser.branch}[관리점]` : ""],
+                ["주민등록번호", profileUser.residentNumber],
+                ["사업자등록증", profileUser.businessLicenseFile],
+              ].filter(([, v]) => v).map(([label, value]) => (
+                <div key={label} className="flex items-start gap-2">
+                  <span className="text-xs text-gray-500 w-20 shrink-0">{label}</span>
+                  <span className="text-sm text-gray-800">{value}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
