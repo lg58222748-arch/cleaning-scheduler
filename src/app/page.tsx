@@ -65,7 +65,7 @@ export default function Home() {
   const [showAdminPanel, setShowAdminPanel] = useState(false);
   const [showDayPopup, setShowDayPopup] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
-  const [returnAlert, setReturnAlert] = useState<{ title: string; date: string } | null>(null);
+  const [returnAlerts, setReturnAlerts] = useState<{ id: string; title: string; date: string }[]>([]);
 
   const loadData = useCallback(async (monthDate?: Date, fullRefresh = false) => {
     const d = monthDate || selectedDate;
@@ -159,8 +159,8 @@ export default function Home() {
     setSchedules((prev) => prev.filter((s) => s.id !== id));
     if (target) {
       setUnassignedSchedules((prev) => [...prev, { ...target, memberId: "", memberName: "미배정", status: "unassigned" as const }]);
-      // 반환 알림 - 재배정될 때까지 유지
-      setReturnAlert({ title: target.title.replace(/^\[.+?\]\s*/, ""), date: target.date });
+      // 반환 알림 추가
+      setReturnAlerts((prev) => [...prev, { id: target.id, title: target.title.replace(/^\[.+?\]\s*/, ""), date: target.date }]);
     }
     await unassignScheduleApi(id);
   }
@@ -280,18 +280,24 @@ export default function Home() {
           </div>
         </div>
       )}
-      {/* 반환 알림 배너 */}
-      {returnAlert && (
-        <div className="bg-orange-500 text-white px-4 py-2.5 flex items-center justify-between z-50 animate-[slideDown_0.3s_ease-out]">
-          <div className="flex items-center gap-2 flex-1 min-w-0">
-            <span className="text-sm">↩</span>
-            <div className="min-w-0">
-              <span className="text-xs font-medium truncate block">{returnAlert.title}</span>
-              <span className="text-[10px] opacity-80">배정탭으로 반환됨 · {returnAlert.date}</span>
+      {/* 반환 알림 배너 - 관리자만 */}
+      {isAdmin && returnAlerts.length > 0 && (
+        <div className="bg-orange-500 text-white z-50 animate-[slideDown_0.3s_ease-out]">
+          {returnAlerts.slice(0, 5).map((alert) => (
+            <div key={alert.id} className="px-3 py-1.5 flex items-center gap-2 border-b border-orange-400/30 last:border-0">
+              <span className="text-[10px]">↩</span>
+              <span className="text-[11px] font-medium truncate flex-1">{alert.title}</span>
+              <span className="text-[9px] opacity-70 shrink-0">{alert.date}</span>
+              <button onClick={() => setReturnAlerts((prev) => prev.filter((a) => a.id !== alert.id))} className="text-white/60 active:text-white ml-1">
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
             </div>
-          </div>
-          <button onClick={() => { setReturnAlert(null); setActiveTab("assign"); }} className="text-xs bg-white/20 px-2.5 py-1 rounded-lg font-medium shrink-0 ml-2">
-            배정탭 보기
+          ))}
+          {returnAlerts.length > 5 && (
+            <div className="px-3 py-1 text-[10px] opacity-80 text-center">+{returnAlerts.length - 5}건 더</div>
+          )}
+          <button onClick={() => { setReturnAlerts([]); setActiveTab("assign"); }} className="w-full py-1.5 text-[11px] font-medium bg-orange-600/50 active:bg-orange-600">
+            배정탭에서 처리 →
           </button>
         </div>
       )}
