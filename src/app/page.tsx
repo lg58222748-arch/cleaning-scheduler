@@ -494,7 +494,7 @@ export default function Home() {
                   const roleColors: Record<string, string> = { ceo: "bg-purple-100 text-purple-700", scheduler: "bg-blue-100 text-blue-700", sales: "bg-green-100 text-green-700", field: "bg-orange-100 text-orange-700", pending: "bg-gray-100 text-gray-500" };
                   return (
                     <div key={u.id} className={`border rounded-xl p-3 ${isMe ? "border-blue-300 bg-blue-50/30" : u.status === "pending" ? "border-orange-300 bg-orange-50/30" : "border-gray-200"}`}>
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-2.5">
                         <div className={`w-9 h-9 rounded-full flex items-center justify-center font-bold text-xs shrink-0 ${isMe ? "bg-blue-500 text-white" : u.status === "pending" ? "bg-orange-200 text-orange-700" : "bg-blue-100 text-blue-600"}`}>{u.name[0]}</div>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-1.5 flex-wrap">
@@ -505,41 +505,39 @@ export default function Home() {
                               : <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${roleColors[u.role] || "bg-gray-100 text-gray-500"}`}>{roleLabels[u.role] || u.role}</span>
                             }
                           </div>
-                          <div className="text-xs text-gray-400">{u.phone || "연락처 없음"}{u.branch ? ` · ${u.branch}[관리점]` : ""}</div>
-                        </div>
-                        <div className="flex items-center gap-1.5 shrink-0">
-                          {canManageAdvanced && !isMe && u.status !== "pending" && (
-                            <select
-                              value={u.role}
-                              onChange={async (e) => {
-                                const newRole = e.target.value as UserRole;
-                                setAllUsers(prev => prev.map(x => x.id === u.id ? { ...x, role: newRole } : x));
-                                await changeUserRoleApi(u.id, newRole);
-                              }}
-                              className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 outline-none bg-white"
-                            >
-                              <option value="field">현장팀</option>
-                              <option value="sales">영업팀</option>
-                              <option value="scheduler">일정관리자</option>
-                              <option value="ceo">대표</option>
-                            </select>
-                          )}
-                          {canManageAdvanced && !isMe && u.status !== "pending" && (
-                            <>
-                              <button onClick={() => setProfileUser(u)} className="p-1.5 active:bg-gray-100 rounded-lg">
-                                <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                              </button>
-                              <button onClick={() => {
-                                if (!confirm(u.name + "님을 탈퇴시키겠습니까?")) return;
-                                setAllUsers(prev => prev.filter(x => x.id !== u.id));
-                                deleteUserApi(u.id).then(() => loadData(undefined, true));
-                              }} className="p-1.5 active:bg-red-50 rounded-lg">
-                                <svg className="w-4 h-4 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                              </button>
-                            </>
-                          )}
+                          <div className="text-[11px] text-gray-400">{u.phone || "연락처 없음"}</div>
+                          {u.branch && <div className="text-[11px] text-gray-400">{u.branch}[관리점]</div>}
                         </div>
                       </div>
+                      {/* 관리 버튼 - 대표만 */}
+                      {canManageAdvanced && !isMe && u.status !== "pending" && (
+                        <div className="flex items-center gap-2 mt-2 pt-2 border-t border-gray-100">
+                          <select
+                            value={u.role}
+                            onChange={async (e) => {
+                              const newRole = e.target.value as UserRole;
+                              setAllUsers(prev => prev.map(x => x.id === u.id ? { ...x, role: newRole } : x));
+                              await changeUserRoleApi(u.id, newRole);
+                            }}
+                            className="flex-1 text-xs border border-gray-200 rounded-lg px-2 py-1.5 outline-none bg-white"
+                          >
+                            <option value="field">현장팀</option>
+                            <option value="sales">영업팀</option>
+                            <option value="scheduler">일정관리자</option>
+                            <option value="ceo">대표</option>
+                          </select>
+                          <button onClick={() => setProfileUser(u)} className="p-1.5 active:bg-gray-100 rounded-lg border border-gray-200">
+                            <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                          </button>
+                          <button onClick={() => {
+                            if (!confirm(u.name + "님을 탈퇴시키겠습니까?")) return;
+                            setAllUsers(prev => prev.filter(x => x.id !== u.id));
+                            deleteUserApi(u.id).then(() => loadData(undefined, true));
+                          }} className="p-1.5 active:bg-red-50 rounded-lg border border-gray-200">
+                            <svg className="w-4 h-4 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                          </button>
+                        </div>
+                      )}
                       {/* 승인 대기 - 대표만 승인/거절 */}
                       {u.status === "pending" && canManageAdvanced && (
                         <div className="flex gap-2 mt-2 pt-2 border-t border-gray-100">
