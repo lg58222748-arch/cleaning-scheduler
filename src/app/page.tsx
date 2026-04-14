@@ -243,58 +243,88 @@ export default function Home() {
   }, [pushHash]);
 
   // ★ 뒤로가기 + 당겨서 새로고침 방지
+  const [showExitToast, setShowExitToast] = useState(false);
+  const lastBackTime = useRef(0);
+
   useEffect(() => {
     // 당겨서 새로고침 차단
     document.body.style.overscrollBehavior = "none";
 
-    const doBack = () => {
+    const doBack = (): boolean => {
       const s = stateRef.current;
       if (s.detailSchedule) {
-        if (detailBackRef.current && detailBackRef.current()) return;
-        setDetailSchedule(null);
+        if (detailBackRef.current && detailBackRef.current()) return true;
+        setDetailSchedule(null); return true;
       }
-      else if (s.showDayPopup) { setShowDayPopup(false); }
-      else if (s.showNotifications) { setShowNotifications(false); }
-      else if (s.showScheduleForm) { setShowScheduleForm(false); setEditingSchedule(null); }
-      else if (s.showMemberManager) { setShowMemberManager(false); }
-      else if (s.showAdminPanel) { setShowAdminPanel(false); }
-      else if (s.showSearch) { setShowSearch(false); }
-      else if (s.showMemberFilter) { setShowMemberFilter(false); }
-      else if (s.profileUser) { setProfileUser(null); }
-      else if (s.activeTab !== "calendar") { setActiveTab("calendar"); tabHashPushed.current = false; }
+      if (s.showDayPopup) { setShowDayPopup(false); return true; }
+      if (s.showNotifications) { setShowNotifications(false); return true; }
+      if (s.showScheduleForm) { setShowScheduleForm(false); setEditingSchedule(null); return true; }
+      if (s.showMemberManager) { setShowMemberManager(false); return true; }
+      if (s.showAdminPanel) { setShowAdminPanel(false); return true; }
+      if (s.showSearch) { setShowSearch(false); return true; }
+      if (s.showMemberFilter) { setShowMemberFilter(false); return true; }
+      if (s.profileUser) { setProfileUser(null); return true; }
+      if (s.activeTab !== "calendar") { setActiveTab("calendar"); tabHashPushed.current = false; return true; }
+      return false; // 아무것도 안 열려있음
     };
 
-    // Navigation API: 무조건 가로채기
+    // 두 번 눌러 종료 로직
+    const handleBackPress = () => {
+      const handled = doBack();
+      if (!handled) {
+        // 아무것도 안 열려있음 → 2초 내 두 번 누르면 종료 허용
+        const now = Date.now();
+        if (now - lastBackTime.current < 2000) {
+          // 앱 종료 허용 (아무것도 안 함 → 브라우저/앱이 닫힘)
+          return false;
+        }
+        lastBackTime.current = now;
+        setShowExitToast(true);
+        setTimeout(() => setShowExitToast(false), 2000);
+        return true; // 종료 방지
+      }
+      return true;
+    };
+
+    // 1. Capacitor 네이티브 뒤로가기 (APK에서 동작)
+    let capCleanup: (() => void) | null = null;
+    (async () => {
+      try {
+        const { App } = await import("@capacitor/app");
+        const listener = await App.addListener("backButton", () => {
+          const prevent = handleBackPress();
+          if (!prevent) App.exitApp();
+        });
+        capCleanup = () => listener.remove();
+      } catch { /* Capacitor 없으면 무시 */ }
+    })();
+
+    // 2. Navigation API (Chrome PWA)
     const nav = (window as unknown as Record<string, unknown>).navigation as {
       addEventListener(t: string, fn: (e: Record<string, unknown>) => void): void;
       removeEventListener(t: string, fn: (e: Record<string, unknown>) => void): void;
     } | undefined;
     const onNav = (e: Record<string, unknown>) => {
       if (e.navigationType === "traverse" && e.canIntercept) {
-        (e.intercept as (o: { handler: () => Promise<void> }) => void)({
-          handler: async () => {
-            doBack();
-            // 항상 해시 유지 (앱 탈출 방지)
-            if (!window.location.hash || window.location.hash === "#") {
-              window.location.hash = "home";
-            }
-          }
-        });
+        const prevent = handleBackPress();
+        if (prevent) {
+          (e.intercept as (o: { handler: () => Promise<void> }) => void)({
+            handler: async () => {}
+          });
+        }
       }
     };
     if (nav) nav.addEventListener("navigate", onNav);
 
-    // 앱 시작 시 해시 벽 생성: /#home 을 베이스로 설정
+    // 3. 해시 벽 + hashchange/popstate fallback
     if (!window.location.hash || window.location.hash === "#") {
       history.replaceState(null, "", "#home");
     }
-
-    // hashchange/popstate fallback
     const onHashPop = () => {
       const h = window.location.hash;
-      // 해시가 없어졌으면(앱 밖으로 나가려는 중) → 즉시 복구
       if (!h || h === "#") {
-        history.pushState(null, "", "#home");
+        const prevent = handleBackPress();
+        if (prevent) history.pushState(null, "", "#home");
         return;
       }
       const current = h.slice(1);
@@ -307,6 +337,7 @@ export default function Home() {
     window.addEventListener("popstate", onHashPop);
 
     return () => {
+      capCleanup?.();
       if (nav) nav.removeEventListener("navigate", onNav);
       window.removeEventListener("hashchange", onHashPop);
       window.removeEventListener("popstate", onHashPop);
@@ -477,6 +508,12 @@ export default function Home() {
 
   return (
     <div className="h-screen bg-white pb-16 flex flex-col overflow-hidden">
+      {/* 뒤로가기 종료 안내 토스트 */}
+      {showExitToast && (
+        <div className="fixed bottom-20 left-1/2 -translate-x-1/2 bg-gray-800 text-white text-sm px-6 py-3 rounded-full z-[999] animate-[modalIn_0.2s_ease-out]">
+          한 번 더 누르면 종료됩니다
+        </div>
+      )}
       {/* 카카오톡 인앱브라우저 감지 → 외부 브라우저 이동 */}
       {isInApp && (
         <div className="fixed inset-0 bg-black/80 z-[100] flex items-center justify-center p-6">
