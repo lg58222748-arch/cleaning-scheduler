@@ -96,7 +96,8 @@ export default function Home() {
   const [showDayPopup, setShowDayPopup] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
   const [showMemberFilter, setShowMemberFilter] = useState(false);
-  const [selectedMemberIds, setSelectedMemberIds] = useState<Set<string>>(new Set()); // 빈 Set = 전체 보기
+  const [selectedMemberIds, setSelectedMemberIds] = useState<Set<string>>(new Set());
+  const [filterActive, setFilterActive] = useState(false); // 필터 사용 여부
   const [returnAlerts, setReturnAlerts] = useState<{ id: string; title: string; date: string; reason: string }[]>([]);
 
   const loadData = useCallback(async (monthDate?: Date, fullRefresh = false) => {
@@ -157,6 +158,7 @@ export default function Home() {
 
   // 뒤로가기 처리 - 모달/탭 열 때 pushState, popstate에서 닫기
   const prevTabRef = useRef<TabMode>("calendar");
+  const detailBackRef = useRef<(() => boolean) | null>(null);
   const stateRef = useRef({
     detailSchedule: null as Schedule | null,
     showDayPopup: false,
@@ -209,7 +211,13 @@ export default function Home() {
     const handlePop = () => {
       const s = stateRef.current;
 
-      if (s.detailSchedule) { setDetailSchedule(null); }
+      if (s.detailSchedule) {
+        if (detailBackRef.current && detailBackRef.current()) {
+          // detail 내부 탭 뒤로가기 처리됨
+        } else {
+          setDetailSchedule(null);
+        }
+      }
       else if (s.showDayPopup) { setShowDayPopup(false); }
       else if (s.showNotifications) { setShowNotifications(false); }
       else if (s.showScheduleForm) { setShowScheduleForm(false); setEditingSchedule(null); }
@@ -373,7 +381,7 @@ export default function Home() {
       );
   // 팀원 필터 적용 (현장팀 User ID 기준, 이름으로도 매칭)
   const calendarSchedules = (() => {
-    if (selectedMemberIds.size === 0) return baseCalendarSchedules;
+    if (!filterActive || selectedMemberIds.size === 0) return baseCalendarSchedules;
     const filterNames = new Set<string>();
     allUsers.filter(u => u.role === "field").forEach(u => {
       if (selectedMemberIds.has(u.id)) filterNames.add(u.name);
@@ -484,12 +492,12 @@ export default function Home() {
             {canManageAdvanced && activeTab === "calendar" && (
               <button
                 onClick={() => { showMemberFilter ? setShowMemberFilter(false) : openModal(setShowMemberFilter); }}
-                className={`p-2 rounded-lg relative ${showMemberFilter || selectedMemberIds.size > 0 ? "text-blue-500 bg-blue-50" : "text-gray-400 active:bg-blue-50"}`}
+                className={`p-2 rounded-lg relative ${showMemberFilter || filterActive ? "text-blue-500 bg-blue-50" : "text-gray-400 active:bg-blue-50"}`}
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z" />
                 </svg>
-                {selectedMemberIds.size > 0 && (
+                {filterActive && selectedMemberIds.size > 0 && (
                   <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-blue-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center">
                     {selectedMemberIds.size}
                   </span>
@@ -531,10 +539,10 @@ export default function Home() {
             <span className="text-xs font-bold text-gray-700">팀원 필터</span>
             <div className="flex gap-2">
               <button
-                onClick={() => setSelectedMemberIds(new Set())}
+                onClick={() => { setSelectedMemberIds(new Set()); setFilterActive(false); }}
                 className="text-xs text-blue-500 font-medium"
               >
-                전체 보기
+                초기화
               </button>
               <button
                 onClick={() => setShowMemberFilter(false)}
@@ -545,35 +553,42 @@ export default function Home() {
             </div>
           </div>
           <div className="space-y-1">
-            {/* 전체 토글 버튼 */}
-            <button
-              onClick={() => {
-                if (selectedMemberIds.size === 0) {
-                  // 전체 해제 → 전체 개별 선택
-                  const allFieldIds = allUsers.filter(u => u.role === "field").map(u => u.id);
-                  setSelectedMemberIds(new Set(allFieldIds));
-                } else {
-                  // 일부/전체 선택 → 전체 보기(필터 해제)
-                  setSelectedMemberIds(new Set());
-                }
-              }}
-              className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg active:bg-gray-50 ${selectedMemberIds.size === 0 ? "bg-blue-50" : ""}`}
-            >
-              <div
-                className="w-5 h-5 rounded flex items-center justify-center border-2 shrink-0"
-                style={{
-                  borderColor: "#3B82F6",
-                  backgroundColor: selectedMemberIds.size === 0 ? "#3B82F6" : "transparent",
-                }}
-              >
-                {selectedMemberIds.size === 0 && (
-                  <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                  </svg>
-                )}
-              </div>
-              <span className="text-sm text-gray-800 font-medium">전체</span>
-            </button>
+            {/* 전체 토글 버튼 (개별 클릭처럼 동작) */}
+            {(() => {
+              const fieldUsers = allUsers.filter(u => u.role === "field");
+              const allSelected = fieldUsers.length > 0 && fieldUsers.every(u => selectedMemberIds.has(u.id));
+              return (
+                <button
+                  onClick={() => {
+                    if (allSelected) {
+                      // 전체 해제 → 필터 비활성
+                      setSelectedMemberIds(new Set());
+                      setFilterActive(false);
+                    } else {
+                      // 전체 선택
+                      setSelectedMemberIds(new Set(fieldUsers.map(u => u.id)));
+                      setFilterActive(true);
+                    }
+                  }}
+                  className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg active:bg-gray-50 ${allSelected ? "bg-blue-50" : ""}`}
+                >
+                  <div
+                    className="w-5 h-5 rounded flex items-center justify-center border-2 shrink-0"
+                    style={{
+                      borderColor: "#3B82F6",
+                      backgroundColor: allSelected ? "#3B82F6" : "transparent",
+                    }}
+                  >
+                    {allSelected && (
+                      <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                      </svg>
+                    )}
+                  </div>
+                  <span className="text-sm text-gray-800 font-medium">전체</span>
+                </button>
+              );
+            })()}
             {/* 현장팀 사용자 목록 */}
             {allUsers.filter(u => u.role === "field").map((u) => {
               const uid = u.id;
@@ -589,6 +604,7 @@ export default function Home() {
                       const next = new Set(prev);
                       if (next.has(uid)) next.delete(uid);
                       else next.add(uid);
+                      setFilterActive(next.size > 0);
                       return next;
                     });
                   }}
@@ -945,6 +961,8 @@ export default function Home() {
           mode={detailMode}
           currentUserName={currentUser.name}
           allUsers={allUsers.map(u => ({ id: u.id, name: u.name, username: u.username, role: u.role }))}
+          onRegisterBackHandler={(fn) => { detailBackRef.current = fn; }}
+          memberBranch={allUsers.find(u => u.name === (detailSchedule?.memberName))?.branch || ""}
           onEdit={(s) => { setDetailSchedule(null); handleEditSchedule(s); }}
           onDelete={(id) => { handleDeleteSchedule(id); setDetailSchedule(null); }}
           onUnassign={(id, reason) => { handleUnassignSchedule(id, reason); setDetailSchedule(null); }}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Schedule, Member, Comment } from "@/types";
 import { fetchComments, createComment, deleteCommentApi, updateSchedule as apiUpdateSchedule } from "@/lib/api";
 import ScheduleChecklist from "./ScheduleChecklist";
@@ -13,6 +13,8 @@ interface ScheduleDetailProps {
   mode?: "calendar" | "assign";
   currentUserName?: string;
   allUsers?: { id?: string; name: string; username?: string; role?: string }[];
+  onRegisterBackHandler?: (handler: (() => boolean) | null) => void;
+  memberBranch?: string;
   onEdit: (schedule: Schedule) => void;
   onDelete: (id: string) => void;
   onUnassign?: (id: string, reason: string) => void;
@@ -30,6 +32,8 @@ export default function ScheduleDetail({
   mode = "calendar",
   currentUserName = "",
   allUsers = [],
+  onRegisterBackHandler,
+  memberBranch = "",
   onEdit,
   onDelete,
   onUnassign,
@@ -55,6 +59,22 @@ export default function ScheduleDetail({
   const [noteChanged, setNoteChanged] = useState(false);
   const [schedColor, setSchedColor] = useState(schedule.color || "#FDDCCC");
   const [assignMemberId, setAssignMemberId] = useState("");
+
+  // 탭 히스토리 (뒤로가기 지원)
+  const tabHistoryRef = useRef<DetailTab[]>([]);
+
+  useEffect(() => {
+    const handler = (): boolean => {
+      if (tabHistoryRef.current.length > 0) {
+        const prevTab = tabHistoryRef.current.pop()!;
+        setActiveTab(prevTab);
+        return true;
+      }
+      return false;
+    };
+    onRegisterBackHandler?.(handler);
+    return () => onRegisterBackHandler?.(null);
+  }, [onRegisterBackHandler]);
 
   // 시간대 (제목 앞에 [오전] 등)
   const TIME_SLOTS = ["오전", "오후", "시무", "사이"] as const;
@@ -211,7 +231,13 @@ export default function ScheduleDetail({
           ] as [DetailTab, string][]).map(([tab, label]) => (
             <button
               key={tab}
-              onClick={() => setActiveTab(tab)}
+              onClick={() => {
+                if (tab !== activeTab) {
+                  tabHistoryRef.current.push(activeTab);
+                  history.pushState({ detailTab: true }, "");
+                }
+                setActiveTab(tab);
+              }}
               className={`flex-1 py-2.5 text-sm font-medium text-center transition-colors ${
                 activeTab === tab
                   ? "text-blue-500 border-b-2 border-blue-500"
@@ -264,7 +290,7 @@ export default function ScheduleDetail({
                   <div className="w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0" style={{ backgroundColor: memberColor }}>
                     {schedule.memberName[0]}
                   </div>
-                  <span className="font-medium text-gray-800">관리사: {schedule.memberName}</span>
+                  <span className="font-medium text-gray-800">{memberBranch ? `${memberBranch} 관리점` : ""} {schedule.memberName}</span>
                 </div>
                 {(() => {
                   const member = members.find(m => m.id === schedule.memberId);
@@ -372,6 +398,8 @@ export default function ScheduleDetail({
               scheduleNote={schedule.note}
               customerNameFromSchedule={schedule.note?.match(/1\)성함\s*[:：]\s*(.+)/)?.[1]?.trim()}
               customerPhoneFromSchedule={schedule.note?.match(/3\)연락처\s*[:：]\s*(.+)/)?.[1]?.trim()}
+              memberName={schedule.memberName}
+              memberBranch={memberBranch}
             />}
           </div>
         </div>
