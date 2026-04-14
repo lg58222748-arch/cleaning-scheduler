@@ -85,7 +85,7 @@ export default function SalesTab({ userName, onCreated }: SalesTabProps) {
     text += `1)성함 :\n2)주소 : (아파트명+동호수)\n3)연락처 :\n4)청소희망날짜:\n  (오전: 7시~9시, 오후: 1시~3시 사이 방문 선택)\n5)고객님 특이사항 :\n\n`;
     text += `──────────────────\n`;
     text += `6)서비스 종류 : ${svcList}\n`;
-    text += `7)평수 : ${pyeong ? pyeong : ""}\n`;
+    text += `7)평수 : ${pyeong ? pyeong + "평" : ""}\n`;
 
     services.forEach((s, i) => {
       text += `► ${s.name}\n`;
@@ -255,7 +255,7 @@ export default function SalesTab({ userName, onCreated }: SalesTabProps) {
     msg += `4)청소희망날짜 : ${wish || parsedWishDate}\n`;
     msg += `5)고객님 특이사항 : ${note || parsedNote}\n\n`;
     msg += `──────────────────\n`;
-    msg += `6)서비스 종류 : ${svcList}\n7)평수 : ${parsedPyeong || pyeong}\n`;
+    msg += `6)서비스 종류 : ${svcList}\n7)평수 : ${(parsedPyeong || pyeong) ? (parsedPyeong || pyeong) + "평" : ""}\n`;
 
     services.forEach((s) => {
       msg += `► ${s.name}\n`;
@@ -534,25 +534,17 @@ export default function SalesTab({ userName, onCreated }: SalesTabProps) {
                   className="w-full text-[11px] text-gray-700 font-sans leading-relaxed bg-transparent outline-none resize-y" />
               </div>
 
-              {/* 버튼 */}
+              {/* 버튼: 예약 확정 → 5개 복사 → 캘린더 저장 */}
               {!confirmed ? (
                 <div className="space-y-2">
-                  <button onClick={() => handleCopy(confirmMsg, "confirm")}
+                  <button onClick={() => { setConfirmed(true); setPostDone([]); }}
                     className="w-full py-3 rounded-xl text-sm font-bold text-white" style={{ background: "linear-gradient(135deg, #1a6b3c, #22874c)" }}>
-                    {copied === "confirm" ? "✅ 복사됨!" : "📋 확정 메시지 복사"}
-                  </button>
-                  <button onClick={handleConfirm} disabled={saving}
-                    className="w-full py-3 rounded-xl text-sm font-bold text-white active:opacity-90 disabled:opacity-50" style={{ background: "linear-gradient(135deg, #0f4c81, #1a6bb5)" }}>
-                    {saving ? "저장 중..." : `📅 예약 확정 (${schedules.length}건 배정탭 등록)`}
+                    예약 확정
                   </button>
                 </div>
               ) : (
                 <div className="space-y-3">
-                  <div className="p-3 bg-green-50 border border-green-200 rounded-xl text-center">
-                    <div className="text-lg mb-1">✅</div>
-                    <div className="text-sm font-bold text-green-700">{schedules.length}건 배정탭 등록 완료!</div>
-                    <div className="text-xs text-green-600 mt-1">아래 순서대로 고객에게 전송하세요</div>
-                  </div>
+                  <div className="text-xs font-bold text-green-700">고객 전송 (순서대로 📋 복사 → 붙여넣기)</div>
 
                   <div className="text-xs font-bold text-green-700 mb-1">고객 전송 (순서대로 복사 → 붙여넣기)</div>
                   {POST_MSGS.map((msg, i) => (
@@ -571,9 +563,18 @@ export default function SalesTab({ userName, onCreated }: SalesTabProps) {
                     </div>
                   ))}
 
-                  {postDone.length >= 5 && (
+                  {/* 6. 캘린더 저장 - 5개 모두 복사 후 활성화 */}
+                  <div className={`border rounded-xl p-3 ${postDone.length >= 5 ? "border-blue-300 bg-blue-50" : "border-gray-200 opacity-50"}`}>
+                    <button onClick={handleConfirm} disabled={saving || postDone.length < 5}
+                      className="w-full py-2.5 rounded-lg text-sm font-bold text-white disabled:opacity-50" style={{ background: "linear-gradient(135deg, #0f4c81, #1a6bb5)" }}>
+                      {saving ? "저장 중..." : `6. 📅 캘린더 저장 (${schedules.length}건)`}
+                    </button>
+                    {postDone.length < 5 && <p className="text-[10px] text-gray-400 text-center mt-1">위 5개 항목을 모두 복사해야 저장이 활성화됩니다</p>}
+                  </div>
+
+                  {postDone.length >= 5 && saving === false && (
                     <div className="text-center text-xs text-green-600 font-bold py-2">
-                      🎉 모든 전송 완료! 수고하셨습니다.
+                      🎉 모든 전송 완료!
                     </div>
                   )}
                 </div>
