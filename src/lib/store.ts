@@ -99,11 +99,14 @@ export async function addSchedule(input: Omit<Schedule, "id" | "status">): Promi
 }
 
 export async function addUnassignedSchedule(input: Omit<Schedule, "id" | "status" | "memberId" | "memberName">): Promise<Schedule | null> {
-  // 구글 캘린더 중복 체크 (googleEventId가 있으면)
+  // 중복 체크 1: googleEventId
   if (input.googleEventId) {
     const { data: existing } = await supabase.from("schedules").select("id").eq("google_event_id", input.googleEventId).limit(1);
-    if (existing && existing.length > 0) return null; // 이미 존재
+    if (existing && existing.length > 0) return null;
   }
+  // 중복 체크 2: 같은 제목+날짜
+  const { data: dup } = await supabase.from("schedules").select("id").eq("title", input.title).eq("date", input.date).limit(1);
+  if (dup && dup.length > 0) return null;
   const { data } = await supabase.from("schedules").insert({
     member_id: "", member_name: "미배정", title: input.title, location: input.location || "", date: input.date, start_time: input.startTime, end_time: input.endTime, status: "unassigned", google_event_id: input.googleEventId, note: input.note || "",
   }).select().single();

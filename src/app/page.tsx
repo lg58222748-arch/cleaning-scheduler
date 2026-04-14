@@ -411,30 +411,29 @@ export default function Home() {
       {/* Main content area */}
       <main className="flex-1 overflow-hidden">
         {/* Calendar tab - 삼성 캘린더 스타일 */}
-        {activeTab === "calendar" && (
-          <div className="h-full">
-            <Calendar
-              schedules={calendarSchedules}
-              members={members}
-              selectedDate={selectedDate}
-              onSelectDate={(d) => { setSelectedDate(d); setShowDayPopup(true); }}
-              onMonthChange={(d) => loadData(d)}
-            />
+        {/* 모든 탭 항상 마운트, display로 전환 → 즉시 전환 */}
+        <div className="h-full" style={{ display: activeTab === "calendar" ? "block" : "none" }}>
+          <Calendar
+            schedules={calendarSchedules}
+            members={members}
+            selectedDate={selectedDate}
+            onSelectDate={(d) => { setSelectedDate(d); setShowDayPopup(true); }}
+            onMonthChange={(d) => loadData(d)}
+          />
+        </div>
+
+        <div style={{ display: activeTab === "manage" ? "block" : "none" }}>
+          <ManageTab isAdmin={isAdmin} onRefresh={() => loadData(undefined, true)} />
+        </div>
+
+        {isAdmin && (
+          <div className="h-full" style={{ display: activeTab === "assign" ? "block" : "none" }}>
+            <AssignTab members={members} schedules={unassignedSchedules} onAssigned={() => loadData(undefined, true)} />
           </div>
         )}
 
-        {/* List tab */}
-        {activeTab === "manage" && (
-          <ManageTab isAdmin={isAdmin} onRefresh={() => loadData(undefined, true)} />
-        )}
-
-        {/* Assign tab */}
-        {activeTab === "assign" && (
-          <div className="h-full"><AssignTab members={members} schedules={unassignedSchedules} onAssigned={() => loadData(undefined, true)} /></div>
-        )}
-
         {/* Members tab */}
-        {activeTab === "members" && (
+        <div style={{ display: activeTab === "members" ? "block" : "none" }}>
           <div className="space-y-3 p-3 h-full overflow-y-auto">
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
               <div className="flex items-center justify-between mb-3">
@@ -482,7 +481,7 @@ export default function Home() {
             {/* Google Calendar section - 관리자만 */}
             {isAdmin && <GoogleCalendarSync onImport={handleGoogleImport} />}
           </div>
-        )}
+        </div>
       </main>
 
       {/* Bottom tab bar - mobile style */}
