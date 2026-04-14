@@ -293,6 +293,25 @@ export default function SalesTab({ userName, onCreated }: SalesTabProps) {
   ];
 
   async function handleConfirm() {
+    // 날짜 검증: 일정별 날짜가 비어있는지 확인
+    for (let i = 0; i < schedules.length; i++) {
+      if (!schedules[i].date) {
+        alert(`${i + 1}번째 일정의 날짜가 설정되지 않았습니다.`);
+        return;
+      }
+    }
+
+    // 날짜 검증: 확정 메시지의 날짜와 일정 날짜 비교
+    if (parsedWishDate && schedules.length > 0) {
+      const wishNums = parsedWishDate.replace(/[^0-9]/g, "");
+      const schedDates = schedules.map(s => s.date.replace(/-/g, ""));
+      const hasMatch = schedDates.some(d => d.includes(wishNums.slice(-4)) || wishNums.includes(d.slice(-4)));
+      if (!hasMatch && wishNums.length >= 4) {
+        const ok = confirm(`청소희망날짜(${parsedWishDate})와 일정 날짜(${schedules.map(s => s.date).join(", ")})가 다릅니다.\n\n그래도 저장하시겠습니까?`);
+        if (!ok) return;
+      }
+    }
+
     setSaving(true);
     for (let i = 0; i < schedules.length; i++) {
       const sched = schedules[i];
@@ -301,12 +320,11 @@ export default function SalesTab({ userName, onCreated }: SalesTabProps) {
       const noteExtra = calendarNote ? `/${calendarNote}` : "";
       const originalTitle = `U${parsedName}/${parsedAddr?.split(" ").slice(0, 2).join("")}/${userName} [${i + 1}/${schedules.length}]/${svc.name}${noteExtra}`;
       const calOriginal = sched.time && sched.time !== "선택" ? `[${sched.time}] ${originalTitle}` : originalTitle;
-      // 미입금 상태: u로그인사용자/미입금/고객이름
       const displayTitle = `u${userName}/미입금/${parsedName}`;
 
       await addUnassignedSchedule({
         title: displayTitle,
-        date: sched.date || new Date().toISOString().slice(0, 10),
+        date: sched.date,
         startTime: sched.time === "오전" ? "07:00" : sched.time === "오후" ? "13:00" : "09:00",
         endTime: sched.time === "오전" ? "12:00" : sched.time === "오후" ? "18:00" : "18:00",
         note: `원래제목: ${calOriginal}\n${confirmMsg}`,
@@ -315,6 +333,7 @@ export default function SalesTab({ userName, onCreated }: SalesTabProps) {
     setSaving(false);
     setConfirmed(true);
     setPostDone([]);
+    alert("예약 확정되었습니다!");
     onCreated();
   }
 
