@@ -910,7 +910,7 @@ export default function Home() {
           isAdmin={canAssign}
           mode={detailMode}
           currentUserName={currentUser.name}
-          allUsers={allUsers.map(u => ({ name: u.name, username: u.username, role: u.role }))}
+          allUsers={allUsers.map(u => ({ id: u.id, name: u.name, username: u.username, role: u.role }))}
           onEdit={(s) => { setDetailSchedule(null); handleEditSchedule(s); }}
           onDelete={(id) => { handleDeleteSchedule(id); setDetailSchedule(null); }}
           onUnassign={(id, reason) => { handleUnassignSchedule(id, reason); setDetailSchedule(null); }}
