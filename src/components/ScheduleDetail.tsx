@@ -352,7 +352,8 @@ export default function ScheduleDetail({
                       ref={(el) => { if (el) { el.style.height = "auto"; el.style.height = el.scrollHeight + "px"; } }}
                       value={noteText}
                       onChange={(e) => { setNoteText(e.target.value); setNoteChanged(true); const t = e.target; t.style.height = "auto"; t.style.height = t.scrollHeight + "px"; }}
-                      className="w-full text-xs text-gray-700 leading-relaxed bg-transparent outline-none resize-none min-h-[60px]"
+                      style={{ fontSize: "12px" }}
+                      className="w-full text-gray-700 leading-relaxed bg-transparent outline-none resize-none min-h-[60px]"
                       placeholder="내용을 입력하세요..."
                     />
                   </div>

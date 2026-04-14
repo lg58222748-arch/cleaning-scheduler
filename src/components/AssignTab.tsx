@@ -209,7 +209,7 @@ export default function AssignTab({ members, schedules, onAssigned, onDeleted, o
                         return (
                           <div
                             key={s.id}
-                            className="text-xs leading-[1.2] px-0.5 py-0.5 rounded font-medium bg-orange-100 text-orange-700 overflow-hidden mb-0.5"
+                            className="text-[8px] leading-[1.2] px-0.5 py-0.5 rounded font-medium bg-orange-100 text-orange-700 overflow-hidden mb-0.5"
                             style={{ maxHeight: "2.6em", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const }}
                           >
                             {fullName}
@@ -217,7 +217,7 @@ export default function AssignTab({ members, schedules, onAssigned, onDeleted, o
                         );
                       })}
                       {dayScheds.length > 2 && (
-                        <div className="absolute bottom-0 right-0 text-xs text-gray-400 font-medium">+{dayScheds.length - 2}</div>
+                        <div className="absolute bottom-0 right-0 text-[8px] text-gray-400 font-medium">+{dayScheds.length - 2}</div>
                       )}
                     </div>
                   </button>
