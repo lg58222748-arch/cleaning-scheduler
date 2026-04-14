@@ -46,17 +46,16 @@ import { ko } from "date-fns/locale";
 
 type TabMode = "calendar" | "manage" | "assign" | "members" | "sales";
 
-// localStorage에서 로그인 정보 복원
-function getSavedUser(): User | null {
-  if (typeof window === "undefined") return null;
-  try {
-    const saved = localStorage.getItem("currentUser");
-    return saved ? JSON.parse(saved) : null;
-  } catch { return null; }
-}
-
 export default function Home() {
-  const [currentUser, setCurrentUser] = useState<User | null>(getSavedUser);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+
+  // 클라이언트에서만 localStorage 복원 (hydration mismatch 방지)
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("currentUser");
+      if (saved) setCurrentUser(JSON.parse(saved));
+    } catch {}
+  }, []);
   const [members, setMembers] = useState<Member[]>([]);
   const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [unassignedSchedules, setUnassignedSchedules] = useState<Schedule[]>([]);
