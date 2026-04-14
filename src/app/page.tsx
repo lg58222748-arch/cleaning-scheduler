@@ -56,7 +56,6 @@ type TabMode = "calendar" | "manage" | "assign" | "members" | "sales";
 export default function Home() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [appReady, setAppReady] = useState(false);
-  const [showSplash, setShowSplash] = useState(false);
 
   // 클라이언트에서만 localStorage 복원
   useEffect(() => {
@@ -64,17 +63,7 @@ export default function Home() {
       const saved = localStorage.getItem("currentUser");
       if (saved) setCurrentUser(JSON.parse(saved));
     } catch {}
-    // 스플래시: 세션당 최초 1회만, 1.2초 후 앱 표시
-    if (!sessionStorage.getItem("splashShown")) {
-      sessionStorage.setItem("splashShown", "1");
-      setShowSplash(true);
-      setTimeout(() => {
-        setShowSplash(false);
-        setAppReady(true);
-      }, 1200);
-    } else {
-      setAppReady(true);
-    }
+    setAppReady(true);
   }, []);
   const [members, setMembers] = useState<Member[]>([]);
   const [schedules, setSchedules] = useState<Schedule[]>([]);
@@ -235,17 +224,8 @@ export default function Home() {
     return () => window.removeEventListener("popstate", handlePop);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // 앱 준비 전: 스플래시 또는 빈 화면
-  if (!appReady) {
-    if (showSplash) {
-      return (
-        <div className="fixed inset-0 bg-[#3a9ad9] flex items-center justify-center">
-          <img src="/logo.png" alt="새집느낌" className="w-40 h-40 rounded-3xl" />
-        </div>
-      );
-    }
-    return null;
-  }
+  // 앱 준비 전: 빈 화면 (hydration 완료 대기)
+  if (!appReady) return null;
 
   // Login gate - must be AFTER all hooks
   if (!currentUser) {
