@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import dynamic from "next/dynamic";
 import { Member, Schedule, SwapRequest, Notification, User, UserRole } from "@/types";
 import Calendar from "@/components/Calendar";
@@ -27,10 +27,6 @@ import {
   createSchedule,
   updateSchedule as apiUpdateSchedule,
   softDeleteSchedule,
-  deleteAllSchedules,
-  fetchDeletedSchedules,
-  restoreScheduleApi,
-  emptyTrashApi,
   unassignScheduleApi,
   assignScheduleApi,
   fetchSwapRequests,
@@ -41,7 +37,6 @@ import {
   fetchNotifications,
   markNotificationRead as apiMarkRead,
   markAllNotificationsRead as apiMarkAllRead,
-  autoSyncGoogleCalendar,
   fetchUsers,
   approveUserApi,
   rejectUserApi,
@@ -101,31 +96,34 @@ export default function Home() {
   const [returnAlerts, setReturnAlerts] = useState<{ id: string; title: string; date: string; reason: string }[]>([]);
 
   const loadData = useCallback(async (monthDate?: Date, fullRefresh = false) => {
-    const d = monthDate || selectedDate;
-    const start = format(startOfMonth(subMonths(d, 1)), "yyyy-MM-dd");
-    const end = format(endOfMonth(addMonths(d, 1)), "yyyy-MM-dd");
+    try {
+      const d = monthDate || selectedDate;
+      const start = format(startOfMonth(subMonths(d, 1)), "yyyy-MM-dd");
+      const end = format(endOfMonth(addMonths(d, 1)), "yyyy-MM-dd");
 
-    if (fullRefresh) {
-      const [m, rangeScheds, unassignedScheds, sw, notif, usersData] = await Promise.all([
-        fetchMembers(),
-        fetchSchedules(start, end),
-        fetchUnassignedSchedules(),
-        fetchSwapRequests(),
-        fetchNotifications(),
-        fetchUsers(),
-      ]);
-      setMembers(m);
-      setSchedules(rangeScheds); // 달력용: 배정된 일정만
-      setUnassignedSchedules(unassignedScheds); // 배정탭용: 미배정만
-      setSwapRequests(sw);
-      setNotifications(notif.notifications);
-      setUnreadCount(notif.unreadCount);
-      setAllUsers(usersData.users);
-      setPendingUsers(usersData.pendingUsers);
-    } else {
-      // 월 이동 시에는 배정된 일정만 빠르게
-      const rangeScheds = await fetchSchedules(start, end);
-      setSchedules(rangeScheds);
+      if (fullRefresh) {
+        const [m, rangeScheds, unassignedScheds, sw, notif, usersData] = await Promise.all([
+          fetchMembers(),
+          fetchSchedules(start, end),
+          fetchUnassignedSchedules(),
+          fetchSwapRequests(),
+          fetchNotifications(),
+          fetchUsers(),
+        ]);
+        setMembers(m);
+        setSchedules(rangeScheds);
+        setUnassignedSchedules(unassignedScheds);
+        setSwapRequests(sw);
+        setNotifications(notif.notifications);
+        setUnreadCount(notif.unreadCount);
+        setAllUsers(usersData.users);
+        setPendingUsers(usersData.pendingUsers);
+      } else {
+        const rangeScheds = await fetchSchedules(start, end);
+        setSchedules(rangeScheds);
+      }
+    } catch (e) {
+      console.error("데이터 로드 실패:", e);
     }
   }, [selectedDate]);
 
@@ -195,6 +193,21 @@ export default function Home() {
     window.location.hash = id;
   }, []);
 
+  // 직접 닫기 시 해시 스택에서 1개 제거 + history.back()으로 해시 소비
+  const consumeHash = useCallback(() => {
+    if (hashStackRef.current.length > 0) {
+      hashStackRef.current.pop();
+      // history.back()은 hashchange를 트리거하므로, 이미 닫힌 상태에서 doBack이 또 호출되지 않도록
+      // 스택에서 먼저 pop하고, 해시만 정리
+      if (hashStackRef.current.length === 0) {
+        history.replaceState(null, "", window.location.pathname);
+      } else {
+        // 이전 해시로 돌아가기
+        history.replaceState(null, "", `#${hashStackRef.current[hashStackRef.current.length - 1]}`);
+      }
+    }
+  }, []);
+
   const openModal = useCallback((setter: (v: boolean) => void) => {
     pushHash("m");
     setter(true);
@@ -231,17 +244,25 @@ export default function Home() {
 
   // ★ 뒤로가기 감지 (Navigation API + hashchange)
   useEffect(() => {
+    // 현재 열린 것이 있는지 확인
+    const hasOpenOverlay = (): boolean => {
+      const s = stateRef.current;
+      return !!(s.detailSchedule || s.showDayPopup || s.showNotifications ||
+        s.showScheduleForm || s.showMemberManager || s.showAdminPanel ||
+        s.showSearch || s.showMemberFilter || s.profileUser || s.activeTab !== "calendar");
+    };
+
+    // 뒤로가기 핵심 로직: 열린 것 하나 닫기 (해시 push 없음)
     const doBack = () => {
       const s = stateRef.current;
       if (s.detailSchedule) {
+        // 디테일 내부 탭 히스토리가 있으면 그것만 pop
         if (detailBackRef.current && detailBackRef.current()) {
-          pushHash("d");
-        } else {
-          setDetailSchedule(null);
-          hashStackRef.current = [];
-          history.replaceState(null, "", window.location.pathname);
+          // 내부 탭 복귀 성공 - 디테일은 유지
           return;
         }
+        // 내부 탭 없으면 디테일 자체 닫기
+        setDetailSchedule(null);
       }
       else if (s.showDayPopup) { setShowDayPopup(false); }
       else if (s.showNotifications) { setShowNotifications(false); }
@@ -251,7 +272,15 @@ export default function Home() {
       else if (s.showSearch) { setShowSearch(false); }
       else if (s.showMemberFilter) { setShowMemberFilter(false); }
       else if (s.profileUser) { setProfileUser(null); }
-      else if (s.activeTab !== "calendar") { setActiveTab(prevTabRef.current || "calendar"); tabHashPushed.current = false; }
+      else if (s.activeTab !== "calendar") { setActiveTab("calendar"); tabHashPushed.current = false; }
+    };
+
+    // 해시 스택 정리 (모든 해시 제거, 깨끗한 URL 복원)
+    const clearAllHashes = () => {
+      hashStackRef.current = [];
+      if (window.location.hash) {
+        history.replaceState(null, "", window.location.pathname);
+      }
     };
 
     // 1. Navigation API (Android PWA에서 하드웨어 뒤로가기 감지)
@@ -261,16 +290,14 @@ export default function Home() {
     } | undefined;
     const onNav = (e: Record<string, unknown>) => {
       if (e.navigationType === "traverse" && e.canIntercept) {
+        // 열린 게 없으면 intercept하지 않음 → 브라우저/PWA 기본 동작 (앱 종료)
+        if (!hasOpenOverlay()) return;
         (e.intercept as (o: { handler: () => Promise<void> }) => void)({
           handler: async () => {
             if (hashStackRef.current.length > 0) hashStackRef.current.pop();
-            const s = stateRef.current;
-            // 뭔가 열려있으면 닫고 해시 보충, 아무것도 없으면 보충 안 함 (앱 종료 허용)
-            const hasOpen = s.detailSchedule || s.showDayPopup || s.showNotifications ||
-              s.showScheduleForm || s.showMemberManager || s.showAdminPanel ||
-              s.showSearch || s.showMemberFilter || s.profileUser || s.activeTab !== "calendar";
             doBack();
-            if (hasOpen) pushHash("b");
+            // 닫은 후에도 열린 게 남아있으면 해시 스택 유지, 없으면 정리
+            if (!hasOpenOverlay()) clearAllHashes();
           }
         });
       }
@@ -281,9 +308,11 @@ export default function Home() {
     const onHashChange = () => {
       const current = window.location.hash.slice(1);
       const top = hashStackRef.current[hashStackRef.current.length - 1];
-      if (current === top) return;
+      if (current === top) return; // forward 이동은 무시
       if (hashStackRef.current.length > 0) hashStackRef.current.pop();
       doBack();
+      // 모두 닫혔으면 해시 정리
+      if (!hasOpenOverlay()) clearAllHashes();
     };
     window.addEventListener("hashchange", onHashChange);
     window.addEventListener("popstate", onHashChange);
@@ -315,32 +344,33 @@ export default function Home() {
   }
 
   const role = currentUser.role;
-  const isAdmin = role === "ceo"; // 하위 호환
-  const isSales = role === "ceo" || role === "sales";
+  const isAdmin = role === "ceo";
   const canSales = role === "ceo" || role === "sales";
   const canAssign = role === "ceo" || role === "scheduler" || role === "sales";
-  const canMembers = role === "ceo" || role === "scheduler";
   const canManage = role === "ceo" || role === "field" || role === "scheduler";
   const canManageAdvanced = role === "ceo";
 
   // Members — 낙관적 업데이트
   async function handleAddMember(data: { name: string; phone: string; availableDays: number[] }) {
-    const newMember = await createMember(data);
-    setMembers((prev) => [...prev, newMember]);
+    try {
+      const newMember = await createMember(data);
+      setMembers((prev) => [...prev, newMember]);
+    } catch { /* safeFetch가 이미 로깅 */ }
   }
   async function handleUpdateMember(id: string, data: Partial<Member>) {
     setMembers((prev) => prev.map((m) => m.id === id ? { ...m, ...data } : m));
-    await apiUpdateMember(id, data);
+    try { await apiUpdateMember(id, data); } catch { /* 낙관적 업데이트 유지 */ }
   }
   async function handleDeleteMember(id: string) {
     setMembers((prev) => prev.filter((m) => m.id !== id));
-    await apiDeleteMember(id);
+    try { await apiDeleteMember(id); } catch { /* 낙관적 업데이트 유지 */ }
   }
 
   // Schedules — 낙관적 업데이트
   async function handleSaveSchedule(data: Omit<Schedule, "id" | "status">) {
     setShowScheduleForm(false);
     setEditingSchedule(null);
+    consumeHash();
     if (editingSchedule) {
       setSchedules((prev) => prev.map((s) => s.id === editingSchedule.id ? { ...s, ...data } : s));
       await apiUpdateSchedule(editingSchedule.id, data);
@@ -455,7 +485,6 @@ export default function Home() {
   const daySchedules = calendarSchedules
     .filter((s) => s.date === dateStr)
     .sort((a, b) => a.startTime.localeCompare(b.startTime));
-  const pendingSwapCount = swapRequests.filter((r) => r.status === "pending").length;
 
   return (
     <div className="h-screen bg-white pb-16 flex flex-col overflow-hidden">
@@ -549,7 +578,7 @@ export default function Home() {
             {/* Member filter - 관리자만 */}
             {canManageAdvanced && activeTab === "calendar" && (
               <button
-                onClick={() => { showMemberFilter ? setShowMemberFilter(false) : openModal(setShowMemberFilter); }}
+                onClick={() => { showMemberFilter ? (setShowMemberFilter(false), consumeHash()) : openModal(setShowMemberFilter); }}
                 className={`p-2 rounded-lg relative ${showMemberFilter || filterActive ? "text-blue-500 bg-blue-50" : "text-gray-400 active:bg-blue-50"}`}
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -564,7 +593,7 @@ export default function Home() {
             )}
             {/* Notification bell */}
             <button
-              onClick={() => { setShowDayPopup(false); openModal(setShowNotifications); }}
+              onClick={() => { if (showDayPopup) { setShowDayPopup(false); consumeHash(); } openModal(setShowNotifications); }}
               className="p-2 text-gray-400 active:bg-yellow-50 rounded-lg relative"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -603,7 +632,7 @@ export default function Home() {
                 초기화
               </button>
               <button
-                onClick={() => setShowMemberFilter(false)}
+                onClick={() => { setShowMemberFilter(false); consumeHash(); }}
                 className="text-xs text-gray-400"
               >
                 닫기
@@ -715,7 +744,7 @@ export default function Home() {
             schedules={calendarSchedules}
             members={members}
             selectedDate={selectedDate}
-            onSelectDate={(d) => { setSelectedDate(d); setShowDayPopup(true); }}
+            onSelectDate={(d) => { setSelectedDate(d); pushHash("day"); setShowDayPopup(true); }}
             onMonthChange={(d) => loadData(d)}
           />
         </div>
@@ -925,7 +954,7 @@ export default function Home() {
           selectedDate={selectedDate}
           editingSchedule={editingSchedule}
           onSave={handleSaveSchedule}
-          onCancel={() => { setShowScheduleForm(false); setEditingSchedule(null); }}
+          onCancel={() => { setShowScheduleForm(false); setEditingSchedule(null); consumeHash(); }}
         />
       )}
       {showMemberManager && (
@@ -934,7 +963,7 @@ export default function Home() {
           onAdd={handleAddMember}
           onUpdate={handleUpdateMember}
           onDelete={handleDeleteMember}
-          onClose={() => setShowMemberManager(false)}
+          onClose={() => { setShowMemberManager(false); consumeHash(); }}
         />
       )}
       {showSwapPanel && (
@@ -944,7 +973,7 @@ export default function Home() {
           members={members}
           onApprove={handleApproveSwap}
           onReject={handleRejectSwap}
-          onClose={() => setShowSwapPanel(false)}
+          onClose={() => { setShowSwapPanel(false); consumeHash(); }}
         />
       )}
       {showNotifications && (
@@ -953,12 +982,12 @@ export default function Home() {
           onMarkRead={handleMarkRead}
           onMarkAllRead={handleMarkAllRead}
           onClearAll={handleClearAllNotifications}
-          onClose={() => setShowNotifications(false)}
+          onClose={() => { setShowNotifications(false); consumeHash(); }}
         />
       )}
       {/* 날짜 클릭 팝업 - 삼성 캘린더 스타일 (달력탭에서만) */}
       {showDayPopup && activeTab === "calendar" && (
-        <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50 px-5" onClick={(e) => { if (e.target === e.currentTarget) setShowDayPopup(false); }}>
+        <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50 px-5" onClick={(e) => { if (e.target === e.currentTarget) { setShowDayPopup(false); consumeHash(); } }}>
           <div className="bg-white rounded-3xl shadow-2xl w-full max-w-[380px] animate-[modalIn_0.15s_ease-out]">
             {/* 날짜 헤더 */}
             <div className="px-5 pt-5 pb-3 flex items-center justify-between">
@@ -967,7 +996,7 @@ export default function Home() {
                 <span className="text-sm text-gray-500">{format(selectedDate, "EEEE", { locale: ko })}</span>
               </div>
               <button
-                onClick={() => { setShowDayPopup(false); setEditingSchedule(null); openModal(setShowScheduleForm); }}
+                onClick={() => { setShowDayPopup(false); consumeHash(); setEditingSchedule(null); openModal(setShowScheduleForm); }}
                 className="w-9 h-9 bg-gray-100 rounded-full flex items-center justify-center active:bg-blue-100"
               >
                 <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -991,7 +1020,7 @@ export default function Home() {
                       key={s.id}
                       className="rounded-2xl cursor-pointer active:scale-[0.97] transition-transform"
                       style={{ backgroundColor: schedColor }}
-                      onClick={() => { setShowDayPopup(false); swapMode ? handleSwapSelect(s) : (() => { setDetailMode("calendar"); openDetailSchedule(s); })(); }}
+                      onClick={() => { setShowDayPopup(false); consumeHash(); swapMode ? handleSwapSelect(s) : (() => { setDetailMode("calendar"); openDetailSchedule(s); })(); }}
                     >
                       <div className="px-4 py-4 flex items-center gap-3">
                         <span className="text-xl">📅</span>
@@ -1021,9 +1050,9 @@ export default function Home() {
           allUsers={allUsers.map(u => ({ id: u.id, name: u.name, username: u.username, role: u.role }))}
           onRegisterBackHandler={(fn) => { detailBackRef.current = fn; }}
           memberBranch={allUsers.find(u => u.name === (detailSchedule?.memberName))?.branch || ""}
-          onEdit={(s) => { setDetailSchedule(null); handleEditSchedule(s); }}
-          onDelete={(id) => { handleDeleteSchedule(id); setDetailSchedule(null); }}
-          onUnassign={(id, reason) => { handleUnassignSchedule(id, reason); setDetailSchedule(null); }}
+          onEdit={(s) => { setDetailSchedule(null); consumeHash(); handleEditSchedule(s); }}
+          onDelete={(id) => { handleDeleteSchedule(id); setDetailSchedule(null); consumeHash(); }}
+          onUnassign={(id, reason) => { handleUnassignSchedule(id, reason); setDetailSchedule(null); consumeHash(); }}
           onAssign={(scheduleId, memberId, memberName) => {
             const target = unassignedSchedules.find((s) => s.id === scheduleId);
             if (target) {
@@ -1032,27 +1061,28 @@ export default function Home() {
             }
             assignScheduleApi(scheduleId, memberId, memberName);
             setDetailSchedule(null);
+            consumeHash();
           }}
-          onClose={() => setDetailSchedule(null)}
+          onClose={() => { setDetailSchedule(null); consumeHash(); }}
           onUpdated={() => loadData(undefined, true)}
         />
       )}
       {showAdminPanel && (
-        <AdminPanel onClose={() => setShowAdminPanel(false)} onRefresh={() => loadData(undefined, true)} />
+        <AdminPanel onClose={() => { setShowAdminPanel(false); consumeHash(); }} onRefresh={() => loadData(undefined, true)} />
       )}
       {showSearch && (
         <SearchPanel
-          onSelectSchedule={(s) => { setShowSearch(false); setDetailMode("calendar"); openDetailSchedule(s); }}
-          onClose={() => setShowSearch(false)}
+          onSelectSchedule={(s) => { setShowSearch(false); consumeHash(); setDetailMode("calendar"); openDetailSchedule(s); }}
+          onClose={() => { setShowSearch(false); consumeHash(); }}
         />
       )}
       {/* 신상정보 팝업 */}
       {profileUser && (
-        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center px-6" onClick={(e) => { if (e.target === e.currentTarget) setProfileUser(null); }}>
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center px-6" onClick={(e) => { if (e.target === e.currentTarget) { setProfileUser(null); consumeHash(); } }}>
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm animate-[modalIn_0.15s_ease-out]">
             <div className="px-5 pt-5 pb-3 flex items-center justify-between">
               <h3 className="text-base font-bold text-gray-800">신상정보</h3>
-              <button onClick={() => setProfileUser(null)} className="p-1 active:bg-gray-100 rounded-lg">
+              <button onClick={() => { setProfileUser(null); consumeHash(); }} className="p-1 active:bg-gray-100 rounded-lg">
                 <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
               </button>
             </div>

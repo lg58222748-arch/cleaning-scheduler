@@ -29,7 +29,7 @@ export async function fetchMembers(): Promise<Member[]> {
 }
 
 export async function createMember(data: { name: string; phone?: string; availableDays?: number[] }): Promise<Member> {
-  const res = await fetch(`${BASE}/api/members`, {
+  const res = await safeFetch(`${BASE}/api/members`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
@@ -38,7 +38,7 @@ export async function createMember(data: { name: string; phone?: string; availab
 }
 
 export async function updateMember(id: string, data: Partial<Member>): Promise<Member> {
-  const res = await fetch(`${BASE}/api/members/${id}`, {
+  const res = await safeFetch(`${BASE}/api/members/${id}`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
@@ -47,7 +47,7 @@ export async function updateMember(id: string, data: Partial<Member>): Promise<M
 }
 
 export async function deleteMember(id: string): Promise<void> {
-  await fetch(`${BASE}/api/members/${id}`, { method: "DELETE" });
+  await safeFetch(`${BASE}/api/members/${id}`, { method: "DELETE" });
 }
 
 // Schedules
@@ -61,7 +61,7 @@ export async function searchSchedules(query: string): Promise<Schedule[]> {
 }
 
 export async function softDeleteSchedule(id: string): Promise<void> {
-  await fetch(`${BASE}/api/schedules`, {
+  await safeFetch(`${BASE}/api/schedules`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ action: "softDelete", scheduleId: id }),
@@ -69,7 +69,7 @@ export async function softDeleteSchedule(id: string): Promise<void> {
 }
 
 export async function deleteAllSchedules(): Promise<{ deleted: number }> {
-  const res = await fetch(`${BASE}/api/schedules`, {
+  const res = await safeFetch(`${BASE}/api/schedules`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ action: "deleteAll" }),
@@ -82,7 +82,7 @@ export async function fetchDeletedSchedules(): Promise<Schedule[]> {
 }
 
 export async function restoreScheduleApi(id: string): Promise<void> {
-  await fetch(`${BASE}/api/schedules`, {
+  await safeFetch(`${BASE}/api/schedules`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ action: "restore", scheduleId: id }),
@@ -90,7 +90,7 @@ export async function restoreScheduleApi(id: string): Promise<void> {
 }
 
 export async function emptyTrashApi(): Promise<{ deleted: number }> {
-  const res = await fetch(`${BASE}/api/schedules`, {
+  const res = await safeFetch(`${BASE}/api/schedules`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ action: "emptyTrash" }),
@@ -99,7 +99,7 @@ export async function emptyTrashApi(): Promise<{ deleted: number }> {
 }
 
 export async function createSchedule(data: Omit<Schedule, "id" | "status">): Promise<Schedule> {
-  const res = await fetch(`${BASE}/api/schedules`, {
+  const res = await safeFetch(`${BASE}/api/schedules`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
@@ -112,7 +112,7 @@ export async function fetchUnassignedSchedules(): Promise<Schedule[]> {
 }
 
 export async function assignScheduleApi(scheduleId: string, memberId: string, memberName: string): Promise<Schedule> {
-  const res = await fetch(`${BASE}/api/schedules`, {
+  const res = await safeFetch(`${BASE}/api/schedules`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ action: "assign", scheduleId, memberId, memberName }),
@@ -121,7 +121,7 @@ export async function assignScheduleApi(scheduleId: string, memberId: string, me
 }
 
 export async function unassignScheduleApi(scheduleId: string): Promise<Schedule> {
-  const res = await fetch(`${BASE}/api/schedules`, {
+  const res = await safeFetch(`${BASE}/api/schedules`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ action: "unassign", scheduleId }),
@@ -130,7 +130,7 @@ export async function unassignScheduleApi(scheduleId: string): Promise<Schedule>
 }
 
 export async function addUnassignedSchedule(data: { title: string; date: string; startTime?: string; endTime?: string; note?: string; googleEventId?: string; color?: string }): Promise<Schedule> {
-  const res = await fetch(`${BASE}/api/schedules`, {
+  const res = await safeFetch(`${BASE}/api/schedules`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ action: "addUnassigned", ...data }),
@@ -139,7 +139,7 @@ export async function addUnassignedSchedule(data: { title: string; date: string;
 }
 
 export async function updateSchedule(id: string, data: Partial<Schedule>): Promise<Schedule> {
-  const res = await fetch(`${BASE}/api/schedules/${id}`, {
+  const res = await safeFetch(`${BASE}/api/schedules/${id}`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
@@ -148,7 +148,7 @@ export async function updateSchedule(id: string, data: Partial<Schedule>): Promi
 }
 
 export async function deleteSchedule(id: string): Promise<void> {
-  await fetch(`${BASE}/api/schedules/${id}`, { method: "DELETE" });
+  await safeFetch(`${BASE}/api/schedules/${id}`, { method: "DELETE" });
 }
 
 // Swap
@@ -157,7 +157,7 @@ export async function fetchSwapRequests(): Promise<SwapRequest[]> {
 }
 
 export async function createSwapRequest(fromScheduleId: string, toScheduleId: string): Promise<SwapRequest> {
-  const res = await fetch(`${BASE}/api/schedules/swap`, {
+  const res = await safeFetch(`${BASE}/api/schedules/swap`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ action: "create", fromScheduleId, toScheduleId }),
@@ -166,7 +166,7 @@ export async function createSwapRequest(fromScheduleId: string, toScheduleId: st
 }
 
 export async function approveSwapRequest(swapId: string): Promise<void> {
-  await fetch(`${BASE}/api/schedules/swap`, {
+  await safeFetch(`${BASE}/api/schedules/swap`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ action: "approve", swapId }),
@@ -174,7 +174,7 @@ export async function approveSwapRequest(swapId: string): Promise<void> {
 }
 
 export async function rejectSwapRequest(swapId: string): Promise<void> {
-  await fetch(`${BASE}/api/schedules/swap`, {
+  await safeFetch(`${BASE}/api/schedules/swap`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ action: "reject", swapId }),
@@ -183,17 +183,20 @@ export async function rejectSwapRequest(swapId: string): Promise<void> {
 
 // Google Calendar
 export async function getGoogleAuthUrl(): Promise<{ authUrl?: string; error?: string; needSetup?: boolean }> {
-  const res = await fetch(`${BASE}/api/calendar?action=auth-url`);
-  return res.json();
+  return safeJson(`${BASE}/api/calendar?action=auth-url`, { error: "네트워크 오류" });
 }
 
 export async function autoSyncGoogleCalendar(refreshToken: string): Promise<{ items?: GoogleEvent[]; error?: string; needReauth?: boolean; newAccessToken?: string }> {
-  const res = await fetch(`${BASE}/api/calendar`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ action: "auto-sync", refreshToken }),
-  });
-  return res.json();
+  try {
+    const res = await safeFetch(`${BASE}/api/calendar`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "auto-sync", refreshToken }),
+    });
+    return res.json();
+  } catch {
+    return { error: "네트워크 오류" };
+  }
 }
 
 interface GoogleEvent {
@@ -205,12 +208,16 @@ interface GoogleEvent {
 }
 
 export async function fetchGoogleEvents(accessToken: string, timeMin: string, timeMax: string) {
-  const res = await fetch(`${BASE}/api/calendar`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ action: "fetch-events", accessToken, timeMin, timeMax }),
-  });
-  return res.json();
+  try {
+    const res = await safeFetch(`${BASE}/api/calendar`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "fetch-events", accessToken, timeMin, timeMax }),
+    });
+    return res.json();
+  } catch {
+    return { error: "네트워크 오류" };
+  }
 }
 
 // Notifications
@@ -219,19 +226,23 @@ export async function fetchNotifications(): Promise<{ notifications: import("@/t
 }
 
 export async function markNotificationRead(id: string): Promise<void> {
-  await fetch(`${BASE}/api/notifications`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ action: "markRead", id }),
-  });
+  try {
+    await safeFetch(`${BASE}/api/notifications`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "markRead", id }),
+    });
+  } catch { /* 낙관적 업데이트 - UI는 이미 반영됨 */ }
 }
 
 export async function markAllNotificationsRead(): Promise<void> {
-  await fetch(`${BASE}/api/notifications`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ action: "markAllRead" }),
-  });
+  try {
+    await safeFetch(`${BASE}/api/notifications`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "markAllRead" }),
+    });
+  } catch { /* 낙관적 업데이트 */ }
 }
 
 // Comments
@@ -240,7 +251,7 @@ export async function fetchComments(scheduleId: string): Promise<import("@/types
 }
 
 export async function createComment(scheduleId: string, authorName: string, content: string): Promise<import("@/types").Comment> {
-  const res = await fetch(`${BASE}/api/comments`, {
+  const res = await safeFetch(`${BASE}/api/comments`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ scheduleId, authorName, content }),
@@ -249,7 +260,7 @@ export async function createComment(scheduleId: string, authorName: string, cont
 }
 
 export async function deleteCommentApi(id: string): Promise<void> {
-  await fetch(`${BASE}/api/comments`, {
+  await safeFetch(`${BASE}/api/comments`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ action: "delete", id }),
@@ -258,12 +269,16 @@ export async function deleteCommentApi(id: string): Promise<void> {
 
 // Auth
 export async function loginApi(username: string, password: string): Promise<{ error?: string; status?: string } & Partial<import("@/types").User>> {
-  const res = await fetch(`${BASE}/api/auth`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ action: "login", username, password }),
-  });
-  return res.json();
+  try {
+    const res = await safeFetch(`${BASE}/api/auth`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "login", username, password }),
+    });
+    return res.json();
+  } catch {
+    return { error: "네트워크 오류. 인터넷 연결을 확인해주세요." };
+  }
 }
 
 export async function registerApi(data: {
@@ -271,12 +286,16 @@ export async function registerApi(data: {
   name: string; phone: string; address: string;
   residentNumber: string; businessLicenseFile: string; branch: string;
 }): Promise<{ error?: string } & Partial<import("@/types").User>> {
-  const res = await fetch(`${BASE}/api/auth`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ action: "register", ...data }),
-  });
-  return res.json();
+  try {
+    const res = await safeFetch(`${BASE}/api/auth`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "register", ...data }),
+    });
+    return res.json();
+  } catch {
+    return { error: "네트워크 오류. 인터넷 연결을 확인해주세요." };
+  }
 }
 
 // Users (Admin)
@@ -285,7 +304,7 @@ export async function fetchUsers(): Promise<{ users: import("@/types").User[]; p
 }
 
 export async function approveUserApi(userId: string): Promise<void> {
-  await fetch(`${BASE}/api/users`, {
+  await safeFetch(`${BASE}/api/users`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ action: "approve", userId }),
@@ -293,7 +312,7 @@ export async function approveUserApi(userId: string): Promise<void> {
 }
 
 export async function rejectUserApi(userId: string): Promise<void> {
-  await fetch(`${BASE}/api/users`, {
+  await safeFetch(`${BASE}/api/users`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ action: "reject", userId }),
@@ -301,7 +320,7 @@ export async function rejectUserApi(userId: string): Promise<void> {
 }
 
 export async function deleteUserApi(userId: string): Promise<void> {
-  await fetch(`${BASE}/api/users`, {
+  await safeFetch(`${BASE}/api/users`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ action: "delete", userId }),
@@ -309,7 +328,7 @@ export async function deleteUserApi(userId: string): Promise<void> {
 }
 
 export async function changeUserRoleApi(userId: string, role: string): Promise<void> {
-  await fetch(`${BASE}/api/users`, {
+  await safeFetch(`${BASE}/api/users`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ action: "changeRole", userId, role }),
@@ -318,12 +337,11 @@ export async function changeUserRoleApi(userId: string, role: string): Promise<v
 
 // Checklist
 export async function fetchChecklist(scheduleId: string): Promise<import("@/types").ScheduleChecklist> {
-  const res = await fetch(`${BASE}/api/checklist?scheduleId=${scheduleId}`);
-  return res.json();
+  return safeJson(`${BASE}/api/checklist?scheduleId=${scheduleId}`, { items: [], submitted: false } as unknown as import("@/types").ScheduleChecklist);
 }
 
 export async function toggleChecklistItem(scheduleId: string, itemId: string, checked: boolean): Promise<import("@/types").ScheduleChecklist> {
-  const res = await fetch(`${BASE}/api/checklist`, {
+  const res = await safeFetch(`${BASE}/api/checklist`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ action: "toggle", scheduleId, itemId, checked }),
@@ -332,7 +350,7 @@ export async function toggleChecklistItem(scheduleId: string, itemId: string, ch
 }
 
 export async function submitChecklistApi(scheduleId: string): Promise<import("@/types").ScheduleChecklist> {
-  const res = await fetch(`${BASE}/api/checklist`, {
+  const res = await safeFetch(`${BASE}/api/checklist`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ action: "submit", scheduleId }),
@@ -342,12 +360,11 @@ export async function submitChecklistApi(scheduleId: string): Promise<import("@/
 
 // Settlement
 export async function fetchSettlement(scheduleId: string): Promise<import("@/types").Settlement | null> {
-  const res = await fetch(`${BASE}/api/settlement?scheduleId=${scheduleId}`);
-  return res.json();
+  return safeJson(`${BASE}/api/settlement?scheduleId=${scheduleId}`, null);
 }
 
 export async function saveSettlement(scheduleId: string, data: Partial<import("@/types").Settlement>): Promise<import("@/types").Settlement> {
-  const res = await fetch(`${BASE}/api/settlement`, {
+  const res = await safeFetch(`${BASE}/api/settlement`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ scheduleId, ...data }),
