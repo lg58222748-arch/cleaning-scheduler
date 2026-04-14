@@ -215,20 +215,18 @@ export default function Home() {
     }
   }, [pushHash]);
 
-  // ★ 뒤로가기 감지
+  // ★ 뒤로가기 감지 (Navigation API + hashchange)
   useEffect(() => {
     const doBack = () => {
       const s = stateRef.current;
       if (s.detailSchedule) {
         if (detailBackRef.current && detailBackRef.current()) {
-          // 탭 내부 이동 처리됨 → 해시 보충
           pushHash("d");
         } else {
-          // 디테일 완전 닫기 → 해시 스택 정리 (달력으로 복귀)
           setDetailSchedule(null);
           hashStackRef.current = [];
           history.replaceState(null, "", window.location.pathname);
-          return; // 이미 정리됨
+          return;
         }
       }
       else if (s.showDayPopup) { setShowDayPopup(false); }
@@ -242,25 +240,38 @@ export default function Home() {
       else if (s.activeTab !== "calendar") { setActiveTab(prevTabRef.current || "calendar"); tabHashPushed.current = false; }
     };
 
+    // 1. Navigation API (Android PWA에서 하드웨어 뒤로가기 감지)
+    const nav = (window as unknown as Record<string, unknown>).navigation as {
+      addEventListener(t: string, fn: (e: Record<string, unknown>) => void): void;
+      removeEventListener(t: string, fn: (e: Record<string, unknown>) => void): void;
+    } | undefined;
+    const onNav = (e: Record<string, unknown>) => {
+      if (e.navigationType === "traverse" && e.canIntercept) {
+        (e.intercept as (o: { handler: () => Promise<void> }) => void)({
+          handler: async () => {
+            if (hashStackRef.current.length > 0) hashStackRef.current.pop();
+            doBack();
+            // 항상 해시 보충 (다음 뒤로가기를 위해)
+            pushHash("b");
+          }
+        });
+      }
+    };
+    if (nav) nav.addEventListener("navigate", onNav);
+
+    // 2. hashchange fallback (브라우저 탭에서 동작)
     const onHashChange = () => {
       const current = window.location.hash.slice(1);
       const top = hashStackRef.current[hashStackRef.current.length - 1];
-
-      if (current === top) {
-        // 우리가 push한 것 → 앞으로 가기 → 무시
-        return;
-      }
-
-      // 뒤로가기 → 스택에서 제거
-      if (hashStackRef.current.length > 0) {
-        hashStackRef.current.pop();
-      }
+      if (current === top) return;
+      if (hashStackRef.current.length > 0) hashStackRef.current.pop();
       doBack();
     };
-
     window.addEventListener("hashchange", onHashChange);
     window.addEventListener("popstate", onHashChange);
+
     return () => {
+      if (nav) nav.removeEventListener("navigate", onNav);
       window.removeEventListener("hashchange", onHashChange);
       window.removeEventListener("popstate", onHashChange);
     };
