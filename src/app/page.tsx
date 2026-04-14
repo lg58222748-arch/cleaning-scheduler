@@ -221,29 +221,40 @@ export default function Home() {
       else if (s.activeTab !== "calendar") { setActiveTab(prevTabRef.current || "calendar"); }
     };
 
-    // 방법 1: Navigation API (Android Chrome 102+ PWA에서 동작)
+    // 방법 1: Navigation API
     const nav = (window as unknown as Record<string, unknown>).navigation as {
       addEventListener(type: string, fn: (e: Record<string, unknown>) => void): void;
       removeEventListener(type: string, fn: (e: Record<string, unknown>) => void): void;
+      entries?: () => unknown[];
     } | undefined;
 
     const handleNavigate = (e: Record<string, unknown>) => {
-      // traverse = 뒤로가기/앞으로가기
-      if (e.navigationType === "traverse" && e.canIntercept) {
-        (e.intercept as (opts: { handler: () => Promise<void> }) => void)({
-          handler: async () => { doBack("nav-api"); }
-        });
+      // 모든 navigate 이벤트를 디버그 표시
+      const info = `type=${e.navigationType} cancel=${e.cancelable} intercept=${e.canIntercept}`;
+      setBackDebug(info);
+
+      if (e.navigationType === "traverse") {
+        // preventDefault + intercept 둘 다 시도
+        if (e.cancelable) {
+          (e as { preventDefault: () => void }).preventDefault();
+        }
+        if (e.canIntercept) {
+          (e.intercept as (opts: { handler: () => Promise<void> }) => void)({
+            handler: async () => { doBack("nav-intercept"); }
+          });
+        } else {
+          doBack("nav-no-intercept");
+        }
       }
     };
 
     if (nav) {
       nav.addEventListener("navigate", handleNavigate);
-      setBackDebug("Navigation API 지원됨");
-    } else {
-      setBackDebug("Navigation API 없음 - popstate 사용");
+      const entries = nav.entries?.() || [];
+      setBackDebug(`NavAPI OK entries=${entries.length}`);
     }
 
-    // 방법 2: popstate (Navigation API 미지원 시 fallback)
+    // 방법 2: popstate fallback
     for (let i = 0; i < 50; i++) {
       history.pushState(null, "", window.location.pathname);
     }
