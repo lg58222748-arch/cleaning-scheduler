@@ -381,22 +381,19 @@ export default function Home() {
         (myLinkedMember && s.memberId === myLinkedMember.id)
       );
   // 팀원 필터 적용 (현장팀 User ID 기준, 이름으로도 매칭)
-  const selectedFilterNames = useMemo(() => {
-    if (selectedMemberIds.size === 0) return new Set<string>();
-    const names = new Set<string>();
+  const calendarSchedules = (() => {
+    if (selectedMemberIds.size === 0) return baseCalendarSchedules;
+    const filterNames = new Set<string>();
     allUsers.filter(u => u.role === "field").forEach(u => {
-      if (selectedMemberIds.has(u.id)) names.add(u.name);
+      if (selectedMemberIds.has(u.id)) filterNames.add(u.name);
     });
-    return names;
-  }, [selectedMemberIds, allUsers]);
-  const calendarSchedules = selectedMemberIds.size > 0
-    ? baseCalendarSchedules.filter((s) =>
-        selectedMemberIds.has(s.assignedTo || "") ||
-        selectedMemberIds.has(s.memberId) ||
-        selectedFilterNames.has(s.assignedToName || "") ||
-        selectedFilterNames.has(s.memberName)
-      )
-    : baseCalendarSchedules;
+    return baseCalendarSchedules.filter((s) =>
+      selectedMemberIds.has(s.assignedTo || "") ||
+      selectedMemberIds.has(s.memberId) ||
+      filterNames.has(s.assignedToName || "") ||
+      filterNames.has(s.memberName)
+    );
+  })();
   const dateStr = format(selectedDate, "yyyy-MM-dd");
   const daySchedules = calendarSchedules
     .filter((s) => s.date === dateStr)
@@ -676,8 +673,8 @@ export default function Home() {
         )}
 
         {/* 팀원 탭 */}
-        <div style={{ display: activeTab === "members" ? "block" : "none" }}>
-          <div className="h-full overflow-y-auto p-3 space-y-3">
+        <div className="h-full overflow-y-auto" style={{ display: activeTab === "members" ? "block" : "none" }}>
+          <div className="p-3 space-y-3 pb-20">
             {/* 전체 팀원 */}
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
               <h3 className="text-sm font-bold text-gray-800 mb-3">팀원 ({allUsers.length}{canManageAdvanced && pendingUsers.length > 0 ? ` + 대기 ${pendingUsers.length}` : ""})</h3>
