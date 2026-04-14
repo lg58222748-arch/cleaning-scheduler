@@ -32,7 +32,7 @@ export default function SalesTab({ userName, onCreated }: SalesTabProps) {
   const [pyeong, setPyeong] = useState("");
   const [buildType, setBuildType] = useState("선택");
   const [salesNote, setSalesNote] = useState("");
-  const [copied, setCopied] = useState("");
+  const [copied, setCopied] = useState<Set<string>>(new Set());
 
   // Step 2
   const [customerText, setCustomerText] = useState("");
@@ -277,7 +277,7 @@ export default function SalesTab({ userName, onCreated }: SalesTabProps) {
     try { await navigator.clipboard.writeText(text); } catch {
       const ta = document.createElement("textarea"); ta.value = text; document.body.appendChild(ta); ta.select(); document.execCommand("copy"); document.body.removeChild(ta);
     }
-    setCopied(label); setTimeout(() => setCopied(""), 1500);
+    setCopied(prev => new Set(prev).add(label));
   }
 
   // 예약 확정 → 배정탭 등록
@@ -301,8 +301,8 @@ export default function SalesTab({ userName, onCreated }: SalesTabProps) {
       const noteExtra = calendarNote ? `/${calendarNote}` : "";
       const originalTitle = `U${parsedName}/${parsedAddr?.split(" ").slice(0, 2).join("")}/${userName} [${i + 1}/${schedules.length}]/${svc.name}${noteExtra}`;
       const calOriginal = sched.time && sched.time !== "선택" ? `[${sched.time}] ${originalTitle}` : originalTitle;
-      // 미입금 상태: 고객이름/미입금
-      const displayTitle = `${parsedName}/미입금`;
+      // 미입금 상태: u로그인사용자/미입금/고객이름
+      const displayTitle = `u${userName}/미입금/${parsedName}`;
 
       await addUnassignedSchedule({
         title: displayTitle,
@@ -449,11 +449,11 @@ export default function SalesTab({ userName, onCreated }: SalesTabProps) {
           <div className="flex gap-2">
             <button onClick={() => handleCopy(getFormText(), "form")}
               className="flex-1 py-3 rounded-xl text-sm font-bold text-white" style={{ background: "linear-gradient(135deg, #1a6b3c, #22874c)" }}>
-              {copied === "form" ? "✅ 복사됨!" : "1. 📋 양식 복사"}
+              {copied.has("form") ? "✅ 복사됨!" : "1. 📋 양식 복사"}
             </button>
             <button onClick={() => handleCopy(getDepositText(), "dep")}
               className="flex-1 py-3 rounded-xl text-sm font-bold border-2 border-green-700 text-green-700 active:bg-green-50">
-              {copied === "dep" ? "✅ 복사됨!" : "2. 💰 예약금 안내"}
+              {copied.has("dep") ? "✅ 복사됨!" : "2. 💰 예약금 안내"}
             </button>
           </div>
 
@@ -561,7 +561,7 @@ export default function SalesTab({ userName, onCreated }: SalesTabProps) {
               <div className="bg-gray-50 border border-gray-200 rounded-xl p-3 mb-2">
                 <span className="text-xs font-bold text-gray-600 block mb-1.5">저장될 제목 예시</span>
                 <div className="space-y-1">
-                  <div className="text-xs text-red-500 font-medium">미입금: {parsedName || "이름"}/미입금</div>
+                  <div className="text-xs text-red-500 font-medium">미입금: u{userName}/미입금/{parsedName || "고객이름"}</div>
                   {services.map((s, i) => {
                     const noteExtra = calendarNote ? `/${calendarNote}` : "";
                     const time = schedules[i]?.time;
@@ -608,7 +608,7 @@ export default function SalesTab({ userName, onCreated }: SalesTabProps) {
                           handleCopy(msg.getText(), `post${i}`);
                           if (!postDone.includes(i)) setPostDone((p) => [...p, i]);
                         }} className="px-3 py-1 bg-green-700 text-white rounded-lg text-xs font-bold active:bg-green-800">
-                          {copied === `post${i}` ? "✅" : "📋 복사"}
+                          {copied.has(`post${i}`) ? "✅" : "📋 복사"}
                         </button>
                       </div>
                     </div>
@@ -643,7 +643,7 @@ export default function SalesTab({ userName, onCreated }: SalesTabProps) {
           {/* 안내 양식 모음 */}
           <div className="text-xs font-bold text-green-700 mb-2">안내 양식 모음</div>
           {TEMPLATES.map((tpl, i) => (
-            <TemplateCard key={i} title={tpl.title} content={tpl.content} onCopy={(text) => handleCopy(text, `tpl${i}`)} copied={copied === `tpl${i}`} />
+            <TemplateCard key={i} title={tpl.title} content={tpl.content} onCopy={(text) => handleCopy(text, `tpl${i}`)} copied={copied.has(`tpl${i}`)} />
           ))}
         </div>
       )}
