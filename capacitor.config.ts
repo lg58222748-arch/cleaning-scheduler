@@ -7,6 +7,11 @@ const config: CapacitorConfig = {
   server: {
     url: 'https://cleaning-scheduler-chi.vercel.app',
     cleartext: true
+  },
+  android: {
+    backgroundColor: '#ffffff',
+    allowMixedContent: true,
+    webContentsDebuggingEnabled: false
   }
 };
 
