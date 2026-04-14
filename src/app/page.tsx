@@ -181,40 +181,40 @@ export default function Home() {
     profileUser, activeTab,
   };
 
-  // 해시 라우팅: URL 해시로 상태를 표현하여 안드로이드 뒤로가기 지원
-  const suppressHashChange = useRef(false);
+  // 해시 라우팅: 스택으로 정확한 앞으로/뒤로 구분
+  const hashStackRef = useRef<string[]>([]);
 
-  const pushHash = useCallback((hash: string) => {
-    suppressHashChange.current = true;
-    window.location.hash = hash;
-    setTimeout(() => { suppressHashChange.current = false; }, 50);
+  const pushHash = useCallback((tag: string) => {
+    const id = `${tag}-${Date.now()}`;
+    hashStackRef.current.push(id);
+    window.location.hash = id;
   }, []);
 
   const openModal = useCallback((setter: (v: boolean) => void) => {
-    pushHash("modal");
+    pushHash("m");
     setter(true);
   }, [pushHash]);
 
   const openDetailSchedule = useCallback((s: Schedule | null) => {
-    if (s) pushHash("detail");
+    if (s) pushHash("d");
     setDetailSchedule(s);
   }, [pushHash]);
 
   const openProfileUser = useCallback((u: User | null) => {
-    if (u) pushHash("profile");
+    if (u) pushHash("p");
     setProfileUser(u);
   }, [pushHash]);
 
   const switchTab = useCallback((tab: TabMode) => {
     if (tab !== stateRef.current.activeTab) {
       prevTabRef.current = stateRef.current.activeTab;
-      pushHash(`tab-${tab}`);
+      pushHash("t");
       setActiveTab(tab);
       setShowMemberFilter(false);
     }
   }, [pushHash]);
 
-  // ★ 뒤로가기: hashchange로 감지 (안드로이드 PWA에서 URL 변경은 뒤로가기로 인식)
+  // ★ 뒤로가기 감지
   useEffect(() => {
     const doBack = () => {
       const s = stateRef.current;
@@ -233,22 +233,26 @@ export default function Home() {
     };
 
     const onHashChange = () => {
-      // 우리가 직접 해시를 바꾼 경우 무시 (앞으로 가기)
-      if (suppressHashChange.current) return;
-      // 뒤로가기로 해시가 바뀐 경우
-      doBack();
-    };
+      const current = window.location.hash.slice(1);
+      const top = hashStackRef.current[hashStackRef.current.length - 1];
 
-    const onPopState = () => {
-      if (suppressHashChange.current) return;
+      if (current === top) {
+        // 우리가 push한 것 → 앞으로 가기 → 무시
+        return;
+      }
+
+      // 뒤로가기 → 스택에서 제거
+      if (hashStackRef.current.length > 0) {
+        hashStackRef.current.pop();
+      }
       doBack();
     };
 
     window.addEventListener("hashchange", onHashChange);
-    window.addEventListener("popstate", onPopState);
+    window.addEventListener("popstate", onHashChange);
     return () => {
       window.removeEventListener("hashchange", onHashChange);
-      window.removeEventListener("popstate", onPopState);
+      window.removeEventListener("popstate", onHashChange);
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
