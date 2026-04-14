@@ -297,7 +297,7 @@ export default function ScheduleDetail({
                 </div>
 
                 {/* 날짜 + 상태 */}
-                <div className="flex items-center gap-3 text-sm text-gray-700">
+                <div className="flex items-center gap-3 text-xs text-gray-700">
                   <svg className="w-5 h-5 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                   </svg>
@@ -306,7 +306,7 @@ export default function ScheduleDetail({
                 </div>
 
                 {/* 담당자 */}
-                <div className="flex items-center gap-3 text-sm text-gray-700">
+                <div className="flex items-center gap-3 text-xs text-gray-700">
                   <svg className="w-5 h-5 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                   </svg>
@@ -315,7 +315,7 @@ export default function ScheduleDetail({
 
                 {/* 위치 */}
                 {schedule.location && (
-                  <div className="flex items-center gap-3 text-sm text-gray-700">
+                  <div className="flex items-center gap-3 text-xs text-gray-700">
                     <svg className="w-5 h-5 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
                     </svg>
@@ -409,7 +409,7 @@ export default function ScheduleDetail({
             <select
               value={assignMemberId}
               onChange={(e) => setAssignMemberId(e.target.value)}
-              className="flex-1 px-3 py-2 border border-gray-300 rounded-xl text-sm outline-none bg-white focus:ring-2 focus:ring-orange-400"
+              className="flex-1 px-2 py-1.5 border border-gray-300 rounded-lg text-xs outline-none bg-white focus:ring-2 focus:ring-orange-400"
             >
               <option value="">배정 팀장 선택</option>
               {members.filter(m => m.active).map((m) => (
