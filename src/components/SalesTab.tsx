@@ -343,7 +343,7 @@ export default function SalesTab({ userName, onCreated }: SalesTabProps) {
           {/* 고객 답장 붙여넣기 */}
           <div>
             <label className="text-xs font-bold text-green-700 mb-1 block">고객 답장 붙여넣기</label>
-            <textarea value={customerText} onChange={(e) => setCustomerText(e.target.value)} rows={6}
+            <textarea value={customerText} onChange={(e) => setCustomerText(e.target.value)} rows={15}
               placeholder="고객이 보낸 1~5번 내용을 그대로 복사해서 붙여넣기"
               className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm outline-none focus:border-green-500 resize-y" />
             <button onClick={parseCustomer}
