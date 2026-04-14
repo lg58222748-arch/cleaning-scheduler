@@ -44,7 +44,6 @@ export default function AssignTab({ members, schedules, onAssigned }: AssignTabP
     setSelectedSchedule(null);
     setSelectedMemberId("");
     setShowDayPopup(false);
-    await loadUnassigned();
     onAssigned();
   }
 
