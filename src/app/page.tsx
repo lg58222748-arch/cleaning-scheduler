@@ -245,20 +245,9 @@ export default function Home() {
   // ★ 뒤로가기 + 당겨서 새로고침 방지
 
   useEffect(() => {
-    // 당겨서 새로고침 차단 (CSS + touch 이벤트)
+    // 당겨서 새로고침 차단 (CSS only)
     document.body.style.overscrollBehavior = "none";
     document.documentElement.style.overscrollBehavior = "none";
-    let touchStartY = 0;
-    const onTouchStart = (e: TouchEvent) => { touchStartY = e.touches[0].clientY; };
-    const onTouchMove = (e: TouchEvent) => {
-      const y = e.touches[0].clientY;
-      // 페이지 맨 위에서 아래로 당기면 차단
-      if (document.scrollingElement && document.scrollingElement.scrollTop <= 0 && y > touchStartY) {
-        e.preventDefault();
-      }
-    };
-    document.addEventListener("touchstart", onTouchStart, { passive: true });
-    document.addEventListener("touchmove", onTouchMove, { passive: false });
 
     const doBack = (): boolean => {
       const s = stateRef.current;
@@ -348,8 +337,6 @@ export default function Home() {
       if (nav) nav.removeEventListener("navigate", onNav);
       window.removeEventListener("hashchange", onHashPop);
       window.removeEventListener("popstate", onHashPop);
-      document.removeEventListener("touchstart", onTouchStart);
-      document.removeEventListener("touchmove", onTouchMove);
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
