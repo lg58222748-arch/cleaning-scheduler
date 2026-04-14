@@ -315,9 +315,18 @@ export async function getPendingUsers(): Promise<User[]> {
 }
 
 export async function registerUser(input: { username: string; password: string; name: string; phone: string; address: string; residentNumber: string; businessLicenseFile: string; branch: string }): Promise<User> {
-  const { data } = await supabase.from("users").insert({
-    username: input.username, password: input.password, name: input.name, phone: input.phone, address: input.address, resident_number: input.residentNumber, business_license_file: input.businessLicenseFile, branch: input.branch, role: "pending", status: "pending",
-  }).select().single();
+  // branch 컬럼이 있으면 포함, 없으면 제외
+  const insertData: Record<string, unknown> = {
+    username: input.username, password: input.password, name: input.name, phone: input.phone, address: input.address, resident_number: input.residentNumber, business_license_file: input.businessLicenseFile, role: "pending", status: "pending",
+  };
+  if (input.branch) insertData.branch = input.branch;
+  const { data, error } = await supabase.from("users").insert(insertData).select().single();
+  if (error && error.message?.includes("branch")) {
+    // branch 컬럼이 없으면 branch 없이 재시도
+    delete insertData.branch;
+    const { data: d2 } = await supabase.from("users").insert(insertData).select().single();
+    return rowToUser(d2!);
+  }
   return rowToUser(data!);
 }
 
