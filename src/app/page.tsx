@@ -229,38 +229,30 @@ export default function Home() {
     } | undefined;
 
     const handleNavigate = (e: Record<string, unknown>) => {
-      // 모든 navigate 이벤트를 디버그 표시
-      const info = `type=${e.navigationType} cancel=${e.cancelable} intercept=${e.canIntercept}`;
-      setBackDebug(info);
-
       if (e.navigationType === "traverse") {
-        // preventDefault + intercept 둘 다 시도
-        if (e.cancelable) {
-          (e as { preventDefault: () => void }).preventDefault();
-        }
         if (e.canIntercept) {
           (e.intercept as (opts: { handler: () => Promise<void> }) => void)({
-            handler: async () => { doBack("nav-intercept"); }
+            handler: async () => {
+              doBack("back");
+              // 히스토리 보충 (다음 뒤로가기를 위해)
+              history.pushState(null, "", window.location.pathname);
+            }
           });
-        } else {
-          doBack("nav-no-intercept");
         }
       }
     };
 
     if (nav) {
       nav.addEventListener("navigate", handleNavigate);
-      const entries = nav.entries?.() || [];
-      setBackDebug(`NavAPI OK entries=${entries.length}`);
     }
 
-    // 방법 2: popstate fallback
+    // popstate fallback (Navigation API 미지원 브라우저용)
     for (let i = 0; i < 50; i++) {
       history.pushState(null, "", window.location.pathname);
     }
 
     const handlePop = () => {
-      doBack("popstate");
+      doBack("back");
       history.pushState(null, "", window.location.pathname);
     };
     window.addEventListener("popstate", handlePop);
