@@ -68,7 +68,7 @@ export default function Home() {
     const t = setTimeout(() => {
       setShowSplash(false);
       setAppReady(true);
-    }, 1000);
+    }, 2000);
     return () => clearTimeout(t);
   }, []);
   const [members, setMembers] = useState<Member[]>([]);

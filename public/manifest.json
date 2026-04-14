@@ -4,7 +4,7 @@
   "description": "새집느낌 파트너 - 일정 · 검수 · 정산 · 영업 관리",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#3a9ad9",
+  "background_color": "#ffffff",
   "theme_color": "#3a9ad9",
   "orientation": "portrait",
   "icons": [
