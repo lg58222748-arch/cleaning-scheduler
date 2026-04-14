@@ -202,15 +202,21 @@ export default function Home() {
   // ★ 안드로이드 하드웨어 뒤로가기 방어
   const [backDebug, setBackDebug] = useState("");
   const backCountRef = useRef(0);
+  const isSettingUp = useRef(true);
 
   useEffect(() => {
-    // 해시를 직접 변경하여 히스토리 추가 (pushState보다 확실)
-    const initialLen = history.length;
-    window.location.hash = "app";
-    setBackDebug(`초기: history=${initialLen}, 현재=${history.length}`);
+    // 각각 다른 해시로 50개 버퍼 push (hashchange 발생 보장)
+    for (let i = 0; i < 50; i++) {
+      history.pushState(null, "", `#p${i}`);
+    }
+    setBackDebug(`버퍼완료 h=${history.length}`);
 
-    // popstate + hashchange 모두 감지
+    // 세팅 완료 표시 (hashchange 이벤트 무시용)
+    setTimeout(() => { isSettingUp.current = false; }, 100);
+
     const handleBack = () => {
+      if (isSettingUp.current) return; // 세팅 중 이벤트 무시
+
       backCountRef.current++;
       setBackDebug(`감지! #${backCountRef.current} h=${history.length}`);
 
@@ -234,10 +240,9 @@ export default function Home() {
         setActiveTab(prevTabRef.current || "calendar");
       }
 
-      // 해시 복원 (다음 뒤로가기를 위해)
-      setTimeout(() => {
-        window.location.hash = "app";
-      }, 50);
+      // 2개 보충 (소비1 < 보충2)
+      history.pushState(null, "", `#p${Date.now()}`);
+      history.pushState(null, "", `#p${Date.now() + 1}`);
     };
 
     window.addEventListener("popstate", handleBack);
