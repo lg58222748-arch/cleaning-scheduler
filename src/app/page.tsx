@@ -157,7 +157,7 @@ export default function Home() {
     return () => window.removeEventListener("beforeinstallprompt", handler);
   }, []);
 
-  // 뒤로가기 버튼 처리 - hash 기반 (페이지 새로고침 방지)
+  // 뒤로가기 버튼 처리 - popstate + replaceState (hash/pushState 없이)
   const prevTabRef = useRef<TabMode>("calendar");
   const stateRef = useRef({
     detailSchedule: null as Schedule | null,
@@ -178,77 +178,62 @@ export default function Home() {
     profileUser, activeTab,
   };
 
-  // hash 카운터로 히스토리 관리 (pushState 대신 hash 사용 → 페이지 리로드 없음)
-  const hashCounter = useRef(0);
-  const isHandlingPop = useRef(false);
-
-  const pushHash = useCallback(() => {
-    hashCounter.current++;
-    window.location.hash = `s${hashCounter.current}`;
+  // 모달/탭 열 때는 히스토리를 건드리지 않음 (깜빡임 방지)
+  const openModal = useCallback((setter: (v: boolean) => void) => {
+    setter(true);
   }, []);
 
-  const openModal = useCallback((setter: (v: boolean) => void) => {
-    pushHash();
-    setter(true);
-  }, [pushHash]);
-
   const openDetailSchedule = useCallback((s: Schedule | null) => {
-    if (s) pushHash();
     setDetailSchedule(s);
-  }, [pushHash]);
+  }, []);
 
   const openProfileUser = useCallback((u: User | null) => {
-    if (u) pushHash();
     setProfileUser(u);
-  }, [pushHash]);
+  }, []);
 
   const switchTab = useCallback((tab: TabMode) => {
     if (tab !== stateRef.current.activeTab) {
       prevTabRef.current = stateRef.current.activeTab;
-      pushHash();
       setActiveTab(tab);
       setShowMemberFilter(false);
     }
-  }, [pushHash]);
+  }, []);
 
+  // 뒤로가기: 항상 히스토리 2개를 유지하여 뒤로가기 가로챔
   useEffect(() => {
-    // 초기 hash 설정
-    window.location.hash = "s0";
+    // 초기 히스토리 2개 쌓기 (뒤로가기 가로채기용)
+    history.replaceState({ guard: true }, "");
+    history.pushState({ app: true }, "");
 
-    const handleHashChange = () => {
-      if (isHandlingPop.current) return;
-      isHandlingPop.current = true;
-
+    const handlePop = () => {
       const s = stateRef.current;
+      let handled = false;
 
       // 열려있는 모달을 순서대로 닫기
-      if (s.detailSchedule) { setDetailSchedule(null); }
-      else if (s.showDayPopup) { setShowDayPopup(false); }
-      else if (s.showNotifications) { setShowNotifications(false); }
-      else if (s.showScheduleForm) { setShowScheduleForm(false); setEditingSchedule(null); }
-      else if (s.showMemberManager) { setShowMemberManager(false); }
-      else if (s.showAdminPanel) { setShowAdminPanel(false); }
-      else if (s.showSearch) { setShowSearch(false); }
-      else if (s.showMemberFilter) { setShowMemberFilter(false); }
-      else if (s.profileUser) { setProfileUser(null); }
+      if (s.detailSchedule) { setDetailSchedule(null); handled = true; }
+      else if (s.showDayPopup) { setShowDayPopup(false); handled = true; }
+      else if (s.showNotifications) { setShowNotifications(false); handled = true; }
+      else if (s.showScheduleForm) { setShowScheduleForm(false); setEditingSchedule(null); handled = true; }
+      else if (s.showMemberManager) { setShowMemberManager(false); handled = true; }
+      else if (s.showAdminPanel) { setShowAdminPanel(false); handled = true; }
+      else if (s.showSearch) { setShowSearch(false); handled = true; }
+      else if (s.showMemberFilter) { setShowMemberFilter(false); handled = true; }
+      else if (s.profileUser) { setProfileUser(null); handled = true; }
       else if (s.activeTab !== "calendar") {
-        // 이전 탭으로
         setActiveTab(prevTabRef.current || "calendar");
-      } else {
-        // 캘린더이고 아무것도 안 열려있음 → 나가지 않게 다시 hash push
-        hashCounter.current++;
-        window.location.hash = `s${hashCounter.current}`;
+        handled = true;
       }
 
-      // hash 카운터 동기화
-      const match = window.location.hash.match(/s(\d+)/);
-      if (match) hashCounter.current = parseInt(match[1]);
+      // 항상 히스토리 복원 (다음 뒤로가기를 위해)
+      history.pushState({ app: true }, "");
 
-      setTimeout(() => { isHandlingPop.current = false; }, 50);
+      if (!handled) {
+        // 아무것도 안 열려있고 캘린더면 → 아무 일도 안 함
+      }
     };
 
-    window.addEventListener("hashchange", handleHashChange);
-    return () => window.removeEventListener("hashchange", handleHashChange);
+    window.addEventListener("popstate", handlePop);
+    return () => window.removeEventListener("popstate", handlePop);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Splash screen
