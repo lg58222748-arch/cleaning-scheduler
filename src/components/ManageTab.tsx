@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Schedule } from "@/types";
-import { fetchDeletedSchedules, restoreScheduleApi, emptyTrashApi, deleteAllSchedules, fetchSchedules } from "@/lib/api";
+import { fetchDeletedSchedules, restoreScheduleApi, emptyTrashApi, deleteAllSchedules, fetchSchedules, addUnassignedSchedule } from "@/lib/api";
 
 interface ManageTabProps {
   isAdmin: boolean;
@@ -13,6 +13,10 @@ export default function ManageTab({ isAdmin, onRefresh }: ManageTabProps) {
   const [trashItems, setTrashItems] = useState<Schedule[]>([]);
   const [loading, setLoading] = useState(false);
   const [showTrash, setShowTrash] = useState(false);
+  const [showBulkAdd, setShowBulkAdd] = useState(false);
+  const [bulkText, setBulkText] = useState("");
+  const [bulkDate, setBulkDate] = useState(new Date().toISOString().slice(0, 10));
+  const [bulkAdding, setBulkAdding] = useState(false);
   const [totalCount, setTotalCount] = useState(0);
 
   useEffect(() => {
@@ -49,6 +53,44 @@ export default function ManageTab({ isAdmin, onRefresh }: ManageTabProps) {
     alert(`${result.deleted}건 삭제 완료`);
   }
 
+  async function handleBulkAdd() {
+    if (!bulkText.trim()) return;
+    setBulkAdding(true);
+    // 줄바꿈으로 구분 - 각 줄이 하나의 일정 제목
+    // 또는 전체를 하나의 일정 본문으로 등록
+    const lines = bulkText.trim().split("\n").filter((l) => l.trim());
+
+    if (lines.length === 1 || bulkText.includes("1)") || bulkText.includes("성함")) {
+      // 전체가 하나의 일정 (예약양식 붙여넣기)
+      const titleLine = lines[0].slice(0, 50);
+      await addUnassignedSchedule({
+        title: titleLine,
+        date: bulkDate,
+        startTime: "09:00",
+        endTime: "18:00",
+        note: bulkText.trim(),
+      });
+    } else {
+      // 여러 줄 → 각각 별도 일정
+      for (const line of lines) {
+        if (line.trim()) {
+          await addUnassignedSchedule({
+            title: line.trim(),
+            date: bulkDate,
+            startTime: "09:00",
+            endTime: "18:00",
+            note: "",
+          });
+        }
+      }
+    }
+    setBulkText("");
+    setBulkAdding(false);
+    setShowBulkAdd(false);
+    onRefresh();
+    loadCounts();
+  }
+
   async function handleBackup() {
     const all = await fetchSchedules();
     const blob = new Blob([JSON.stringify(all, null, 2)], { type: "application/json" });
@@ -76,6 +118,45 @@ export default function ManageTab({ isAdmin, onRefresh }: ManageTabProps) {
 
         {isAdmin && (
           <>
+            {/* 일정 직접 등록 */}
+            <button
+              onClick={() => setShowBulkAdd(!showBulkAdd)}
+              className="w-full px-4 py-3.5 flex items-center gap-3 active:bg-gray-50"
+            >
+              <div className="w-9 h-9 bg-green-50 rounded-xl flex items-center justify-center">
+                <svg className="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                </svg>
+              </div>
+              <div className="flex-1 text-left">
+                <div className="text-sm font-medium text-gray-800">일정 직접 등록</div>
+                <div className="text-xs text-gray-400">예약양식 붙여넣기로 등록</div>
+              </div>
+              <svg className={`w-4 h-4 text-gray-400 transition-transform ${showBulkAdd ? "rotate-90" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+            </button>
+
+            {showBulkAdd && (
+              <div className="px-4 py-3 bg-gray-50 space-y-3">
+                <input
+                  type="date" value={bulkDate} onChange={(e) => setBulkDate(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-green-400"
+                />
+                <textarea
+                  value={bulkText} onChange={(e) => setBulkText(e.target.value)}
+                  rows={8} placeholder={"예약양식을 붙여넣으세요\n\n예시:\n1)성함: 홍길동\n2)주소: 서울시 강남구...\n3)연락처: 010-1234-5678\n\n또는 여러 건은 줄마다 제목 입력"}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-green-400 resize-y"
+                />
+                <button
+                  onClick={handleBulkAdd} disabled={bulkAdding || !bulkText.trim()}
+                  className="w-full py-2.5 bg-green-500 text-white rounded-lg text-sm font-bold active:bg-green-600 disabled:opacity-50"
+                >
+                  {bulkAdding ? "등록 중..." : "배정탭에 등록"}
+                </button>
+              </div>
+            )}
+
             {/* 휴지통 */}
             <button
               onClick={() => { setShowTrash(!showTrash); if (!showTrash) loadTrash(); }}
