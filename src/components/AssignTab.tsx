@@ -40,14 +40,17 @@ export default function AssignTab({ members, schedules, onAssigned }: AssignTabP
     if (!selectedMemberId) return;
     const member = members.find((m) => m.id === selectedMemberId);
     if (!member) return;
-    // 즉시 UI 반영 (API는 page.tsx에서 백그라운드)
+    // 팝업 즉시 닫기
+    setShowDayPopup(false);
     setSelectedSchedule(null);
     setSelectedMemberId("");
-    setShowDayPopup(false);
-    onAssigned(schedule.id, member.id, member.name);
+    // 다음 프레임에서 상태 업데이트 (UI가 먼저 반응)
+    requestAnimationFrame(() => {
+      onAssigned(schedule.id, member.id, member.name);
+    });
   }
 
-  const activeMembers = members.filter((m) => m.active);
+  const activeMembers = useMemo(() => members.filter((m) => m.active), [members]);
 
   // 캘린더 주 배열
   // 항상 6주 고정
@@ -73,9 +76,9 @@ export default function AssignTab({ members, schedules, onAssigned }: AssignTabP
     return map;
   }, [unassigned]);
 
-  const daySchedules = selectedDate
+  const daySchedules = useMemo(() => selectedDate
     ? (scheduleMap.get(format(selectedDate, "yyyy-MM-dd")) || [])
-    : [];
+    : [], [selectedDate, scheduleMap]);
 
   function animateMonth(direction: "left" | "right", newMonth: Date) {
     if (animating) return;
