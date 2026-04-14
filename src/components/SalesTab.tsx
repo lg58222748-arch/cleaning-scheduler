@@ -25,7 +25,7 @@ interface ParsedSchedule {
 }
 
 export default function SalesTab({ userName, onCreated }: SalesTabProps) {
-  const [step, setStep] = useState<1 | 2>(1);
+  const [step, setStep] = useState<1 | 2 | 3>(1);
 
   // Step 1
   const [services, setServices] = useState<ServiceEntry[]>([]);
@@ -107,8 +107,40 @@ export default function SalesTab({ userName, onCreated }: SalesTabProps) {
     return `예약금 안내드립니다.\n\n💳 입금 계좌\n하나은행 12345678901\n예금주: 새집느낌\n\n예약금: ${totalDeposit.toLocaleString()}원\n\n입금 확인 후 예약 확정 안내드리겠습니다.\n감사합니다!`;
   }
 
-  // AI 파싱 - 양식 뒤에 붙은 답변도 추출
-  function parseCustomer() {
+  const [parsing, setParsing] = useState(false);
+
+  // AI 파싱 - Claude API 우선, 실패시 regex fallback
+  async function parseCustomer() {
+    setParsing(true);
+
+    // 1차: Claude API 시도
+    try {
+      const res = await fetch("/api/parse", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: customerText }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setParsedName(data.name || "");
+        setParsedPhone(data.phone || "");
+        setParsedAddr(data.addr || "");
+        setParsedWishDate(data.date || "");
+        setParsedNote(data.note || "");
+        setParsedPyeong(pyeong);
+        setSchedules(services.map((s) => ({ service: s.name, date: "", time: "선택" })));
+        generateConfirmMsg(data.name, data.addr, data.phone, data.date, data.note);
+        setParsing(false);
+        return;
+      }
+    } catch {}
+
+    // 2차: regex fallback
+    regexParse();
+    setParsing(false);
+  }
+
+  function regexParse() {
     const t = customerText;
     const lines = t.split("\n").map((l) => l.trim()).filter(Boolean);
 
@@ -259,11 +291,14 @@ export default function SalesTab({ userName, onCreated }: SalesTabProps) {
     <div className="h-full overflow-y-auto bg-white">
       {/* 탭 */}
       <div className="flex border-b border-gray-200 sticky top-0 bg-white z-10">
-        <button onClick={() => setStep(1)} className={`flex-1 py-3 text-sm font-bold text-center ${step === 1 ? "text-green-700 border-b-2 border-green-700 bg-green-50" : "text-gray-400"}`}>
-          STEP 1 · 양식 발송
+        <button onClick={() => setStep(1)} className={`flex-1 py-2.5 text-xs font-bold text-center ${step === 1 ? "text-green-700 border-b-2 border-green-700 bg-green-50" : "text-gray-400"}`}>
+          양식 발송
         </button>
-        <button onClick={() => setStep(2)} className={`flex-1 py-3 text-sm font-bold text-center ${step === 2 ? "text-green-700 border-b-2 border-green-700 bg-green-50" : "text-gray-400"}`}>
-          STEP 2 · 예약 확정
+        <button onClick={() => setStep(2)} className={`flex-1 py-2.5 text-xs font-bold text-center ${step === 2 ? "text-green-700 border-b-2 border-green-700 bg-green-50" : "text-gray-400"}`}>
+          예약 확정
+        </button>
+        <button onClick={() => setStep(3)} className={`flex-1 py-2.5 text-xs font-bold text-center ${step === 3 ? "text-green-700 border-b-2 border-green-700 bg-green-50" : "text-gray-400"}`}>
+          안내 양식
         </button>
       </div>
 
@@ -400,12 +435,12 @@ export default function SalesTab({ userName, onCreated }: SalesTabProps) {
           {/* 고객 답장 붙여넣기 */}
           <div>
             <label className="text-xs font-bold text-green-700 mb-1 block">고객 답장 붙여넣기</label>
-            <textarea value={customerText} onChange={(e) => setCustomerText(e.target.value)} rows={15}
-              placeholder="고객이 보낸 1~5번 내용을 그대로 복사해서 붙여넣기"
-              className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm outline-none focus:border-green-500 resize-y" />
-            <button onClick={parseCustomer}
-              className="mt-2 w-full py-3 rounded-xl text-sm font-bold text-white" style={{ background: "#1c1c1e" }}>
-              AI 자동 파싱
+            <textarea value={customerText} onChange={(e) => setCustomerText(e.target.value)} rows={20}
+              placeholder="고객이 보낸 1~5번 내용을 그대로 복사해서 붙여넣기&#10;&#10;양식 전체 + 고객 답변을 함께 붙여넣으세요"
+              className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm outline-none focus:border-green-500 resize-y min-h-[300px]" />
+            <button onClick={parseCustomer} disabled={parsing}
+              className="mt-2 w-full py-3.5 rounded-xl text-sm font-bold text-white disabled:opacity-70" style={{ background: "#1c1c1e" }}>
+              {parsing ? "🔄 AI 파싱 처리중..." : "🤖 AI 자동 파싱"}
             </button>
           </div>
 
@@ -520,6 +555,142 @@ export default function SalesTab({ userName, onCreated }: SalesTabProps) {
               )}
             </>
           )}
+        </div>
+      )}
+
+      {/* ===== STEP 3 · 안내 양식 ===== */}
+      {step === 3 && (
+        <div className="p-4 space-y-3">
+          {/* 예약 보관함 */}
+          <div>
+            <div className="text-xs font-bold text-green-700 mb-2">📂 예약 보관함</div>
+            <SavedBookings onLoad={(data) => {
+              if (data.services) setServices(data.services);
+              if (data.parsedName) setParsedName(data.parsedName);
+              if (data.parsedPhone) setParsedPhone(data.parsedPhone);
+              if (data.parsedAddr) setParsedAddr(data.parsedAddr);
+              if (data.confirmMsg) setConfirmMsg(data.confirmMsg);
+              setStep(2);
+            }} currentData={{ services, parsedName, parsedPhone, parsedAddr, parsedWishDate, confirmMsg, userName }} />
+          </div>
+
+          <hr className="border-gray-100" />
+
+          {/* 안내 양식 모음 */}
+          <div className="text-xs font-bold text-green-700 mb-2">📋 안내 양식 모음</div>
+          {TEMPLATES.map((tpl, i) => (
+            <TemplateCard key={i} title={tpl.title} content={tpl.content} onCopy={(text) => handleCopy(text, `tpl${i}`)} copied={copied === `tpl${i}`} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ===== 안내 양식 데이터 =====
+const TEMPLATES = [
+  { title: "📢 사전 고지사항 (QnA)", content: `안녕하세요 청소로 행복을 드리는 새집느낌입니다.\n입주청소를 처음 받아보는 분들을 위해 드리는 방문 전 사전 진행 약관 및 고지사항입니다.\n\nQ.외창 청소는 기본인가요?\nA.입주청소는 기본적으로 내부 공간 케어를 진행하기 때문에 외창은 추가비용이 발생 되는 부분입니다.\n\nQ.빌트인 가전,블라인드 청소도 해주시나요?\nA.가전과 커튼 블라인드가 있는 상태에서 내부까지 청소하게 되는것은 거주 청소로 분류 됩니다.\n\nQ.입주청소에 곰팡이도 포함되나요?\nA.곰팡이 같은 특수 오염은 추가 비용에 의한 서비스 사항으로 분류됩니다.\n\nQ.추가비용이 나올 상황들은?\nA.-심각한 분진 및 먼지\n-가전 내부청소\n-심각한 니코틴 오염\n-별도 설치한 서랍장, 붙박이장\n-3층 이상 엘레베이터 없을 경우\n-다량의 곰팡이/스티커/시트지\n-주차비 필요 시\n\n감사합니다.` },
+  { title: "📌 예약/변경/취소 안내", content: `📌 [입주청소 예약 / 변경 / 취소 안내]\n\n📢 예약금 결제 후 24시간 경과 시 취소 → 예약금 50%만 환불\n📢 1주 내 변경/취소 → 예약금 환불 불가\n📢 1주 전 변경 → 1회만 가능, 변경 후 취소는 환불 불가\n📢 당일 현장 철수 시 → 청소비용 20% 위약금\n📢 탄성코트+입주청소 날짜는 최소 7일\n\n위 내용 꼭 숙지해주시길 부탁드립니다!` },
+  { title: "✅ 확인 안내 (해피콜)", content: `확인했습니다!\n\n해피콜은 보통 1일전 오후 12시~18시 사이 드리고 있으니 참고 부탁드리며,\n방문에 필요한 집 비밀번호, 임시 방문증 등은 1일 전 해피콜 드린 관리사님께 전달주시면 감사드리겠습니다.\n\n그럼 1일 전날 해피콜 연락 드리고 방문드리겠습니다.\n\n믿고 맡겨주신만큼 최선을 다해서 꼼꼼하게 작업해드리겠습니다^^` },
+  { title: "📶 인터넷 할인 안내", content: `아참 그리구요 이번에 이사하실때 인터넷도 알아보고 계시다면 1644-0199로 연락주시면\n\n저희 새집느낌 인터넷 센터 통해서 48만원 지원금도 받고 청소 비용도 10~20만원 할인받을 수 있으셔서 참고하시면 좋으실거 같으세용\n\n참고해보세요 고객님^^\n오늘도 좋은 하루되세요!` },
+  { title: "🔧 AS 고지사항", content: `[AS 관련 안내]\n\n작업 완료 후 현장에서 바로 검수를 진행해 주시기 바랍니다.\n현장 철수 이후 발생하는 오염이나 하자는 AS 대상에 포함되지 않을 수 있습니다.\n\n작업 당일 검수 시 발견된 미흡한 부분은 즉시 보완 작업 진행해 드립니다.\n\nAS 접수: 작업 완료 후 3일 이내\n- 사진 촬영 후 담당자에게 전달\n- 확인 후 일정 조율하여 재방문\n\n감사합니다.` },
+  { title: "💰 추가비용 안내", content: `[추가비용 안내]\n\n다음 항목은 기본 청소에 포함되지 않아 추가 비용이 발생할 수 있습니다:\n\n- 외부 유리창 청소\n- 에어컨 완전분해 청소\n- 세탁기 청소\n- 곰팡이 제거\n- 니코틴 제거\n- 스티커/시트지 제거\n- 걸레받이 시공\n- 탄성코트\n- 줄눈시공\n\n상담 시 확인되지 않은 현장 상황에 따라 추가 비용이 발생할 수 있으며,\n작업 전 고객님께 안내 후 진행됩니다.\n\n감사합니다.` },
+  { title: "📅 일정 변경 양식", content: `[일정 변경 요청]\n\n기존 예약일: \n변경 희망일: \n변경 사유: \n\n※ 1주 전 변경: 1회만 가능\n※ 변경 후 취소 시 예약금 환불 불가\n※ 1주 이내 변경은 예약금 환불 불가` },
+  { title: "❌ 일정 취소 양식", content: `[일정 취소 요청]\n\n예약일: \n취소 사유: \n\n※ 예약금 결제 후 24시간 경과 → 50%만 환불\n※ 1주 이내 취소 → 예약금 환불 불가\n※ 당일 취소/철수 → 청소비용 20% 위약금` },
+];
+
+// ===== 안내 양식 카드 =====
+function TemplateCard({ title, content, onCopy, copied }: { title: string; content: string; onCopy: (text: string) => void; copied: boolean }) {
+  const [open, setOpen] = useState(false);
+  const [editText, setEditText] = useState(content);
+
+  return (
+    <div className="border border-gray-200 rounded-xl overflow-hidden">
+      <button onClick={() => { setOpen(!open); setEditText(content); }} className="w-full px-3 py-2.5 flex items-center justify-between active:bg-gray-50">
+        <span className="text-sm font-medium text-gray-800">{title}</span>
+        <svg className={`w-4 h-4 text-gray-400 transition-transform ${open ? "rotate-90" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+        </svg>
+      </button>
+      {open && (
+        <div className="px-3 pb-3 border-t border-gray-100">
+          <textarea value={editText} onChange={(e) => setEditText(e.target.value)} rows={8}
+            className="w-full mt-2 text-xs text-gray-700 leading-relaxed bg-gray-50 rounded-lg p-2 outline-none resize-y" />
+          <button onClick={() => onCopy(editText)} className="mt-2 w-full py-2 bg-green-700 text-white rounded-lg text-xs font-bold active:bg-green-800">
+            {copied ? "✅ 복사됨!" : "📋 복사"}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ===== 예약 보관함 =====
+interface BookingData {
+  services: ServiceEntry[];
+  parsedName: string;
+  parsedPhone: string;
+  parsedAddr: string;
+  parsedWishDate?: string;
+  confirmMsg: string;
+  userName: string;
+  savedAt: string;
+}
+
+function SavedBookings({ onLoad, currentData }: { onLoad: (data: BookingData) => void; currentData: Omit<BookingData, "savedAt"> }) {
+  const [items, setItems] = useState<BookingData[]>([]);
+  const [showList, setShowList] = useState(false);
+
+  // localStorage에서 불러오기
+  function loadItems() {
+    try {
+      const saved = localStorage.getItem("savedBookings");
+      if (saved) setItems(JSON.parse(saved));
+    } catch {}
+  }
+
+  function saveCurrentBooking() {
+    if (!currentData.parsedName && !currentData.confirmMsg) {
+      alert("저장할 예약 내용이 없습니다. STEP 2에서 파싱 후 저장해주세요.");
+      return;
+    }
+    const newItem: BookingData = { ...currentData, savedAt: new Date().toISOString() };
+    const updated = [newItem, ...items].slice(0, 50); // 최대 50건
+    setItems(updated);
+    localStorage.setItem("savedBookings", JSON.stringify(updated));
+    alert("예약 저장 완료!");
+  }
+
+  function deleteItem(idx: number) {
+    const updated = items.filter((_, i) => i !== idx);
+    setItems(updated);
+    localStorage.setItem("savedBookings", JSON.stringify(updated));
+  }
+
+  return (
+    <div>
+      <div className="flex gap-2 mb-2">
+        <button onClick={saveCurrentBooking} className="flex-1 py-2 bg-blue-50 text-blue-700 rounded-lg text-xs font-bold active:bg-blue-100">
+          💾 현재 예약 저장
+        </button>
+        <button onClick={() => { setShowList(!showList); if (!showList) loadItems(); }} className="flex-1 py-2 bg-gray-100 text-gray-700 rounded-lg text-xs font-bold active:bg-gray-200">
+          📂 보관함 ({items.length || "불러오기"})
+        </button>
+      </div>
+
+      {showList && (
+        <div className="space-y-1.5 max-h-[300px] overflow-y-auto">
+          {items.length === 0 ? (
+            <div className="py-4 text-center text-xs text-gray-400">저장된 예약이 없습니다</div>
+          ) : items.map((item, i) => (
+            <div key={i} className="flex items-center gap-2 bg-gray-50 rounded-lg px-3 py-2">
+              <div className="flex-1 min-w-0 cursor-pointer" onClick={() => onLoad(item)}>
+                <div className="text-sm font-medium text-gray-800 truncate">{item.parsedName || "이름없음"} · {item.parsedAddr || "주소없음"}</div>
+                <div className="text-[10px] text-gray-400">{item.services?.map((s) => s.name).join(", ")} · {new Date(item.savedAt).toLocaleDateString("ko")}</div>
+              </div>
+              <button onClick={() => deleteItem(i)} className="text-red-400 text-xs shrink-0">✕</button>
+            </div>
+          ))}
         </div>
       )}
     </div>
