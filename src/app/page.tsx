@@ -290,14 +290,11 @@ export default function Home() {
     } | undefined;
     const onNav = (e: Record<string, unknown>) => {
       if (e.navigationType === "traverse" && e.canIntercept) {
-        // 열린 게 없으면 intercept하지 않음 → 브라우저/PWA 기본 동작 (앱 종료)
-        if (!hasOpenOverlay()) return;
+        // 무조건 가로채기 → 앱 절대 안 꺼짐
         (e.intercept as (o: { handler: () => Promise<void> }) => void)({
           handler: async () => {
             if (hashStackRef.current.length > 0) hashStackRef.current.pop();
             doBack();
-            // 닫은 후에도 열린 게 남아있으면 해시 스택 유지, 없으면 정리
-            if (!hasOpenOverlay()) clearAllHashes();
           }
         });
       }
