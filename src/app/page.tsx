@@ -220,9 +220,15 @@ export default function Home() {
       const s = stateRef.current;
       if (s.detailSchedule) {
         if (detailBackRef.current && detailBackRef.current()) {
-          // 탭 내부 이동 처리됨 → 해시 보충 (탭은 해시 안 쌓으니까)
+          // 탭 내부 이동 처리됨 → 해시 보충
           pushHash("d");
-        } else { setDetailSchedule(null); }
+        } else {
+          // 디테일 완전 닫기 → 해시 스택 정리 (달력으로 복귀)
+          setDetailSchedule(null);
+          hashStackRef.current = [];
+          history.replaceState(null, "", window.location.pathname);
+          return; // 이미 정리됨
+        }
       }
       else if (s.showDayPopup) { setShowDayPopup(false); }
       else if (s.showNotifications) { setShowNotifications(false); }
