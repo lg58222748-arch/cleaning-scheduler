@@ -181,28 +181,40 @@ export default function Home() {
     profileUser, activeTab,
   };
 
-  // 모달/탭 열 때 pushState 안 함 (깜빡임 방지, 히스토리는 버퍼로 관리)
-  const openModal = useCallback((setter: (v: boolean) => void) => {
-    setter(true);
+  // 해시 라우팅: URL 해시로 상태를 표현하여 안드로이드 뒤로가기 지원
+  const suppressHashChange = useRef(false);
+
+  const pushHash = useCallback((hash: string) => {
+    suppressHashChange.current = true;
+    window.location.hash = hash;
+    setTimeout(() => { suppressHashChange.current = false; }, 50);
   }, []);
+
+  const openModal = useCallback((setter: (v: boolean) => void) => {
+    pushHash("modal");
+    setter(true);
+  }, [pushHash]);
 
   const openDetailSchedule = useCallback((s: Schedule | null) => {
+    if (s) pushHash("detail");
     setDetailSchedule(s);
-  }, []);
+  }, [pushHash]);
 
   const openProfileUser = useCallback((u: User | null) => {
+    if (u) pushHash("profile");
     setProfileUser(u);
-  }, []);
+  }, [pushHash]);
 
   const switchTab = useCallback((tab: TabMode) => {
     if (tab !== stateRef.current.activeTab) {
       prevTabRef.current = stateRef.current.activeTab;
+      pushHash(`tab-${tab}`);
       setActiveTab(tab);
       setShowMemberFilter(false);
     }
-  }, []);
+  }, [pushHash]);
 
-  // ★ 뒤로가기 처리 (popstate + Navigation API)
+  // ★ 뒤로가기: hashchange로 감지 (안드로이드 PWA에서 URL 변경은 뒤로가기로 인식)
   useEffect(() => {
     const doBack = () => {
       const s = stateRef.current;
@@ -220,28 +232,23 @@ export default function Home() {
       else if (s.activeTab !== "calendar") { setActiveTab(prevTabRef.current || "calendar"); }
     };
 
-    // Navigation API (Chrome PWA)
-    const nav = (window as unknown as Record<string, unknown>).navigation as {
-      addEventListener(t: string, fn: (e: Record<string, unknown>) => void): void;
-      removeEventListener(t: string, fn: (e: Record<string, unknown>) => void): void;
-    } | undefined;
-    const onNav = (e: Record<string, unknown>) => {
-      if (e.navigationType === "traverse" && e.canIntercept) {
-        (e.intercept as (o: { handler: () => Promise<void> }) => void)({
-          handler: async () => { doBack(); history.pushState(null, "", window.location.pathname); }
-        });
-      }
+    const onHashChange = () => {
+      // 우리가 직접 해시를 바꾼 경우 무시 (앞으로 가기)
+      if (suppressHashChange.current) return;
+      // 뒤로가기로 해시가 바뀐 경우
+      doBack();
     };
-    if (nav) nav.addEventListener("navigate", onNav);
 
-    // popstate fallback
-    history.pushState(null, "", window.location.pathname);
-    const onPop = () => { doBack(); history.pushState(null, "", window.location.pathname); };
-    window.addEventListener("popstate", onPop);
+    const onPopState = () => {
+      if (suppressHashChange.current) return;
+      doBack();
+    };
 
+    window.addEventListener("hashchange", onHashChange);
+    window.addEventListener("popstate", onPopState);
     return () => {
-      window.removeEventListener("popstate", onPop);
-      if (nav) nav.removeEventListener("navigate", onNav);
+      window.removeEventListener("hashchange", onHashChange);
+      window.removeEventListener("popstate", onPopState);
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
