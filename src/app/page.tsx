@@ -481,54 +481,7 @@ export default function Home() {
       {/* Bottom tab bar - mobile style */}
       <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-40 safe-area-bottom">
         <div className="flex items-center justify-around h-16 max-w-lg mx-auto">
-          <button
-            onClick={() => setActiveTab("calendar")}
-            className={`flex flex-col items-center justify-center gap-0.5 w-16 h-full ${
-              activeTab === "calendar" ? "text-blue-500" : "text-gray-400"
-            }`}
-          >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={activeTab === "calendar" ? 2.5 : 1.5} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-            </svg>
-            <span className="text-[10px] font-medium">달력</span>
-          </button>
-
-          {isAdmin && (
-            <button
-              onClick={() => setActiveTab("assign")}
-              className={`flex flex-col items-center justify-center gap-0.5 w-16 h-full ${
-                activeTab === "assign" ? "text-blue-500" : "text-gray-400"
-              }`}
-            >
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={activeTab === "assign" ? 2.5 : 1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-              </svg>
-              <span className="text-[10px] font-medium">배정</span>
-            </button>
-          )}
-
-          {/* Center FAB - add schedule */}
-          <button
-            onClick={() => { setEditingSchedule(null); setShowScheduleForm(true); }}
-            className="w-14 h-14 bg-blue-500 rounded-full flex items-center justify-center shadow-lg -mt-5 active:bg-blue-600"
-          >
-            <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
-            </svg>
-          </button>
-
-          <button
-            onClick={() => setActiveTab("members")}
-            className={`flex flex-col items-center justify-center gap-0.5 w-16 h-full ${
-              activeTab === "members" ? "text-blue-500" : "text-gray-400"
-            }`}
-          >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={activeTab === "members" ? 2.5 : 1.5} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
-            </svg>
-            <span className="text-[10px] font-medium">팀원</span>
-          </button>
-
+          {/* 영업 */}
           {isSales && (
             <button
               onClick={() => setActiveTab("sales")}
@@ -543,6 +496,48 @@ export default function Home() {
             </button>
           )}
 
+          {/* 배정 */}
+          {isAdmin && (
+            <button
+              onClick={() => setActiveTab("assign")}
+              className={`flex flex-col items-center justify-center gap-0.5 w-16 h-full ${
+                activeTab === "assign" ? "text-blue-500" : "text-gray-400"
+              }`}
+            >
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={activeTab === "assign" ? 2.5 : 1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+              </svg>
+              <span className="text-[10px] font-medium">배정</span>
+            </button>
+          )}
+
+          {/* 달력 */}
+          <button
+            onClick={() => setActiveTab("calendar")}
+            className={`flex flex-col items-center justify-center gap-0.5 w-16 h-full ${
+              activeTab === "calendar" ? "text-blue-500" : "text-gray-400"
+            }`}
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={activeTab === "calendar" ? 2.5 : 1.5} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+            </svg>
+            <span className="text-[10px] font-medium">달력</span>
+          </button>
+
+          {/* 팀원 */}
+          <button
+            onClick={() => setActiveTab("members")}
+            className={`flex flex-col items-center justify-center gap-0.5 w-16 h-full ${
+              activeTab === "members" ? "text-blue-500" : "text-gray-400"
+            }`}
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={activeTab === "members" ? 2.5 : 1.5} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+            <span className="text-[10px] font-medium">팀원</span>
+          </button>
+
+          {/* 관리 */}
           <button
             onClick={() => setActiveTab("manage")}
             className={`flex flex-col items-center justify-center gap-0.5 w-16 h-full ${
