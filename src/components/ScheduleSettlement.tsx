@@ -129,8 +129,8 @@ export default function ScheduleSettlement({ scheduleId, scheduleNote, customerN
       depositorName, bankName, accountNumber,
     } as Record<string, unknown>);
     // 일정에 작업완료 표시
-    await apiUpdateSchedule(scheduleId, { status: "completed" as string });
-    if (s) setS({ ...s, status: "completed" });
+    await apiUpdateSchedule(scheduleId, { status: "completed" } as Partial<import("@/types").Schedule>);
+    if (s) setS({ ...s, status: "completed" as const });
     setShowShareModal(true);
     onCompleted?.();
   }
