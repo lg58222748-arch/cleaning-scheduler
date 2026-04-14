@@ -484,26 +484,22 @@ export default function ScheduleDetail({
               배정
             </button>
           )}
-          {/* 입금확인 버튼 */}
-          {titleText.includes("/미입금") ? (
-            <button
-              onClick={async () => {
+          {/* 입금확인 버튼 - 항상 표시 */}
+          <button
+            onClick={async () => {
+              if (titleText.includes("/미입금")) {
                 const originalTitle = (schedule.note?.match(/제목\s*[:：]\s*(.+)/)?.[1] || titleText.replace(/\/미입금$/, "")).trim();
                 schedule.title = originalTitle;
                 setTitleText(originalTitle);
                 await apiUpdateSchedule(schedule.id, { title: originalTitle });
                 onUpdated?.();
-              }}
-              className="flex-1 py-3 rounded-xl text-sm font-bold text-white active:opacity-90"
-              style={{ background: "linear-gradient(135deg, #00c473, #00a35e)" }}
-            >
-              입금확인
-            </button>
-          ) : schedule.memberName && schedule.memberName !== "미배정" ? (
-            <div className="flex-1 py-2 rounded-xl text-xs font-medium text-center text-green-600 bg-green-50 border border-green-200">
-              입금완료
-            </div>
-          ) : null}
+              }
+            }}
+            className={`flex-1 py-3 rounded-xl text-sm font-bold active:opacity-90 ${titleText.includes("/미입금") ? "text-white" : "text-green-600 bg-green-50 border border-green-200"}`}
+            style={titleText.includes("/미입금") ? { background: "linear-gradient(135deg, #00c473, #00a35e)" } : {}}
+          >
+            {titleText.includes("/미입금") ? "입금확인" : "입금완료"}
+          </button>
           <button
             onClick={async () => {
               setSaving(true);
