@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { Schedule, Member, Comment } from "@/types";
 import { fetchComments, createComment, deleteCommentApi, updateSchedule as apiUpdateSchedule } from "@/lib/api";
 import ScheduleChecklist from "./ScheduleChecklist";
@@ -187,8 +187,29 @@ export default function ScheduleDetail({
   const day = schedDate.getDate();
   const dateDisplay = `${month}월 ${day}일 (${dayName})`;
 
+  // 스와이프 뒤로가기 (오른쪽 스와이프 → 닫기)
+  const detailRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!detailRef.current) return;
+    let mc: InstanceType<typeof import("hammerjs")> | null = null;
+    import("hammerjs").then((Hammer) => {
+      if (!detailRef.current) return;
+      mc = new Hammer.default(detailRef.current);
+      mc.get("swipe").set({ direction: Hammer.default.DIRECTION_RIGHT });
+      mc.on("swiperight", () => {
+        if (tabHistoryRef.current.length > 0) {
+          const prev = tabHistoryRef.current.pop()!;
+          setActiveTab(prev);
+        } else {
+          onClose();
+        }
+      });
+    });
+    return () => { mc?.destroy(); };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   return (
-    <div className="fixed inset-0 bg-white z-50 flex flex-col animate-[modalIn_0.15s_ease-out]">
+    <div ref={detailRef} className="fixed inset-0 bg-white z-50 flex flex-col animate-[modalIn_0.15s_ease-out]">
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Header */}
         <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
