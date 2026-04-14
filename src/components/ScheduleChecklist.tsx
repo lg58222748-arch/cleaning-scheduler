@@ -21,9 +21,24 @@ export default function ScheduleChecklist({ scheduleId }: ScheduleChecklistProps
     setLoading(false);
   }
 
-  async function handleToggle(itemId: string, checked: boolean) {
-    const data = await toggleChecklistItem(scheduleId, itemId, checked);
-    setChecklist(data);
+  function handleToggle(itemId: string, checked: boolean) {
+    // 낙관적 업데이트: 즉시 UI 반영
+    if (checklist) {
+      const updated = {
+        ...checklist,
+        categories: checklist.categories.map((cat) => ({
+          ...cat,
+          items: cat.items.map((item) =>
+            item.id === itemId ? { ...item, checked } : item
+          ),
+        })),
+      };
+      const done = updated.categories.reduce((sum, cat) => sum + cat.items.filter((i) => i.checked).length, 0);
+      updated.completedCount = done;
+      setChecklist(updated);
+    }
+    // API 백그라운드
+    toggleChecklistItem(scheduleId, itemId, checked);
   }
 
   async function handleSubmit() {
