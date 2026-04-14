@@ -105,9 +105,6 @@ export default function ScheduleSettlement({ scheduleId, scheduleNote, customerN
     const memberDisplay = memberBranch ? `${memberBranch} 관리점 ${memberName}` : memberName;
 
     const lines: string[] = [];
-    // 관리사 정보 (맨 위)
-    if (memberDisplay) lines.push(`${memberDisplay} 관리사`);
-    lines.push("");
     lines.push("새집느낌 정산서");
     lines.push("──── 고객 정보 ────");
     lines.push(`고객명: ${customerName || "-"}님`);
@@ -130,6 +127,8 @@ export default function ScheduleSettlement({ scheduleId, scheduleNote, customerN
     lines.push("──── 최종 결제 안내 ────");
     lines.push(receiptMsg);
     lines.push("");
+    if (memberDisplay) lines.push(`${memberDisplay} 관리사`);
+    if (accountNumber && bankName) lines.push(`${bankName} ${accountNumber}`);
     lines.push(`최종 결제 금액: ${formatWon(total)}`);
     lines.push("");
     lines.push("이용해주셔서 너무 감사드립니다.");
