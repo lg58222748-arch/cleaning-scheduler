@@ -699,8 +699,11 @@ export default function Home() {
               if (target) {
                 // 배정탭에서 제거
                 setUnassignedSchedules((prev) => prev.filter((s) => s.id !== scheduleId));
-                // 달력에 추가
-                setSchedules((prev) => [...prev, { ...target, memberId, memberName, status: "confirmed" as const }]);
+                // 달력에 추가 - [미입금] 접두어
+                const newTitle = target.title.startsWith("[미입금]") ? target.title : `[미입금] ${target.title}`;
+                setSchedules((prev) => [...prev, { ...target, title: newTitle, memberId, memberName, status: "confirmed" as const }]);
+                // 제목도 DB에 업데이트
+                apiUpdateSchedule(scheduleId, { title: newTitle });
               }
               // API는 백그라운드 (안 기다림)
               assignScheduleApi(scheduleId, memberId, memberName);
@@ -995,7 +998,9 @@ export default function Home() {
             const target = unassignedSchedules.find((s) => s.id === scheduleId);
             if (target) {
               setUnassignedSchedules((prev) => prev.filter((s) => s.id !== scheduleId));
-              setSchedules((prev) => [...prev, { ...target, memberId, memberName, status: "confirmed" as const }]);
+              const newTitle = target.title.startsWith("[미입금]") ? target.title : `[미입금] ${target.title}`;
+              setSchedules((prev) => [...prev, { ...target, title: newTitle, memberId, memberName, status: "confirmed" as const }]);
+              apiUpdateSchedule(scheduleId, { title: newTitle });
             }
             assignScheduleApi(scheduleId, memberId, memberName);
             setDetailSchedule(null);

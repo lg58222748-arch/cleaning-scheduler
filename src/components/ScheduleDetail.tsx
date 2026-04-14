@@ -451,6 +451,24 @@ export default function ScheduleDetail({
             </select>
           </div>
         )}
+        {/* 입금완료 버튼 - [미입금] 상태일 때만 */}
+        {schedule.title.includes("[미입금]") && (
+          <div className="px-4 py-2">
+            <button
+              onClick={async () => {
+                const newTitle = schedule.title.replace(/\[미입금\]\s*/, "");
+                schedule.title = newTitle;
+                setTitleText(newTitle);
+                await apiUpdateSchedule(schedule.id, { title: newTitle });
+                onUpdated?.();
+              }}
+              className="w-full py-3 rounded-xl text-sm font-bold text-white active:opacity-90"
+              style={{ background: "linear-gradient(135deg, #00c473, #00a35e)" }}
+            >
+              입금완료
+            </button>
+          </div>
+        )}
         <div className="flex gap-2 px-4 py-2">
           {mode === "calendar" && isAdmin && schedule.status !== "unassigned" && onUnassign && (
             <button
