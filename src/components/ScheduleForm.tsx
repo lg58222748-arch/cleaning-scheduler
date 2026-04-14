@@ -62,10 +62,9 @@ export default function ScheduleForm({
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (!title.trim()) return;
     const member = members.find((m) => m.id === memberId);
-    if (!member) return;
 
-    // 시간대에 따른 시작/종료 시간
     const times: Record<TimeSlot, [string, string]> = {
       "오전": ["07:00", "12:00"],
       "오후": ["13:00", "18:00"],
@@ -75,8 +74,8 @@ export default function ScheduleForm({
     const [startTime, endTime] = times[timeSlot];
 
     onSave({
-      memberId,
-      memberName: member.name,
+      memberId: member?.id || "",
+      memberName: member?.name || "미배정",
       title: `[${timeSlot}] ${title}`,
       location: "",
       date,
@@ -100,12 +99,11 @@ export default function ScheduleForm({
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              담당 팀원 *
+              담당 팀원
             </label>
             <select
               value={memberId}
               onChange={(e) => setMemberId(e.target.value)}
-              required
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-400 focus:border-transparent outline-none"
             >
               <option value="">팀원 선택</option>
