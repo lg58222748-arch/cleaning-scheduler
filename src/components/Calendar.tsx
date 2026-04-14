@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useCallback, useRef } from "react";
+import { useState, useMemo, useCallback, useRef, memo } from "react";
 import { Schedule, Member } from "@/types";
 import {
   format,
@@ -23,7 +23,7 @@ interface CalendarProps {
   onMonthChange: (date: Date) => void;
 }
 
-export default function Calendar({
+export default memo(function Calendar({
   schedules,
   members,
   selectedDate,
@@ -267,4 +267,4 @@ export default function Calendar({
       </div>
     </div>
   );
-}
+})
