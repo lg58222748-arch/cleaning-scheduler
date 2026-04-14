@@ -684,7 +684,7 @@ export default function Home() {
             schedules={calendarSchedules}
             members={members}
             selectedDate={selectedDate}
-            onSelectDate={(d) => { setSelectedDate(d); openModal(setShowDayPopup); }}
+            onSelectDate={(d) => { setSelectedDate(d); setShowDayPopup(true); }}
             onMonthChange={(d) => loadData(d)}
           />
         </div>

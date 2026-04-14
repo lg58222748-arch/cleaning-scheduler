@@ -484,11 +484,10 @@ export default function ScheduleDetail({
               배정
             </button>
           )}
-          {/* 입금확인 버튼 - 미입금 상태일 때만 */}
-          {titleText.includes("/미입금") && (
+          {/* 입금확인 버튼 */}
+          {titleText.includes("/미입금") ? (
             <button
               onClick={async () => {
-                // "이름/미입금" → 원래 제목(note에서 복원)
                 const originalTitle = (schedule.note?.match(/제목\s*[:：]\s*(.+)/)?.[1] || titleText.replace(/\/미입금$/, "")).trim();
                 schedule.title = originalTitle;
                 setTitleText(originalTitle);
@@ -500,7 +499,11 @@ export default function ScheduleDetail({
             >
               입금확인
             </button>
-          )}
+          ) : schedule.memberName && schedule.memberName !== "미배정" ? (
+            <div className="flex-1 py-2 rounded-xl text-xs font-medium text-center text-green-600 bg-green-50 border border-green-200">
+              입금완료
+            </div>
+          ) : null}
           <button
             onClick={async () => {
               setSaving(true);
