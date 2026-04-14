@@ -199,20 +199,32 @@ export default function Home() {
     }
   }, []);
 
-  // 뒤로가기: 버퍼 20개 + 매 popstate마다 1개 보충 = 절대 소진 안 됨
+  // ★ 안드로이드/iOS PWA 뒤로가기 완전 방어
+  // 원리: 히스토리 스택을 50개 쌓고, popstate마다 2개 보충
+  // 절대 스택이 바닥나지 않으므로 앱이 종료되지 않음
   useEffect(() => {
-    // 히스토리 버퍼 20개 (빠른 연타 대응)
-    for (let i = 0; i < 20; i++) {
-      history.pushState({ g: i }, "");
+    // 현재 엔트리를 앱 베이스로 마킹
+    history.replaceState({ _app: "base" }, "");
+
+    // 버퍼 50개 push (빠른 연타/스와이프 대응)
+    for (let i = 0; i < 50; i++) {
+      history.pushState({ _app: i }, "");
     }
 
-    const handlePop = () => {
+    const handlePop = (e: PopStateEvent) => {
+      // 베이스 엔트리까지 도달한 경우 → 즉시 복구
+      if (e.state && e.state._app === "base") {
+        history.pushState({ _app: "recovered" }, "");
+        history.pushState({ _app: "recovered2" }, "");
+        return;
+      }
+
       const s = stateRef.current;
 
-      // 현재 상태에서 닫아야 할 것을 닫기
+      // 열려있는 것 닫기 (우선순위 순서)
       if (s.detailSchedule) {
         if (detailBackRef.current && detailBackRef.current()) {
-          // detail 내부 탭 뒤로가기 (정산→검수→정보)
+          // 정보/검수/정산 탭 내부 이동
         } else {
           setDetailSchedule(null);
         }
@@ -228,10 +240,10 @@ export default function Home() {
       else if (s.activeTab !== "calendar") {
         setActiveTab(prevTabRef.current || "calendar");
       }
-      // else: 캘린더 + 아무것도 안 열림 → 아무 일도 안 함
 
-      // ★ 핵심: 매번 반드시 1개 보충 → 버퍼 절대 소진 안 됨
-      history.pushState({ g: Date.now() }, "");
+      // ★ 매번 반드시 2개 보충 (소비 1개 < 보충 2개 = 스택이 점점 늘어남)
+      history.pushState({ _app: Date.now() }, "");
+      history.pushState({ _app: Date.now() + 1 }, "");
     };
 
     window.addEventListener("popstate", handlePop);
