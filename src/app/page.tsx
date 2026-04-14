@@ -201,32 +201,19 @@ export default function Home() {
 
   // ★ 안드로이드 하드웨어 뒤로가기 방어
   const [backDebug, setBackDebug] = useState("");
-  const backCountRef = useRef(0);
-  const isSettingUp = useRef(true);
 
   useEffect(() => {
-    // 각각 다른 해시로 50개 버퍼 push (hashchange 발생 보장)
+    // 히스토리 버퍼
     for (let i = 0; i < 50; i++) {
       history.pushState(null, "", `#p${i}`);
     }
-    setBackDebug(`버퍼완료 h=${history.length}`);
-
-    // 세팅 완료 표시 (hashchange 이벤트 무시용)
-    setTimeout(() => { isSettingUp.current = false; }, 100);
+    setBackDebug(`h=${history.length}`);
 
     const handleBack = () => {
-      if (isSettingUp.current) return; // 세팅 중 이벤트 무시
-
-      backCountRef.current++;
-      setBackDebug(`감지! #${backCountRef.current} h=${history.length}`);
-
+      setBackDebug(`pop h=${history.length}`);
       const s = stateRef.current;
       if (s.detailSchedule) {
-        if (detailBackRef.current && detailBackRef.current()) {
-          // 정보/검수/정산 탭 내부 이동
-        } else {
-          setDetailSchedule(null);
-        }
+        if (detailBackRef.current && detailBackRef.current()) {} else { setDetailSchedule(null); }
       }
       else if (s.showDayPopup) { setShowDayPopup(false); }
       else if (s.showNotifications) { setShowNotifications(false); }
@@ -236,20 +223,30 @@ export default function Home() {
       else if (s.showSearch) { setShowSearch(false); }
       else if (s.showMemberFilter) { setShowMemberFilter(false); }
       else if (s.profileUser) { setProfileUser(null); }
-      else if (s.activeTab !== "calendar") {
-        setActiveTab(prevTabRef.current || "calendar");
-      }
-
-      // 2개 보충 (소비1 < 보충2)
+      else if (s.activeTab !== "calendar") { setActiveTab(prevTabRef.current || "calendar"); }
       history.pushState(null, "", `#p${Date.now()}`);
       history.pushState(null, "", `#p${Date.now() + 1}`);
     };
 
     window.addEventListener("popstate", handleBack);
     window.addEventListener("hashchange", handleBack);
+
+    // Android PWA: 뒤로가기로 앱이 백그라운드로 갈 때 → 다시 포그라운드 오면 복구
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") {
+        // 앱이 다시 보임 → 버퍼 재충전
+        for (let i = 0; i < 10; i++) {
+          history.pushState(null, "", `#p${Date.now() + i}`);
+        }
+        setBackDebug(`복구 h=${history.length}`);
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
+
     return () => {
       window.removeEventListener("popstate", handleBack);
       window.removeEventListener("hashchange", handleBack);
+      document.removeEventListener("visibilitychange", handleVisibility);
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -693,11 +690,11 @@ export default function Home() {
               if (target) {
                 // 배정탭에서 제거
                 setUnassignedSchedules((prev) => prev.filter((s) => s.id !== scheduleId));
-                // 달력에 추가 - [미입금] 접두어
-                const newTitle = target.title.startsWith("[미입금]") ? target.title : `[미입금] ${target.title}`;
-                setSchedules((prev) => [...prev, { ...target, title: newTitle, memberId, memberName, status: "confirmed" as const }]);
-                // 제목도 DB에 업데이트
-                apiUpdateSchedule(scheduleId, { title: newTitle });
+                // 달력에 추가 - 이름/미입금 형태 + 원래 제목을 note에 보존
+                const newTitle = `${memberName}/미입금`;
+                const preservedNote = target.note ? `제목: ${target.title}\n${target.note}` : `제목: ${target.title}`;
+                setSchedules((prev) => [...prev, { ...target, title: newTitle, note: preservedNote, memberId, memberName, status: "confirmed" as const }]);
+                apiUpdateSchedule(scheduleId, { title: newTitle, note: preservedNote });
               }
               // API는 백그라운드 (안 기다림)
               assignScheduleApi(scheduleId, memberId, memberName);
@@ -992,9 +989,10 @@ export default function Home() {
             const target = unassignedSchedules.find((s) => s.id === scheduleId);
             if (target) {
               setUnassignedSchedules((prev) => prev.filter((s) => s.id !== scheduleId));
-              const newTitle = target.title.startsWith("[미입금]") ? target.title : `[미입금] ${target.title}`;
-              setSchedules((prev) => [...prev, { ...target, title: newTitle, memberId, memberName, status: "confirmed" as const }]);
-              apiUpdateSchedule(scheduleId, { title: newTitle });
+              const newTitle = `${memberName}/미입금`;
+              const preservedNote = target.note ? `제목: ${target.title}\n${target.note}` : `제목: ${target.title}`;
+              setSchedules((prev) => [...prev, { ...target, title: newTitle, note: preservedNote, memberId, memberName, status: "confirmed" as const }]);
+              apiUpdateSchedule(scheduleId, { title: newTitle, note: preservedNote });
             }
             assignScheduleApi(scheduleId, memberId, memberName);
             setDetailSchedule(null);

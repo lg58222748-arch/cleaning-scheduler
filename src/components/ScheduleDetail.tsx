@@ -451,30 +451,6 @@ export default function ScheduleDetail({
             </select>
           </div>
         )}
-        {/* 입금 상태 */}
-        {schedule.memberName && schedule.memberName !== "미배정" && (
-          <div className="px-4 py-2">
-            {titleText.includes("[미입금]") ? (
-              <button
-                onClick={async () => {
-                  const newTitle = titleText.replace(/\[미입금\]\s*/, "");
-                  schedule.title = newTitle;
-                  setTitleText(newTitle);
-                  await apiUpdateSchedule(schedule.id, { title: newTitle });
-                  onUpdated?.();
-                }}
-                className="w-full py-3 rounded-xl text-sm font-bold text-white active:opacity-90"
-                style={{ background: "linear-gradient(135deg, #00c473, #00a35e)" }}
-              >
-                입금완료
-              </button>
-            ) : (
-              <div className="w-full py-2 rounded-xl text-xs font-medium text-center text-green-600 bg-green-50 border border-green-200">
-                입금 확인됨
-              </div>
-            )}
-          </div>
-        )}
         <div className="flex gap-2 px-4 py-2">
           {mode === "calendar" && isAdmin && schedule.status !== "unassigned" && onUnassign && (
             <button
@@ -506,6 +482,23 @@ export default function ScheduleDetail({
               className="flex-1 py-3 bg-orange-500 text-white rounded-xl text-sm font-bold active:bg-orange-600 disabled:opacity-40"
             >
               배정
+            </button>
+          )}
+          {/* 입금확인 버튼 - 미입금 상태일 때만 */}
+          {titleText.includes("/미입금") && (
+            <button
+              onClick={async () => {
+                // "이름/미입금" → 원래 제목(note에서 복원)
+                const originalTitle = (schedule.note?.match(/제목\s*[:：]\s*(.+)/)?.[1] || titleText.replace(/\/미입금$/, "")).trim();
+                schedule.title = originalTitle;
+                setTitleText(originalTitle);
+                await apiUpdateSchedule(schedule.id, { title: originalTitle });
+                onUpdated?.();
+              }}
+              className="flex-1 py-3 rounded-xl text-sm font-bold text-white active:opacity-90"
+              style={{ background: "linear-gradient(135deg, #00c473, #00a35e)" }}
+            >
+              입금확인
             </button>
           )}
           <button
