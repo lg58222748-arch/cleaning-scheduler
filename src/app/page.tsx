@@ -199,21 +199,20 @@ export default function Home() {
     }
   }, []);
 
-  // ★ 안드로이드/iOS PWA 뒤로가기 방어
+  // ★ 안드로이드 하드웨어 뒤로가기 방어
+  // 디버그: 뒤로가기 감지 여부 확인용
+  const [backDebug, setBackDebug] = useState("");
+
   useEffect(() => {
-    // 1. history 버퍼
-    history.replaceState({ _app: "base" }, "");
-    for (let i = 0; i < 50; i++) {
-      history.pushState({ _app: i }, "");
+    // history 버퍼: URL 해시를 사용 (pushState보다 안드로이드 PWA에서 확실)
+    // 해시 변경은 페이지 리로드 없이 히스토리 추가
+    const baseHash = window.location.hash;
+    for (let i = 0; i < 30; i++) {
+      history.pushState(null, "", `#b${i}`);
     }
 
-    // 2. popstate 핸들러
-    const handlePop = (e: PopStateEvent) => {
-      if (e.state && e.state._app === "base") {
-        history.pushState({ _app: "r1" }, "");
-        history.pushState({ _app: "r2" }, "");
-        return;
-      }
+    const handlePop = () => {
+      setBackDebug(`뒤로가기 감지 ${Date.now()}`);
 
       const s = stateRef.current;
       if (s.detailSchedule) {
@@ -235,32 +234,12 @@ export default function Home() {
         setActiveTab(prevTabRef.current || "calendar");
       }
 
-      history.pushState({ _app: Date.now() }, "");
-      history.pushState({ _app: Date.now() + 1 }, "");
+      // 항상 보충
+      history.pushState(null, "", `#b${Date.now()}`);
     };
+
     window.addEventListener("popstate", handlePop);
-
-    // 3. Navigation API (Chrome 102+, Android PWA에서 popstate보다 먼저 동작)
-    const nav = (window as unknown as { navigation?: { addEventListener: (type: string, fn: (e: { canIntercept?: boolean; intercept?: (opts: { handler: () => void }) => void; preventDefault?: () => void }) => void) => void } }).navigation;
-    if (nav) {
-      nav.addEventListener("navigate", (e) => {
-        if (e.canIntercept) {
-          e.intercept?.({ handler: () => {} }); // 네비게이션 가로채기
-        }
-      });
-    }
-
-    // 4. beforeunload (마지막 안전망)
-    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      e.preventDefault();
-      e.returnValue = "";
-    };
-    window.addEventListener("beforeunload", handleBeforeUnload);
-
-    return () => {
-      window.removeEventListener("popstate", handlePop);
-      window.removeEventListener("beforeunload", handleBeforeUnload);
-    };
+    return () => window.removeEventListener("popstate", handlePop);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // 스플래시: 로고만 크게, 1초 표시
@@ -495,6 +474,10 @@ export default function Home() {
             배정탭에서 처리 →
           </button>
         </div>
+      )}
+      {/* 디버그: 뒤로가기 감지 확인 (테스트 후 제거) */}
+      {backDebug && (
+        <div className="bg-green-500 text-white text-xs text-center py-1 z-50">{backDebug}</div>
       )}
       {/* Compact mobile header */}
       <header className="bg-white border-b border-gray-200 sticky top-0 z-40">
