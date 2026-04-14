@@ -12,7 +12,7 @@ interface ScheduleDetailProps {
   isAdmin?: boolean;
   onEdit: (schedule: Schedule) => void;
   onDelete: (id: string) => void;
-  onUnassign?: (id: string) => void;
+  onUnassign?: (id: string, reason: string) => void;
   onClose: () => void;
   onUpdated?: () => void;
 }
@@ -260,10 +260,13 @@ export default function ScheduleDetail({
                   </div>
                 </div>
 
-                {/* 액션 버튼 */}
+                {/* 반환 */}
                 {isAdmin && schedule.status !== "unassigned" && onUnassign && (
                   <div className="pt-2 border-t border-gray-100">
-                    <button onClick={() => { onUnassign(schedule.id); onClose(); }} className="w-full px-3 py-2.5 bg-orange-50 text-orange-600 rounded-xl text-sm font-medium active:bg-orange-100">반환</button>
+                    <button onClick={() => {
+                      const reason = prompt("반환 사유를 입력하세요:");
+                      if (reason !== null) { onUnassign(schedule.id, reason || "사유 없음"); onClose(); }
+                    }} className="w-full px-3 py-2.5 bg-orange-50 text-orange-600 rounded-xl text-sm font-medium active:bg-orange-100">반환</button>
                   </div>
                 )}
               </div>

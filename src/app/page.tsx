@@ -76,7 +76,7 @@ export default function Home() {
   const [showAdminPanel, setShowAdminPanel] = useState(false);
   const [showDayPopup, setShowDayPopup] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
-  const [returnAlerts, setReturnAlerts] = useState<{ id: string; title: string; date: string }[]>([]);
+  const [returnAlerts, setReturnAlerts] = useState<{ id: string; title: string; date: string; reason: string }[]>([]);
 
   const loadData = useCallback(async (monthDate?: Date, fullRefresh = false) => {
     const d = monthDate || selectedDate;
@@ -168,13 +168,12 @@ export default function Home() {
     await softDeleteSchedule(id);
   }
 
-  async function handleUnassignSchedule(id: string) {
+  async function handleUnassignSchedule(id: string, reason: string = "") {
     const target = schedules.find((s) => s.id === id);
     setSchedules((prev) => prev.filter((s) => s.id !== id));
     if (target) {
       setUnassignedSchedules((prev) => [...prev, { ...target, memberId: "", memberName: "미배정", status: "unassigned" as const }]);
-      // 반환 알림 추가
-      setReturnAlerts((prev) => [...prev, { id: target.id, title: target.title.replace(/^\[.+?\]\s*/, ""), date: target.date }]);
+      setReturnAlerts((prev) => [...prev, { id: target.id, title: target.title.replace(/^\[.+?\]\s*/, ""), date: target.date, reason }]);
     }
     await unassignScheduleApi(id);
   }
@@ -305,9 +304,11 @@ export default function Home() {
           {returnAlerts.slice(0, 5).map((alert) => (
             <div key={alert.id} className="px-3 py-1.5 flex items-center gap-2 border-b border-orange-400/30 last:border-0">
               <span className="text-[10px]">↩</span>
-              <span className="text-[11px] font-medium truncate flex-1">{alert.title}</span>
-              <span className="text-[9px] opacity-70 shrink-0">{alert.date}</span>
-              <button onClick={() => setReturnAlerts((prev) => prev.filter((a) => a.id !== alert.id))} className="text-white/60 active:text-white ml-1">
+              <div className="flex-1 min-w-0">
+                <div className="text-[11px] font-medium truncate">{alert.title}</div>
+                <div className="text-[9px] opacity-70">{alert.date} · {alert.reason}</div>
+              </div>
+              <button onClick={() => setReturnAlerts((prev) => prev.filter((a) => a.id !== alert.id))} className="text-white/60 active:text-white ml-1 shrink-0">
                 <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" /></svg>
               </button>
             </div>
@@ -641,7 +642,7 @@ export default function Home() {
           isAdmin={isAdmin}
           onEdit={(s) => { setDetailSchedule(null); handleEditSchedule(s); }}
           onDelete={(id) => { handleDeleteSchedule(id); setDetailSchedule(null); }}
-          onUnassign={(id) => { handleUnassignSchedule(id); setDetailSchedule(null); }}
+          onUnassign={(id, reason) => { handleUnassignSchedule(id, reason); setDetailSchedule(null); }}
           onClose={() => setDetailSchedule(null)}
           onUpdated={() => loadData(undefined, true)}
         />
