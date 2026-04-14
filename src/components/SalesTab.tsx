@@ -329,7 +329,8 @@ export default function SalesTab({ userName, onCreated }: SalesTabProps) {
 
       {/* ===== STEP 1 ===== */}
       {step === 1 && (
-        <div className="p-4 space-y-4">
+        <div className="p-4 flex flex-col md:flex-row md:gap-6">
+        <div className="space-y-4 md:flex-1">
           {/* 서비스 선택 (복수) */}
           <div>
             <label className="text-xs font-bold text-green-700 mb-2 block">서비스 종류 (복수 선택 가능)</label>
@@ -428,11 +429,14 @@ export default function SalesTab({ userName, onCreated }: SalesTabProps) {
               </div>
             </div>
           )}
+        </div>
 
+        {/* 오른쪽: 미리보기 (PC) */}
+        <div className="space-y-4 mt-4 md:mt-0 md:flex-1 md:sticky md:top-0 md:self-start">
           {/* 미리보기 */}
           <div className="bg-green-50 border border-green-200 rounded-xl p-3">
             <div className="text-xs font-bold text-green-700 mb-2">고객에게 보낼 양식 미리보기</div>
-            <pre className="text-[11px] text-gray-700 whitespace-pre-wrap font-sans leading-relaxed max-h-[250px] overflow-y-auto">{getFormText()}</pre>
+            <pre className="text-[11px] text-gray-700 whitespace-pre-wrap font-sans leading-relaxed md:max-h-[60vh] max-h-[250px] overflow-y-auto">{getFormText()}</pre>
           </div>
 
           {/* 버튼 */}
@@ -452,11 +456,13 @@ export default function SalesTab({ userName, onCreated }: SalesTabProps) {
             STEP 2 · 고객 답장 파싱으로 이동 →
           </button>
         </div>
+        </div>
       )}
 
       {/* ===== STEP 2 ===== */}
       {step === 2 && (
-        <div className="p-4 space-y-4">
+        <div className="p-4 flex flex-col md:flex-row md:gap-6">
+        <div className="space-y-4 md:flex-1">
           {/* 예약 보관함 */}
           <SavedBookings onLoad={(data) => {
             if (data.services) setServices(data.services);
@@ -485,7 +491,8 @@ export default function SalesTab({ userName, onCreated }: SalesTabProps) {
 
           {/* 파싱 결과 */}
           {parsedName && (
-            <>
+            <div className="flex flex-col md:flex-row md:gap-6">
+            <div className="space-y-4 md:flex-1">
               <div className="border border-green-200 rounded-xl p-3 space-y-2">
                 <div className="text-xs font-bold text-green-700 mb-1">파싱 결과 확인 · 수정</div>
                 <div className="flex gap-2">
@@ -538,6 +545,9 @@ export default function SalesTab({ userName, onCreated }: SalesTabProps) {
                 ))}
               </div>
 
+            </div>
+            {/* 오른쪽: 미리보기 (PC) */}
+            <div className="space-y-4 mt-4 md:mt-0 md:flex-1 md:sticky md:top-0 md:self-start">
               {/* 확정 메시지 미리보기 */}
               <div className="bg-green-50 border border-green-200 rounded-xl p-3">
                 <div className="flex items-center justify-between mb-2">
@@ -593,8 +603,10 @@ export default function SalesTab({ userName, onCreated }: SalesTabProps) {
                   )}
                 </div>
               )}
-            </>
+            </div>
+            </div>
           )}
+        </div>
         </div>
       )}
 
