@@ -234,7 +234,6 @@ export default function ScheduleDetail({
               onClick={() => {
                 if (tab !== activeTab) {
                   tabHistoryRef.current.push(activeTab);
-                  history.pushState({ detailTab: true }, "");
                 }
                 setActiveTab(tab);
               }}

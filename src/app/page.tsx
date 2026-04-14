@@ -178,43 +178,41 @@ export default function Home() {
     profileUser, activeTab,
   };
 
-  // 모달/탭 열 때 pushState (뒤로가기 대응용)
+  // 모달/탭 열 때 pushState 안 함 (깜빡임 방지, 히스토리는 버퍼로 관리)
   const openModal = useCallback((setter: (v: boolean) => void) => {
-    history.pushState({ modal: true }, "");
     setter(true);
   }, []);
 
   const openDetailSchedule = useCallback((s: Schedule | null) => {
-    if (s) history.pushState({ modal: true }, "");
     setDetailSchedule(s);
   }, []);
 
   const openProfileUser = useCallback((u: User | null) => {
-    if (u) history.pushState({ modal: true }, "");
     setProfileUser(u);
   }, []);
 
   const switchTab = useCallback((tab: TabMode) => {
     if (tab !== stateRef.current.activeTab) {
       prevTabRef.current = stateRef.current.activeTab;
-      history.pushState({ tab: true }, "");
       setActiveTab(tab);
       setShowMemberFilter(false);
     }
   }, []);
 
-  // popstate: 뒤로가기 시 모달 닫기 / 탭 복귀
+  // 뒤로가기: 버퍼 20개 + 매 popstate마다 1개 보충 = 절대 소진 안 됨
   useEffect(() => {
-    // 초기 guard entry (앱 탈출 방지)
-    history.pushState({ guard: true }, "");
+    // 히스토리 버퍼 20개 (빠른 연타 대응)
+    for (let i = 0; i < 20; i++) {
+      history.pushState({ g: i }, "");
+    }
 
     const handlePop = () => {
       const s = stateRef.current;
 
+      // 현재 상태에서 닫아야 할 것을 닫기
       if (s.detailSchedule) {
         if (detailBackRef.current && detailBackRef.current()) {
-          // detail 내부 탭 뒤로가기 처리됨 → 히스토리 보충
-          history.pushState({ guard: true }, "");
+          // detail 내부 탭 뒤로가기 (정산→검수→정보)
         } else {
           setDetailSchedule(null);
         }
@@ -229,10 +227,11 @@ export default function Home() {
       else if (s.profileUser) { setProfileUser(null); }
       else if (s.activeTab !== "calendar") {
         setActiveTab(prevTabRef.current || "calendar");
-      } else {
-        // 캘린더 + 아무것도 안 열림 → guard 재설정 (앱 탈출 방지)
-        history.pushState({ guard: true }, "");
       }
+      // else: 캘린더 + 아무것도 안 열림 → 아무 일도 안 함
+
+      // ★ 핵심: 매번 반드시 1개 보충 → 버퍼 절대 소진 안 됨
+      history.pushState({ g: Date.now() }, "");
     };
 
     window.addEventListener("popstate", handlePop);
