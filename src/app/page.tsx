@@ -199,29 +199,23 @@ export default function Home() {
     }
   }, []);
 
-  // ★ 안드로이드/iOS PWA 뒤로가기 완전 방어
-  // 원리: 히스토리 스택을 50개 쌓고, popstate마다 2개 보충
-  // 절대 스택이 바닥나지 않으므로 앱이 종료되지 않음
+  // ★ 안드로이드/iOS PWA 뒤로가기 방어
   useEffect(() => {
-    // 현재 엔트리를 앱 베이스로 마킹
+    // 1. history 버퍼
     history.replaceState({ _app: "base" }, "");
-
-    // 버퍼 50개 push (빠른 연타/스와이프 대응)
     for (let i = 0; i < 50; i++) {
       history.pushState({ _app: i }, "");
     }
 
+    // 2. popstate 핸들러
     const handlePop = (e: PopStateEvent) => {
-      // 베이스 엔트리까지 도달한 경우 → 즉시 복구
       if (e.state && e.state._app === "base") {
-        history.pushState({ _app: "recovered" }, "");
-        history.pushState({ _app: "recovered2" }, "");
+        history.pushState({ _app: "r1" }, "");
+        history.pushState({ _app: "r2" }, "");
         return;
       }
 
       const s = stateRef.current;
-
-      // 열려있는 것 닫기 (우선순위 순서)
       if (s.detailSchedule) {
         if (detailBackRef.current && detailBackRef.current()) {
           // 정보/검수/정산 탭 내부 이동
@@ -241,13 +235,32 @@ export default function Home() {
         setActiveTab(prevTabRef.current || "calendar");
       }
 
-      // ★ 매번 반드시 2개 보충 (소비 1개 < 보충 2개 = 스택이 점점 늘어남)
       history.pushState({ _app: Date.now() }, "");
       history.pushState({ _app: Date.now() + 1 }, "");
     };
-
     window.addEventListener("popstate", handlePop);
-    return () => window.removeEventListener("popstate", handlePop);
+
+    // 3. Navigation API (Chrome 102+, Android PWA에서 popstate보다 먼저 동작)
+    const nav = (window as unknown as { navigation?: { addEventListener: (type: string, fn: (e: { canIntercept?: boolean; intercept?: (opts: { handler: () => void }) => void; preventDefault?: () => void }) => void) => void } }).navigation;
+    if (nav) {
+      nav.addEventListener("navigate", (e) => {
+        if (e.canIntercept) {
+          e.intercept?.({ handler: () => {} }); // 네비게이션 가로채기
+        }
+      });
+    }
+
+    // 4. beforeunload (마지막 안전망)
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+
+    return () => {
+      window.removeEventListener("popstate", handlePop);
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+    };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // 스플래시: 로고만 크게, 1초 표시
