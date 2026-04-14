@@ -55,20 +55,25 @@ type TabMode = "calendar" | "manage" | "assign" | "members" | "sales";
 
 export default function Home() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [appReady, setAppReady] = useState(false);
   const [showSplash, setShowSplash] = useState(false);
 
-  // 클라이언트에서만 localStorage 복원 (hydration mismatch 방지)
+  // 클라이언트에서만 localStorage 복원
   useEffect(() => {
     try {
       const saved = localStorage.getItem("currentUser");
       if (saved) setCurrentUser(JSON.parse(saved));
     } catch {}
-    // 스플래시: 세션당 최초 1회만
+    // 스플래시: 세션당 최초 1회만, 1.2초 후 앱 표시
     if (!sessionStorage.getItem("splashShown")) {
       sessionStorage.setItem("splashShown", "1");
       setShowSplash(true);
-      const timer = setTimeout(() => setShowSplash(false), 1500);
-      return () => clearTimeout(timer);
+      setTimeout(() => {
+        setShowSplash(false);
+        setAppReady(true);
+      }, 1200);
+    } else {
+      setAppReady(true);
     }
   }, []);
   const [members, setMembers] = useState<Member[]>([]);
@@ -155,7 +160,7 @@ export default function Home() {
     return () => window.removeEventListener("beforeinstallprompt", handler);
   }, []);
 
-  // 뒤로가기 버튼 처리 - popstate + replaceState (hash/pushState 없이)
+  // 뒤로가기 처리 - 모달/탭 열 때 pushState, popstate에서 닫기
   const prevTabRef = useRef<TabMode>("calendar");
   const stateRef = useRef({
     detailSchedule: null as Schedule | null,
@@ -176,38 +181,39 @@ export default function Home() {
     profileUser, activeTab,
   };
 
-  // 모달/탭 열 때는 히스토리를 건드리지 않음 (깜빡임 방지)
+  // 모달/탭 열 때 pushState (뒤로가기 대응용)
   const openModal = useCallback((setter: (v: boolean) => void) => {
+    history.pushState({ modal: true }, "");
     setter(true);
   }, []);
 
   const openDetailSchedule = useCallback((s: Schedule | null) => {
+    if (s) history.pushState({ modal: true }, "");
     setDetailSchedule(s);
   }, []);
 
   const openProfileUser = useCallback((u: User | null) => {
+    if (u) history.pushState({ modal: true }, "");
     setProfileUser(u);
   }, []);
 
   const switchTab = useCallback((tab: TabMode) => {
     if (tab !== stateRef.current.activeTab) {
       prevTabRef.current = stateRef.current.activeTab;
+      history.pushState({ tab: true }, "");
       setActiveTab(tab);
       setShowMemberFilter(false);
     }
   }, []);
 
-  // 뒤로가기: 히스토리 버퍼를 깊게 쌓아서 앱 종료 방지
+  // popstate: 뒤로가기 시 모달 닫기 / 탭 복귀
   useEffect(() => {
-    // 히스토리 10개 쌓기 (뒤로가기 여유분)
-    for (let i = 0; i < 10; i++) {
-      history.pushState({ appDepth: i }, "");
-    }
+    // 초기 guard entry (앱 탈출 방지)
+    history.pushState({ guard: true }, "");
 
     const handlePop = () => {
       const s = stateRef.current;
 
-      // 열려있는 모달을 순서대로 닫기
       if (s.detailSchedule) { setDetailSchedule(null); }
       else if (s.showDayPopup) { setShowDayPopup(false); }
       else if (s.showNotifications) { setShowNotifications(false); }
@@ -219,24 +225,26 @@ export default function Home() {
       else if (s.profileUser) { setProfileUser(null); }
       else if (s.activeTab !== "calendar") {
         setActiveTab(prevTabRef.current || "calendar");
+      } else {
+        // 캘린더 + 아무것도 안 열림 → guard 재설정 (앱 탈출 방지)
+        history.pushState({ guard: true }, "");
       }
-      // 아무것도 안 열려있으면 아무 일도 안 함 (히스토리 버퍼가 소진될 뿐)
-
-      // 히스토리 1개 다시 보충 (버퍼 유지)
-      history.pushState({ appDepth: Date.now() }, "");
     };
 
     window.addEventListener("popstate", handlePop);
     return () => window.removeEventListener("popstate", handlePop);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Splash overlay (조건부 return 대신 오버레이로 처리 → 깜빡임 방지)
-  if (showSplash) {
-    return (
-      <div className="fixed inset-0 bg-[#3a9ad9] flex items-center justify-center z-[200]">
-        <img src="/logo.png" alt="새집느낌" className="w-40 h-40 rounded-3xl" />
-      </div>
-    );
+  // 앱 준비 전: 스플래시 또는 빈 화면
+  if (!appReady) {
+    if (showSplash) {
+      return (
+        <div className="fixed inset-0 bg-[#3a9ad9] flex items-center justify-center">
+          <img src="/logo.png" alt="새집느낌" className="w-40 h-40 rounded-3xl" />
+        </div>
+      );
+    }
+    return null;
   }
 
   // Login gate - must be AFTER all hooks
