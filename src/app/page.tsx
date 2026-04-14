@@ -204,6 +204,7 @@ export default function Home() {
       prevTabRef.current = stateRef.current.activeTab;
       pushHistory();
       setActiveTab(tab);
+      setShowMemberFilter(false); // 탭 변경 시 필터 닫기
     }
   }, [pushHistory]);
 
@@ -533,8 +534,8 @@ export default function Home() {
         </div>
       </header>
 
-      {/* 팀원 필터 패널 */}
-      {showMemberFilter && canManageAdvanced && (
+      {/* 팀원 필터 패널 - 달력에서만 */}
+      {showMemberFilter && canManageAdvanced && activeTab === "calendar" && (
         <div className="bg-white border-b border-gray-200 px-4 py-3 z-30 max-h-[50vh] overflow-y-auto">
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs font-bold text-gray-700">팀원 필터</span>
@@ -554,9 +555,18 @@ export default function Home() {
             </div>
           </div>
           <div className="space-y-1">
-            {/* 전체 버튼 */}
+            {/* 전체 토글 버튼 */}
             <button
-              onClick={() => setSelectedMemberIds(new Set())}
+              onClick={() => {
+                if (selectedMemberIds.size === 0) {
+                  // 전체 해제 → 전체 개별 선택
+                  const allFieldIds = allUsers.filter(u => u.role === "field").map(u => u.id);
+                  setSelectedMemberIds(new Set(allFieldIds));
+                } else {
+                  // 일부/전체 선택 → 전체 보기(필터 해제)
+                  setSelectedMemberIds(new Set());
+                }
+              }}
               className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg active:bg-gray-50 ${selectedMemberIds.size === 0 ? "bg-blue-50" : ""}`}
             >
               <div
@@ -677,9 +687,9 @@ export default function Home() {
           <div className="p-3 space-y-3 pb-20">
             {/* 전체 팀원 */}
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
-              <h3 className="text-sm font-bold text-gray-800 mb-3">팀원 ({allUsers.length}{canManageAdvanced && pendingUsers.length > 0 ? ` + 대기 ${pendingUsers.length}` : ""})</h3>
+              <h3 className="text-sm font-bold text-gray-800 mb-3">팀원 ({allUsers.filter(u => u.username !== "admin").length}{canManageAdvanced && pendingUsers.length > 0 ? ` + 대기 ${pendingUsers.length}` : ""})</h3>
               <div className="space-y-2.5">
-                {[...allUsers, ...(canManageAdvanced ? pendingUsers : [])].sort((a, b) => {
+                {[...allUsers, ...(canManageAdvanced ? pendingUsers : [])].filter(u => u.username !== "admin").sort((a, b) => {
                   if (a.username === currentUser.username) return -1;
                   if (b.username === currentUser.username) return 1;
                   return 0;
