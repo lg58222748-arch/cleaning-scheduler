@@ -205,10 +205,20 @@ export default function Home() {
     setProfileUser(u);
   }, [pushHash]);
 
+  const tabHashPushed = useRef(false);
   const switchTab = useCallback((tab: TabMode) => {
     if (tab !== stateRef.current.activeTab) {
       prevTabRef.current = stateRef.current.activeTab;
-      pushHash("t");
+      if (!tabHashPushed.current) {
+        // 첫 탭 이동만 해시 push (뒤로가기 1번으로 달력 복귀)
+        pushHash("t");
+        tabHashPushed.current = true;
+      } else {
+        // 이후 탭 이동은 replace (해시 스택 안 쌓임)
+        const id = `t-${Date.now()}`;
+        hashStackRef.current[hashStackRef.current.length - 1] = id;
+        history.replaceState(null, "", `#${id}`);
+      }
       setActiveTab(tab);
       setShowMemberFilter(false);
     }
@@ -238,7 +248,7 @@ export default function Home() {
       else if (s.showSearch) { setShowSearch(false); }
       else if (s.showMemberFilter) { setShowMemberFilter(false); }
       else if (s.profileUser) { setProfileUser(null); }
-      else if (s.activeTab !== "calendar") { setActiveTab(prevTabRef.current || "calendar"); }
+      else if (s.activeTab !== "calendar") { setActiveTab(prevTabRef.current || "calendar"); tabHashPushed.current = false; }
     };
 
     const onHashChange = () => {
