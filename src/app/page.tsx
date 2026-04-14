@@ -152,10 +152,17 @@ export default function Home() {
     setUnassignedSchedules((prev) => prev.filter((s) => s.id !== id));
     await softDeleteSchedule(id);
   }
+  const [returnAlert, setReturnAlert] = useState<{ title: string; date: string } | null>(null);
+
   async function handleUnassignSchedule(id: string) {
     const target = schedules.find((s) => s.id === id);
     setSchedules((prev) => prev.filter((s) => s.id !== id));
-    if (target) setUnassignedSchedules((prev) => [...prev, { ...target, memberId: "", memberName: "미배정", status: "unassigned" as const }]);
+    if (target) {
+      setUnassignedSchedules((prev) => [...prev, { ...target, memberId: "", memberName: "미배정", status: "unassigned" as const }]);
+      // 반환 알림 표시
+      setReturnAlert({ title: target.title.replace(/^\[.+?\]\s*/, ""), date: target.date });
+      setTimeout(() => setReturnAlert(null), 4000);
+    }
     await unassignScheduleApi(id);
   }
   function handleEditSchedule(schedule: Schedule) {
@@ -272,6 +279,21 @@ export default function Home() {
               닫기
             </button>
           </div>
+        </div>
+      )}
+      {/* 반환 알림 배너 */}
+      {returnAlert && (
+        <div className="bg-orange-500 text-white px-4 py-2.5 flex items-center justify-between z-50 animate-[slideDown_0.3s_ease-out]">
+          <div className="flex items-center gap-2 flex-1 min-w-0">
+            <span className="text-sm">↩</span>
+            <div className="min-w-0">
+              <span className="text-xs font-medium truncate block">{returnAlert.title}</span>
+              <span className="text-[10px] opacity-80">배정탭으로 반환됨 · {returnAlert.date}</span>
+            </div>
+          </div>
+          <button onClick={() => { setReturnAlert(null); setActiveTab("assign"); }} className="text-xs bg-white/20 px-2.5 py-1 rounded-lg font-medium shrink-0 ml-2">
+            배정탭 보기
+          </button>
         </div>
       )}
       {/* Compact mobile header */}
