@@ -153,7 +153,7 @@ export default function AssignTab({ members, schedules, onAssigned, onDeleted, o
           </button>
           <div className="text-center">
             <h2 className="text-base font-bold text-gray-800">{format(currentMonth, "yyyy년 M월", { locale: ko })}</h2>
-            <p className="text-[10px] text-orange-500 font-medium">미배정 {unassigned.length}건</p>
+            <p className="text-xs text-orange-500 font-medium">미배정 {unassigned.length}건</p>
           </div>
           <div className="flex items-center gap-1">
             <button onClick={() => { setShowTrash(true); loadTrash(); }} className="p-2 active:bg-gray-100 rounded-lg">
@@ -195,7 +195,7 @@ export default function AssignTab({ members, schedules, onAssigned, onDeleted, o
                       isSelected ? "bg-orange-50 ring-2 ring-orange-400 ring-inset" : "active:bg-gray-50"
                     } ${!isCurrentMonth ? "opacity-40" : ""}`}
                   >
-                    <span className={`inline-flex items-center justify-center w-5 h-5 text-[11px] rounded-full ${
+                    <span className={`inline-flex items-center justify-center w-5 h-5 text-xs rounded-full ${
                       isToday(d) ? "bg-orange-500 text-white font-bold"
                         : dayOfWeek === 0 ? "text-red-500"
                         : dayOfWeek === 6 ? "text-blue-500"
@@ -209,15 +209,15 @@ export default function AssignTab({ members, schedules, onAssigned, onDeleted, o
                         return (
                           <div
                             key={s.id}
-                            className="text-[8px] leading-[1.2] py-0.5 rounded font-medium bg-orange-100 text-orange-700 overflow-hidden break-all mb-0.5"
-                            style={{ maxHeight: "1.5em" }}
+                            className="text-[8px] leading-[1.2] px-0.5 py-0.5 rounded font-medium bg-orange-100 text-orange-700 overflow-hidden mb-0.5"
+                            style={{ maxHeight: "2.6em", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const }}
                           >
                             {fullName}
                           </div>
                         );
                       })}
                       {dayScheds.length > 2 && (
-                        <div className="absolute bottom-0 right-0 text-[7px] text-gray-400 font-medium">+{dayScheds.length - 2}</div>
+                        <div className="absolute bottom-0 right-0 text-[8px] text-gray-400 font-medium">+{dayScheds.length - 2}</div>
                       )}
                     </div>
                   </button>

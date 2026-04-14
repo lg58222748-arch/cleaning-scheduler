@@ -67,13 +67,9 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl shadow-lg w-full max-w-sm overflow-hidden">
         {/* Header */}
-        <div className="bg-blue-500 px-6 py-8 text-center">
-          <div className="w-16 h-16 bg-white/20 rounded-2xl mx-auto mb-3 flex items-center justify-center">
-            <svg className="w-9 h-9 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-            </svg>
-          </div>
-          <h1 className="text-xl font-bold text-white">새집느낌 통합 관리앱</h1>
+        <div className="bg-[#3a9ad9] px-6 py-8 text-center">
+          <img src="/logo.png" alt="새집느낌" className="w-24 h-24 mx-auto mb-2 rounded-2xl" />
+          <h1 className="text-xl font-bold text-white">새집느낌 파트너</h1>
           <p className="text-blue-100 text-sm mt-1">일정 · 검수 · 정산 · 영업</p>
         </div>
 

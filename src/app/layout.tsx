@@ -8,13 +8,20 @@ const geistSans = Geist({
 });
 
 export const metadata: Metadata = {
-  title: "새집느낌 통합 관리앱",
-  description: "새집느낌 일정·검수·정산·영업 통합 관리",
+  title: "새집느낌 파트너",
+  description: "새집느낌 파트너 - 일정·검수·정산·영업 관리",
   manifest: "/manifest.json",
+  icons: {
+    icon: [
+      { url: "/favicon-32.png", sizes: "32x32", type: "image/png" },
+      { url: "/favicon-16.png", sizes: "16x16", type: "image/png" },
+    ],
+    apple: "/icons/apple-touch-icon.png",
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "새집느낌",
+    title: "새집느낌 파트너",
   },
 };
 

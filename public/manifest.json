@@ -1,11 +1,11 @@
 {
-  "name": "새집느낌 청소팀 일정관리",
-  "short_name": "청소팀일정",
-  "description": "청소 팀장 일정 배정 및 변경 관리 시스템",
+  "name": "새집느낌 파트너",
+  "short_name": "새집느낌 파트너",
+  "description": "새집느낌 파트너 - 일정 · 검수 · 정산 · 영업 관리",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#ffffff",
-  "theme_color": "#2563EB",
+  "background_color": "#3a9ad9",
+  "theme_color": "#3a9ad9",
   "orientation": "portrait",
   "icons": [
     {
@@ -19,6 +19,12 @@
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png",
+      "purpose": "any"
     }
   ]
 }

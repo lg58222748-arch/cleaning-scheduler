@@ -261,7 +261,7 @@ export default function ScheduleDetail({
             {schedule.memberName && schedule.memberName !== "미배정" && (
               <div className="bg-gray-50 border border-gray-200 rounded-xl p-3 space-y-1">
                 <div className="flex items-center gap-2 text-sm">
-                  <div className="w-6 h-6 rounded-full flex items-center justify-center text-white text-[10px] font-bold shrink-0" style={{ backgroundColor: memberColor }}>
+                  <div className="w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0" style={{ backgroundColor: memberColor }}>
                     {schedule.memberName[0]}
                   </div>
                   <span className="font-medium text-gray-800">관리사: {schedule.memberName}</span>
@@ -302,7 +302,7 @@ export default function ScheduleDetail({
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                   </svg>
                   <span className="font-medium">{dateDisplay}</span>
-                  <span className={`text-[10px] px-2 py-0.5 rounded-full ml-auto ${statusClass}`}>{statusLabel}</span>
+                  <span className={`text-xs px-2 py-0.5 rounded-full ml-auto ${statusClass}`}>{statusLabel}</span>
                 </div>
 
                 {/* 담당자 */}
@@ -378,18 +378,18 @@ export default function ScheduleDetail({
         {comments.length > 0 && (
           <div className="px-4 pt-2 max-h-[80px] overflow-y-auto border-b border-gray-100">
             {comments.length > 2 && !showAllComments && (
-              <button onClick={() => setShowAllComments(true)} className="text-[11px] text-blue-500 font-medium mb-1 active:text-blue-700">
+              <button onClick={() => setShowAllComments(true)} className="text-xs text-blue-500 font-medium mb-1 active:text-blue-700">
                 +{comments.length - 2}개 이전 댓글
               </button>
             )}
             <div className="space-y-1.5 pb-1.5">
               {(showAllComments ? comments : comments.slice(-2)).map((c) => (
                 <div key={c.id} className="flex items-start gap-1.5">
-                  <div className="w-5 h-5 bg-gray-200 rounded-full flex items-center justify-center text-[8px] font-bold text-gray-600 shrink-0 mt-0.5">{c.authorName[0]}</div>
+                  <div className="w-5 h-5 bg-gray-200 rounded-full flex items-center justify-center text-xs font-bold text-gray-600 shrink-0 mt-0.5">{c.authorName[0]}</div>
                   <div className="flex-1 min-w-0">
-                    <span className="text-[10px] font-medium text-gray-700">{c.authorName}</span>
-                    <span className="text-[9px] text-gray-400 ml-1">{formatTime(c.createdAt)}</span>
-                    <p className="text-[11px] text-gray-600 leading-tight">{c.content}</p>
+                    <span className="text-xs font-medium text-gray-700">{c.authorName}</span>
+                    <span className="text-xs text-gray-400 ml-1">{formatTime(c.createdAt)}</span>
+                    <p className="text-xs text-gray-600 leading-tight">{c.content}</p>
                   </div>
                   <button onClick={() => handleDeleteComment(c.id)} className="p-0.5 text-gray-300 active:text-red-500 shrink-0">
                     <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>

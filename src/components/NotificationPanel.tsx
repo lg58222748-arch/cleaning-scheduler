@@ -101,7 +101,7 @@ export default function NotificationPanel({
                           {!n.read && <div className="w-2 h-2 bg-blue-500 rounded-full shrink-0" />}
                         </div>
                         <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">{n.message}</p>
-                        <span className="text-[10px] text-gray-400 mt-1 block">{timeAgo(n.createdAt)}</span>
+                        <span className="text-xs text-gray-400 mt-1 block">{timeAgo(n.createdAt)}</span>
                       </div>
                     </div>
                   </div>

@@ -98,8 +98,8 @@ export default function AdminPanel({ onClose }: AdminPanelProps) {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-1.5">
                       <span className="text-sm font-medium">{u.name}</span>
-                      <span className="text-[10px] px-1.5 py-0.5 bg-blue-100 text-blue-600 rounded-full">{roleLabels[u.role]}</span>
-                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${statusColors[u.status]}`}>{u.status === "approved" ? "승인" : u.status === "pending" ? "대기" : "거절"}</span>
+                      <span className="text-xs px-1.5 py-0.5 bg-blue-100 text-blue-600 rounded-full">{roleLabels[u.role]}</span>
+                      <span className={`text-xs px-1.5 py-0.5 rounded-full ${statusColors[u.status]}`}>{u.status === "approved" ? "승인" : u.status === "pending" ? "대기" : "거절"}</span>
                     </div>
                     <div className="text-xs text-gray-400">{u.phone}</div>
                   </div>

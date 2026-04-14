@@ -141,7 +141,7 @@ export default function ScheduleForm({
                 </button>
               ))}
             </div>
-            <p className="text-[11px] text-gray-400 mt-1">
+            <p className="text-xs text-gray-400 mt-1">
               {timeSlot === "오전" && "7시~9시 사이 방문"}
               {timeSlot === "오후" && "13시~15시 사이 방문"}
               {timeSlot === "시무" && "오전 오후 상관없음"}

@@ -162,7 +162,7 @@ export default function MemberManager({
                       {DAY_NAMES.map((name, i) => (
                         <span
                           key={i}
-                          className={`text-[10px] w-5 h-5 flex items-center justify-center rounded-full ${
+                          className={`text-xs w-5 h-5 flex items-center justify-center rounded-full ${
                             m.availableDays.includes(i)
                               ? "bg-blue-100 text-blue-600"
                               : "text-gray-300"

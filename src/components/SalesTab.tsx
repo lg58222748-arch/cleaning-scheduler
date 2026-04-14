@@ -351,8 +351,8 @@ export default function SalesTab({ userName, onCreated }: SalesTabProps) {
               <div className="space-y-1.5">
                 {services.map((s, i) => (
                   <div key={s.name} className="flex items-center gap-2 bg-gray-50 rounded-lg px-3 py-2">
-                    <span className="w-5 h-5 bg-green-700 text-white rounded-full text-[10px] font-bold flex items-center justify-center shrink-0">{i + 1}</span>
-                    <span className="text-sm font-medium flex-1">{s.name}</span>
+                    <span className="w-5 h-5 bg-green-700 text-white rounded-full text-xs font-bold flex items-center justify-center shrink-0">{i + 1}</span>
+                    <span className="text-xs font-medium flex-1">{s.name}</span>
                     <button onClick={() => removeService(s.name)} className="text-red-400 text-sm font-bold">✕</button>
                   </div>
                 ))}
@@ -365,14 +365,14 @@ export default function SalesTab({ userName, onCreated }: SalesTabProps) {
             <label className="text-xs font-bold text-green-700 mb-2 block">견적 정보</label>
             <div className="flex gap-2 mb-3">
               <div className="flex-1">
-                <label className="text-[11px] text-gray-400 mb-0.5 block">평수</label>
+                <label className="text-xs text-gray-400 mb-0.5 block">평수</label>
                 <input value={pyeong} onChange={(e) => setPyeong(e.target.value)} placeholder="예) 34평" type="tel"
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:border-green-500" />
+                  style={{ fontSize: "12px" }} className="w-full px-3 py-2 border border-gray-200 rounded-lg outline-none focus:border-green-500" />
               </div>
               <div className="flex-1">
-                <label className="text-[11px] text-gray-400 mb-0.5 block">타입</label>
+                <label className="text-xs text-gray-400 mb-0.5 block">타입</label>
                 <select value={buildType} onChange={(e) => setBuildType(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none bg-white focus:border-green-500">
+                  style={{ fontSize: "12px" }} className="w-full px-3 py-2 border border-gray-200 rounded-lg outline-none bg-white focus:border-green-500">
                   <option value="선택">선택</option>
                   {TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
                 </select>
@@ -383,23 +383,23 @@ export default function SalesTab({ userName, onCreated }: SalesTabProps) {
             {services.map((s, i) => (
               <div key={s.name} className="border border-gray-200 rounded-xl p-3 mb-2">
                 <div className="flex items-center gap-2 mb-2">
-                  <span className="w-5 h-5 bg-green-700 text-white rounded-full text-[10px] font-bold flex items-center justify-center">{i + 1}</span>
+                  <span className="w-5 h-5 bg-green-700 text-white rounded-full text-xs font-bold flex items-center justify-center">{i + 1}</span>
                   <span className="text-sm font-bold text-green-800">{s.name}</span>
                 </div>
                 <div className="flex gap-2">
                   <div className="flex-1">
-                    <label className="text-[11px] text-gray-400 block">견적금액</label>
+                    <label className="text-xs text-gray-400 block">견적금액</label>
                     <input value={s.quote} onChange={(e) => updateService(s.name, "quote", e.target.value)} placeholder="예) 418000원" type="tel"
-                      className="w-full px-2 py-1.5 border border-gray-200 rounded text-sm outline-none focus:border-green-500" />
+                      style={{ fontSize: "12px" }} className="w-full px-2 py-1.5 border border-gray-200 rounded outline-none focus:border-green-500" />
                   </div>
                   <div className="flex-1">
-                    <label className="text-[11px] text-gray-400 block">예약금</label>
+                    <label className="text-xs text-gray-400 block">예약금</label>
                     <input value={s.deposit} onChange={(e) => updateService(s.name, "deposit", e.target.value)} placeholder="예) 108000원" type="tel"
-                      className="w-full px-2 py-1.5 border border-gray-200 rounded text-sm outline-none focus:border-green-500" />
+                      style={{ fontSize: "12px" }} className="w-full px-2 py-1.5 border border-gray-200 rounded outline-none focus:border-green-500" />
                   </div>
                   <div className="flex-1">
-                    <label className="text-[11px] text-gray-400 block">잔금 (자동)</label>
-                    <div className="px-2 py-1.5 bg-gray-50 rounded text-sm text-blue-700 font-bold">
+                    <label className="text-xs text-gray-400 block">잔금 (자동)</label>
+                    <div className="px-2 py-1.5 bg-gray-50 rounded text-xs text-blue-700 font-bold">
                       {getBalance(s) > 0 ? getBalance(s).toLocaleString() : "0"}
                     </div>
                   </div>
@@ -413,7 +413,7 @@ export default function SalesTab({ userName, onCreated }: SalesTabProps) {
             <label className="text-xs font-bold text-gray-500 mb-1 block">상담사 특이사항</label>
             <textarea value={salesNote} onChange={(e) => setSalesNote(e.target.value)} rows={2}
               placeholder="예) 외부유리창, 반분해에어컨청소, 세탁기청소, 곰팡이, 니코틴, 스티커, 걸비시공, 에어컨통, 테라스 특이사항을 기재해주세요"
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:border-green-500 resize-none" />
+              style={{ fontSize: "12px" }} className="w-full px-3 py-2 border border-gray-200 rounded-lg outline-none focus:border-green-500 resize-none" />
           </div>
 
         </div>
@@ -426,7 +426,7 @@ export default function SalesTab({ userName, onCreated }: SalesTabProps) {
               <label className="text-xs font-bold text-gray-500 mb-1 block">캘린더 저장 제목 미리보기</label>
               <div className="flex flex-wrap gap-1.5">
                 {services.map((s, i) => (
-                  <span key={s.name} className="text-[10px] px-2 py-1 bg-green-100 text-green-800 rounded-lg font-medium">
+                  <span key={s.name} className="text-xs px-2 py-1 bg-green-100 text-green-800 rounded-lg font-medium">
                     {getCalTitle(s.name, i)}
                   </span>
                 ))}
@@ -436,7 +436,7 @@ export default function SalesTab({ userName, onCreated }: SalesTabProps) {
           {/* 미리보기 */}
           <div className="bg-green-50 border border-green-200 rounded-xl p-3">
             <div className="text-xs font-bold text-green-700 mb-2">고객에게 보낼 양식 미리보기</div>
-            <pre className="text-[15px] text-gray-700 whitespace-pre-wrap font-sans leading-relaxed max-h-[250px] md:max-h-none overflow-y-auto">{getFormText()}</pre>
+            <pre className="text-xs text-gray-700 whitespace-pre-wrap font-sans leading-relaxed max-h-[250px] md:max-h-none overflow-y-auto">{getFormText()}</pre>
           </div>
 
           {/* 버튼 */}
@@ -482,7 +482,7 @@ export default function SalesTab({ userName, onCreated }: SalesTabProps) {
             <label className="text-xs font-bold text-green-700 mb-1 block">고객 답장 붙여넣기</label>
             <textarea value={customerText} onChange={(e) => setCustomerText(e.target.value)} rows={20}
               placeholder="고객이 보낸 1~5번 내용을 그대로 복사해서 붙여넣기&#10;&#10;양식 전체 + 고객 답변을 함께 붙여넣으세요"
-              className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm outline-none focus:border-green-500 resize-y min-h-[300px]" />
+              style={{ fontSize: "12px" }} className="w-full px-3 py-2.5 border border-gray-200 rounded-lg outline-none focus:border-green-500 resize-y min-h-[300px]" />
             <button onClick={parseCustomer} disabled={parsing}
               className="mt-2 w-full py-3.5 rounded-xl text-sm font-bold text-white disabled:opacity-70" style={{ background: "#1c1c1e" }}>
               {parsing ? "🔄 AI 파싱 처리중..." : "🤖 AI 자동 파싱"}
@@ -496,29 +496,18 @@ export default function SalesTab({ userName, onCreated }: SalesTabProps) {
               <div className="border border-green-200 rounded-xl p-3 space-y-2">
                 <div className="text-xs font-bold text-green-700 mb-1">파싱 결과 확인 · 수정</div>
                 <div className="flex gap-2">
-                  <div className="flex-1"><label className="text-[11px] text-gray-400">1) 성함</label><input value={parsedName} onChange={(e) => setParsedName(e.target.value)} className="w-full px-2 py-1.5 border border-gray-200 rounded text-sm outline-none" /></div>
-                  <div className="flex-1"><label className="text-[11px] text-gray-400">3) 연락처</label><input value={parsedPhone} onChange={(e) => setParsedPhone(e.target.value)} className="w-full px-2 py-1.5 border border-gray-200 rounded text-sm outline-none" /></div>
+                  <div className="flex-1"><label className="text-xs text-gray-400">1) 성함</label><input value={parsedName} onChange={(e) => setParsedName(e.target.value)} className="w-full px-2 py-1.5 border border-gray-200 rounded outline-none" style={{ fontSize: "12px" }} /></div>
+                  <div className="flex-1"><label className="text-xs text-gray-400">3) 연락처</label><input value={parsedPhone} onChange={(e) => setParsedPhone(e.target.value)} className="w-full px-2 py-1.5 border border-gray-200 rounded outline-none" style={{ fontSize: "12px" }} /></div>
                 </div>
-                <div><label className="text-[11px] text-gray-400">2) 주소</label><input value={parsedAddr} onChange={(e) => setParsedAddr(e.target.value)} className="w-full px-2 py-1.5 border border-gray-200 rounded text-sm outline-none" /></div>
+                <div><label className="text-xs text-gray-400">2) 주소</label><input value={parsedAddr} onChange={(e) => setParsedAddr(e.target.value)} className="w-full px-2 py-1.5 border border-gray-200 rounded outline-none" style={{ fontSize: "12px" }} /></div>
                 <div className="flex gap-2">
-                  <div className="flex-1"><label className="text-[11px] text-gray-400">4) 청소희망날짜</label><input value={parsedWishDate} onChange={(e) => setParsedWishDate(e.target.value)} className="w-full px-2 py-1.5 border border-gray-200 rounded text-sm outline-none" /></div>
-                  <div className="flex-1"><label className="text-[11px] text-gray-400">7) 평수</label><input value={parsedPyeong} onChange={(e) => setParsedPyeong(e.target.value)} className="w-full px-2 py-1.5 border border-gray-200 rounded text-sm outline-none" /></div>
+                  <div className="flex-1"><label className="text-xs text-gray-400">4) 청소희망날짜</label><input value={parsedWishDate} onChange={(e) => setParsedWishDate(e.target.value)} className="w-full px-2 py-1.5 border border-gray-200 rounded outline-none" style={{ fontSize: "12px" }} /></div>
+                  <div className="flex-1"><label className="text-xs text-gray-400">7) 평수</label><input value={parsedPyeong} onChange={(e) => setParsedPyeong(e.target.value)} className="w-full px-2 py-1.5 border border-gray-200 rounded outline-none" style={{ fontSize: "12px" }} /></div>
                 </div>
-                <div><label className="text-[11px] text-gray-400">5) 특이사항</label><textarea value={parsedNote} onChange={(e) => setParsedNote(e.target.value)} rows={2} className="w-full px-2 py-1.5 border border-gray-200 rounded text-sm outline-none resize-none" /></div>
-              </div>
-
-              {/* 캘린더 제목 */}
-              <div>
-                <label className="text-xs font-bold text-green-700 mb-1 block">캘린더 저장 제목</label>
-                <div className="flex flex-wrap gap-1.5 mb-2">
-                  {services.map((s, i) => (
-                    <span key={s.name} className="text-[10px] px-2 py-1 bg-green-700 text-white rounded-lg font-medium">
-                      U{parsedName}/{parsedAddr?.split(" ")[0]}/{userName} [{i + 1}/{services.length}]/{s.name}
-                    </span>
-                  ))}
+                <div>
+                  <label className="text-xs text-gray-400">5) 특이사항</label>
+                  <textarea value={parsedNote} onChange={(e) => setParsedNote(e.target.value)} rows={2} style={{ fontSize: "12px" }} className="w-full px-2 py-1.5 border border-gray-200 rounded outline-none resize-none" />
                 </div>
-                <input value={calendarNote} onChange={(e) => setCalendarNote(e.target.value)} placeholder="캘린더 제목 특이사항 (선택) 예) 카톡(아이디),영업폰"
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:border-green-500" />
               </div>
 
               {/* 서비스별 날짜+시간대 */}
@@ -527,16 +516,16 @@ export default function SalesTab({ userName, onCreated }: SalesTabProps) {
                 {schedules.map((sched, i) => (
                   <div key={i} className="border border-gray-200 rounded-xl p-3 mb-2">
                     <div className="flex items-center gap-2 mb-2">
-                      <span className="w-5 h-5 bg-green-700 text-white rounded-full text-[10px] font-bold flex items-center justify-center">{i + 1}</span>
+                      <span className="w-5 h-5 bg-green-700 text-white rounded-full text-xs font-bold flex items-center justify-center">{i + 1}</span>
                       <span className="text-sm font-bold text-green-800">{sched.service}</span>
                     </div>
                     <div className="flex gap-2">
                       <input type="date" value={sched.date} onChange={(e) => {
                         const updated = [...schedules]; updated[i] = { ...sched, date: e.target.value }; setSchedules(updated);
-                      }} className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:border-green-500" />
+                      }} style={{ fontSize: "12px" }} className="flex-1 px-3 py-2 border border-gray-200 rounded-lg outline-none focus:border-green-500" />
                       <select value={sched.time} onChange={(e) => {
                         const updated = [...schedules]; updated[i] = { ...sched, time: e.target.value }; setSchedules(updated);
-                      }} className="px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none bg-white focus:border-green-500">
+                      }} style={{ fontSize: "12px" }} className="px-3 py-2 border border-gray-200 rounded-lg outline-none bg-white focus:border-green-500">
                         <option value="선택">시간대</option>
                         {TIME_SLOTS.map((t) => <option key={t} value={t}>{t}</option>)}
                       </select>
@@ -548,14 +537,28 @@ export default function SalesTab({ userName, onCreated }: SalesTabProps) {
             </div>
             {/* 오른쪽: 미리보기 (PC) */}
             <div className="space-y-4 mt-4 md:mt-0 md:flex-1 md:sticky md:top-0 md:self-start">
+              {/* 캘린더 제목 */}
+              <div>
+                <label className="text-xs font-bold text-green-700 mb-1 block">캘린더 저장 제목</label>
+                <div className="flex flex-wrap gap-1.5 mb-2">
+                  {services.map((s, i) => (
+                    <span key={s.name} className="text-xs px-2 py-1 bg-green-700 text-white rounded-lg font-medium">
+                      U{parsedName}/{parsedAddr?.split(" ")[0]}/{userName} [{i + 1}/{services.length}]/{s.name}
+                    </span>
+                  ))}
+                </div>
+                <input value={calendarNote} onChange={(e) => setCalendarNote(e.target.value)} placeholder="캘린더 제목 특이사항 (선택) 예) 카톡(아이디),영업폰"
+                  style={{ fontSize: "12px" }} className="w-full px-3 py-2 border border-gray-200 rounded-lg outline-none focus:border-green-500" />
+              </div>
+
               {/* 확정 메시지 미리보기 */}
               <div className="bg-green-50 border border-green-200 rounded-xl p-3">
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-xs font-bold text-green-700">최종 확정 메시지 미리보기</span>
-                  <button onClick={() => generateConfirmMsg()} className="text-[10px] text-green-600 font-bold">↻ 갱신</button>
+                  <button onClick={() => generateConfirmMsg()} className="text-xs text-green-600 font-bold">↻ 갱신</button>
                 </div>
                 <textarea value={confirmMsg} onChange={(e) => setConfirmMsg(e.target.value)} rows={10}
-                  className="w-full text-[11px] text-gray-700 font-sans leading-relaxed bg-transparent outline-none resize-y" />
+                  className="w-full text-xs text-gray-700 font-sans leading-relaxed bg-transparent outline-none resize-y" />
               </div>
 
               {/* 버튼: 예약 확정 → 5개 복사 → 캘린더 저장 */}
@@ -580,7 +583,7 @@ export default function SalesTab({ userName, onCreated }: SalesTabProps) {
                         <button onClick={() => {
                           handleCopy(msg.getText(), `post${i}`);
                           if (!postDone.includes(i)) setPostDone((p) => [...p, i]);
-                        }} className="px-3 py-1 bg-green-700 text-white rounded-lg text-[11px] font-bold active:bg-green-800">
+                        }} className="px-3 py-1 bg-green-700 text-white rounded-lg text-xs font-bold active:bg-green-800">
                           {copied === `post${i}` ? "✅" : "📋 복사"}
                         </button>
                       </div>
@@ -593,7 +596,7 @@ export default function SalesTab({ userName, onCreated }: SalesTabProps) {
                       className="w-full py-2.5 rounded-lg text-sm font-bold text-white disabled:opacity-50" style={{ background: "linear-gradient(135deg, #0f4c81, #1a6bb5)" }}>
                       {saving ? "저장 중..." : `6. 📅 캘린더 저장 (${schedules.length}건)`}
                     </button>
-                    {postDone.length < 5 && <p className="text-[11px] text-gray-400 text-center mt-1">위 5개 항목을 모두 복사해야 저장이 활성화됩니다</p>}
+                    {postDone.length < 5 && <p className="text-xs text-gray-400 text-center mt-1">위 5개 항목을 모두 복사해야 저장이 활성화됩니다</p>}
                   </div>
 
                   {postDone.length >= 5 && saving === false && (
@@ -729,7 +732,7 @@ function SavedBookings({ onLoad, onSave }: {
             <div key={i} className="flex items-center gap-2 bg-gray-50 rounded-lg px-3 py-2">
               <div className="flex-1 min-w-0 cursor-pointer" onClick={() => onLoad(item)}>
                 <div className="text-sm font-medium text-gray-800 truncate">{item.parsedName || "이름없음"} · {item.parsedAddr || "주소없음"}</div>
-                <div className="text-[11px] text-gray-400">{item.services?.map((s) => s.name).join(", ")} · {new Date(item.savedAt).toLocaleDateString("ko")}</div>
+                <div className="text-xs text-gray-400">{item.services?.map((s) => s.name).join(", ")} · {new Date(item.savedAt).toLocaleDateString("ko")}</div>
               </div>
               <button onClick={() => deleteItem(i)} className="text-red-400 text-xs shrink-0">✕</button>
             </div>

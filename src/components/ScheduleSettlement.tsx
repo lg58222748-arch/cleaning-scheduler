@@ -194,18 +194,18 @@ export default function ScheduleSettlement({ scheduleId }: ScheduleSettlementPro
       <div className="border border-gray-200 rounded-xl overflow-hidden">
         <div className="px-3 py-2 bg-blue-50">
           <h4 className="text-xs font-bold text-blue-700 flex items-center gap-1.5">
-            <span className="bg-blue-700 text-white text-[10px] px-1.5 py-0.5 rounded">1</span>
+            <span className="bg-blue-700 text-white text-xs px-1.5 py-0.5 rounded">1</span>
             상담받은 견적
           </h4>
         </div>
         <div className="divide-y divide-gray-100">
           <div className="flex items-center px-4 py-3">
-            <span className="flex-1 text-sm">견적 금액 <span className="text-[11px] text-gray-400">(공급가액)</span></span>
+            <span className="flex-1 text-sm">견적 금액 <span className="text-xs text-gray-400">(공급가액)</span></span>
             <input type="tel" value={quote} onChange={(e) => setQuote(e.target.value)} placeholder="0" disabled={isCompleted}
               className="w-28 px-3 py-2 border border-gray-200 rounded-lg text-sm text-right outline-none focus:ring-2 focus:ring-blue-400 disabled:bg-gray-50" />
           </div>
           <div className="flex items-center px-4 py-3">
-            <span className="flex-1 text-sm">예약금 <span className="text-[11px] text-gray-400">(선납 완료)</span></span>
+            <span className="flex-1 text-sm">예약금 <span className="text-xs text-gray-400">(선납 완료)</span></span>
             <input type="tel" value={deposit} onChange={(e) => setDeposit(e.target.value)} placeholder="0" disabled={isCompleted}
               className="w-28 px-3 py-2 border border-gray-200 rounded-lg text-sm text-right outline-none focus:ring-2 focus:ring-blue-400 disabled:bg-gray-50" />
           </div>
@@ -216,7 +216,7 @@ export default function ScheduleSettlement({ scheduleId }: ScheduleSettlementPro
       <div className="border border-gray-200 rounded-xl overflow-hidden">
         <div className="px-3 py-2 bg-blue-50">
           <h4 className="text-xs font-bold text-blue-700 flex items-center gap-1.5">
-            <span className="bg-blue-700 text-white text-[10px] px-1.5 py-0.5 rounded">2</span>
+            <span className="bg-blue-700 text-white text-xs px-1.5 py-0.5 rounded">2</span>
             현장 정산 견적
           </h4>
         </div>
@@ -237,7 +237,7 @@ export default function ScheduleSettlement({ scheduleId }: ScheduleSettlementPro
       <div className="rounded-xl overflow-hidden" style={{ background: "linear-gradient(135deg, #0f4c81, #1a6bb5)" }}>
         <div className="px-3 py-2" style={{ background: "rgba(255,255,255,0.1)" }}>
           <h4 className="text-xs font-bold text-white flex items-center gap-1.5">
-            <span className="bg-white text-blue-700 text-[10px] px-1.5 py-0.5 rounded">3</span>
+            <span className="bg-white text-blue-700 text-xs px-1.5 py-0.5 rounded">3</span>
             고객님 정산 확인
           </h4>
         </div>
@@ -245,21 +245,21 @@ export default function ScheduleSettlement({ scheduleId }: ScheduleSettlementPro
           <div className="flex items-center px-4 py-3.5">
             <div className="flex-1">
               <div className="text-sm text-white/85">전체 부가세 10%</div>
-              <div className="text-[10px] text-white/50">잔금 + 추가금 + 예약금</div>
+              <div className="text-xs text-white/50">잔금 + 추가금 + 예약금</div>
             </div>
             <span className="text-base font-bold text-white">{formatWon(vatTotal)}</span>
           </div>
           <div className="flex items-center px-4 py-3.5">
             <div className="flex-1">
               <div className="text-sm text-white/85">현장 결제 금액</div>
-              <div className="text-[10px] text-white/50">잔금 + 추가금 (부가세 제외)</div>
+              <div className="text-xs text-white/50">잔금 + 추가금 (부가세 제외)</div>
             </div>
             <span className="text-base font-bold text-white">{formatWon(fieldPayment)}</span>
           </div>
           <div className="flex items-center px-4 py-3.5">
             <div className="flex-1">
               <div className="text-sm text-white/85 font-bold">최종 결제 금액</div>
-              <div className="text-[10px] text-white/50">현장 결제 + 전체 부가세</div>
+              <div className="text-xs text-white/50">현장 결제 + 전체 부가세</div>
             </div>
             <span className="text-lg font-bold text-sky-300">{formatWon(total)}</span>
           </div>
@@ -271,14 +271,14 @@ export default function ScheduleSettlement({ scheduleId }: ScheduleSettlementPro
         <div className="flex items-center px-4 py-3 border-b border-blue-200">
           <div className="flex-1">
             <div className="text-sm font-medium text-blue-800">총 서비스 금액</div>
-            <div className="text-[10px] text-blue-500">견적 + 추가금 (부가세 제외)</div>
+            <div className="text-xs text-blue-500">견적 + 추가금 (부가세 제외)</div>
           </div>
           <span className="text-base font-bold text-blue-800">{formatWon(serviceTotal)}</span>
         </div>
         <div className="flex items-center px-4 py-3">
           <div className="flex-1">
             <div className="text-sm font-medium text-blue-800">총 서비스 금액</div>
-            <div className="text-[10px] text-blue-500">부가세 10% 포함</div>
+            <div className="text-xs text-blue-500">부가세 10% 포함</div>
           </div>
           <span className="text-base font-bold text-blue-800">{formatWon(serviceTotalVat)}</span>
         </div>
@@ -319,7 +319,7 @@ export default function ScheduleSettlement({ scheduleId }: ScheduleSettlementPro
         <div className="text-xs font-bold text-blue-800 mb-2">📢 고객님 안내 멘트</div>
         <div className="text-xs text-gray-600 leading-relaxed mb-3 min-h-[60px]">{receiptMsg}</div>
         <div className="rounded-xl p-4 text-center" style={{ background: "linear-gradient(135deg, #0f4c81, #1a6bb5)", boxShadow: "0 4px 16px rgba(15,76,129,0.3)" }}>
-          <div className="text-[11px] text-white/60 mb-1">최종 결제 금액</div>
+          <div className="text-xs text-white/60 mb-1">최종 결제 금액</div>
           <div className="text-2xl font-extrabold text-white tracking-tight">{formatWon(total)}</div>
           <div className="border-t border-white/15 mt-2 pt-2 text-xs text-white/80">
             {paymentMethod === "transfer" ? "💳 계좌이체" : paymentMethod === "cash" ? "💵 현금결제" : "💳 카드결제"}
