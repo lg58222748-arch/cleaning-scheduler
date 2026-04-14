@@ -167,7 +167,11 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">연락처 *</label>
-                <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="010-0000-0000" className={inputClass} />
+                <input value={phone} onChange={(e) => {
+                  const v = e.target.value.replace(/[^0-9]/g, "").slice(0, 11);
+                  const formatted = v.length <= 3 ? v : v.length <= 7 ? v.slice(0,3) + "-" + v.slice(3) : v.slice(0,3) + "-" + v.slice(3,7) + "-" + v.slice(7);
+                  setPhone(formatted);
+                }} placeholder="010-0000-0000" inputMode="tel" className={inputClass} />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">주소 *</label>
