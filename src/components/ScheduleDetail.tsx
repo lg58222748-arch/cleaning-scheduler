@@ -12,7 +12,7 @@ interface ScheduleDetailProps {
   isAdmin?: boolean;
   mode?: "calendar" | "assign";
   currentUserName?: string;
-  allUsers?: { name: string }[];
+  allUsers?: { name: string; username?: string; role?: string }[];
   onEdit: (schedule: Schedule) => void;
   onDelete: (id: string) => void;
   onUnassign?: (id: string, reason: string) => void;
@@ -418,9 +418,16 @@ export default function ScheduleDetail({
               className="flex-1 px-2 py-1.5 border border-gray-300 rounded-lg text-xs outline-none bg-white focus:ring-2 focus:ring-orange-400"
             >
               <option value="">배정 팀장 선택</option>
-              {members.filter(m => m.active).map((m) => (
-                <option key={m.id} value={m.id}>{m.name}</option>
-              ))}
+              {(() => {
+                // 현장팀 사용자의 username 목록
+                const fieldUsernames = new Set((allUsers || []).filter(u => u.role === "field").map(u => u.username));
+                // linkedUsername이 현장팀인 member만 표시, 없으면 전체 active member
+                const fieldMembers = members.filter(m => m.active && m.linkedUsername && fieldUsernames.has(m.linkedUsername));
+                const list = fieldMembers.length > 0 ? fieldMembers : members.filter(m => m.active);
+                return list.map((m) => (
+                  <option key={m.id} value={m.id}>{m.name}</option>
+                ));
+              })()}
             </select>
           </div>
         )}
