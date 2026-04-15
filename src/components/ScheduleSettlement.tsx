@@ -141,7 +141,7 @@ export default function ScheduleSettlement({ scheduleId, scheduleTitle = "", sch
         depositorName, bankName, accountNumber,
       } as Record<string, unknown>).catch(() => {});
       apiUpdateSchedule(scheduleId, {
-        status: "completed", color: "#D1FAE5",
+        status: "completed", color: "#FEF3C7",
       } as Partial<import("@/types").Schedule>).catch(() => {});
       onCompleted?.();
     }
