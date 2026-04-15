@@ -485,7 +485,7 @@ export default function ScheduleDetail({
           </div>
         )}
         <div className="flex gap-2 px-4 py-2">
-          {mode === "calendar" && isAdmin && schedule.status !== "unassigned" && onUnassign && (
+          {mode === "calendar" && schedule.status !== "unassigned" && onUnassign && (
             <button
               onClick={() => {
                 const reason = prompt("반환 사유를 입력하세요:");
