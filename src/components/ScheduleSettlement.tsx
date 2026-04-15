@@ -33,6 +33,7 @@ export default function ScheduleSettlement({ scheduleId, scheduleTitle = "", sch
   const [loading, setLoading] = useState(true);
   const [showBankEdit, setShowBankEdit] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
+  const [showCompleteAlert, setShowCompleteAlert] = useState(false);
   const [copied, setCopied] = useState(false);
 
   // 계좌정보: localStorage에서 불러오기 (한번 저장하면 계속 사용)
@@ -283,28 +284,35 @@ export default function ScheduleSettlement({ scheduleId, scheduleTitle = "", sch
         <div className="text-xs text-white/50 mt-1">{cashReceipt ? "부가세 포함" : "부가세 미포함 (공급가액)"}</div>
       </div>
 
-      {/* 작업 완료 + 정산서 전송 */}
-      <div className="space-y-2">
-        {!isCompleted ? (
-          <button onClick={handleComplete}
-            className="w-full py-4 rounded-xl text-base font-bold text-white active:opacity-90"
-            style={{ background: "linear-gradient(135deg, #00c473, #00a35e)" }}>
-            작업 완료
-          </button>
-        ) : (
-          <>
-            <button disabled
-              className="w-full py-3 rounded-xl text-sm font-bold bg-green-100 text-green-700 border border-green-300">
-              ✅ 작업 완료됨
-            </button>
-            <button onClick={() => setShowShareModal(true)}
-              className="w-full py-4 rounded-xl text-base font-bold text-white active:opacity-90"
-              style={{ background: "linear-gradient(135deg, #0f4c81, #1a6bb5)" }}>
-              정산서 전송
-            </button>
-          </>
-        )}
+      {/* 작업 완료 + 정산서 발행 (가로 2개) */}
+      <div className="flex gap-2">
+        <button onClick={async () => {
+          await handleComplete();
+          setShowCompleteAlert(true);
+          setTimeout(() => setShowCompleteAlert(false), 3000);
+        }}
+          disabled={isCompleted}
+          className={`flex-1 py-4 rounded-xl text-sm font-bold active:opacity-90 ${isCompleted ? "bg-green-100 text-green-700 border border-green-300" : "text-white"}`}
+          style={!isCompleted ? { background: "linear-gradient(135deg, #00c473, #00a35e)" } : {}}>
+          {isCompleted ? "✅ 완료됨" : "작업 완료"}
+        </button>
+        <button onClick={() => {
+          if (!isCompleted) { alert("작업 완료를 먼저 눌러주세요!"); return; }
+          setShowShareModal(true);
+        }}
+          className={`flex-1 py-4 rounded-xl text-sm font-bold active:opacity-90 text-white ${!isCompleted ? "opacity-40" : ""}`}
+          style={{ background: "linear-gradient(135deg, #0f4c81, #1a6bb5)" }}>
+          정산서 발행
+        </button>
       </div>
+
+      {/* 작업 완료 알림 */}
+      {showCompleteAlert && (
+        <div className="p-3 bg-green-50 border border-green-200 rounded-xl text-center animate-[modalIn_0.2s_ease-out]">
+          <div className="text-sm font-bold text-green-700">작업 완료 수고하셨습니다! 👏</div>
+          <div className="text-xs text-green-600 mt-1">이어서 정산을 진행해주세요</div>
+        </div>
+      )}
 
       {/* 마무리 모달 - 문자/카톡 전송 */}
       {showShareModal && (
