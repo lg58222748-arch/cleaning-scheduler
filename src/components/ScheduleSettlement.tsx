@@ -126,32 +126,34 @@ export default function ScheduleSettlement({ scheduleId, scheduleNote, customerN
     if (s) setS({ ...s, status: "completed" as const });
     setShowShareModal(true);
     onCompleted?.();
-    // 제목 U→A 변경 (작업완료 표시)
-    let titleUpdate: Record<string, unknown> = { status: "completed" };
-    try {
-      const res = await fetch(`/api/schedules/${scheduleId}`);
-      const sched = await res.json();
-      if (sched?.title) {
-        const oldTitle = sched.title.replace(/^\[.+?\]\s*/, "");
-        const timePrefix = sched.title.match(/^\[.+?\]\s*/)?.[0] || "";
+
+    // 백그라운드: 정산 저장 + 제목 U→A 변경
+    (async () => {
+      try {
+        // 1. 정산 저장
+        saveSettlement(scheduleId, {
+          quote: q, deposit: d, extraCharge: e,
+          paymentMethod, cashReceipt, customerName, customerPhone, note, status: "completed",
+          depositorName, bankName, accountNumber,
+        } as Record<string, unknown>);
+
+        // 2. 현재 제목 가져와서 U→A 변경
+        const res = await fetch(`/api/schedules/${scheduleId}`);
+        const sched = await res.json();
+        const oldFullTitle = sched?.title || "";
+        const timePrefix = oldFullTitle.match(/^\[.+?\]\s*/)?.[0] || "";
+        const oldTitle = oldFullTitle.replace(/^\[.+?\]\s*/, "");
+
         let newTitle = oldTitle;
-        if (oldTitle.startsWith("U")) {
+        if (oldTitle.startsWith("U") || oldTitle.startsWith("u")) {
           newTitle = "A" + oldTitle.slice(1);
         } else if (!oldTitle.startsWith("A")) {
           newTitle = "A" + oldTitle;
         }
-        titleUpdate = { status: "completed", title: timePrefix + newTitle };
-      }
-    } catch { /* 제목 변경 실패해도 정산은 진행 */ }
-    // API 병렬 처리 (백그라운드)
-    Promise.all([
-      saveSettlement(scheduleId, {
-        quote: q, deposit: d, extraCharge: e,
-        paymentMethod, cashReceipt, customerName, customerPhone, note, status: "completed",
-        depositorName, bankName, accountNumber,
-      } as Record<string, unknown>),
-      apiUpdateSchedule(scheduleId, titleUpdate as Partial<import("@/types").Schedule>),
-    ]).catch(() => {});
+
+        await apiUpdateSchedule(scheduleId, { status: "completed", title: timePrefix + newTitle } as Partial<import("@/types").Schedule>);
+      } catch { /* 실패해도 모달은 이미 표시됨 */ }
+    })();
   }
 
   function handleSendSMS() {
