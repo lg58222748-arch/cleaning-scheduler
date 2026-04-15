@@ -115,11 +115,12 @@ export default function Home() {
         setUnassignedSchedules(unassignedScheds);
         setSwapRequests(sw);
         // 알림: 대표는 전체, 나머지는 본인 이름 포함된 것만
+        const allNotifs = notif.notifications as Notification[];
         const myNotifs = currentUser.role === "ceo"
-          ? notif.notifications
-          : notif.notifications.filter((n: Notification) => n.message.includes(currentUser.name) || n.title.includes(currentUser.name));
+          ? allNotifs
+          : allNotifs.filter(n => n.message.includes(currentUser.name) || n.title.includes(currentUser.name));
         setNotifications(myNotifs);
-        setUnreadCount(myNotifs.filter((n: Notification) => !n.read).length);
+        setUnreadCount(myNotifs.filter(n => !n.read).length);
         setAllUsers(usersData.users);
         setPendingUsers(usersData.pendingUsers);
       } else {
