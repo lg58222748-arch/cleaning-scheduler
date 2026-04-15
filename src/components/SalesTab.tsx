@@ -367,15 +367,15 @@ export default function SalesTab({ userName, onCreated }: SalesTabProps) {
       <div className="flex-1 overflow-y-auto">
       {/* ===== STEP 1 ===== */}
       {step === 1 && (
-        <div className="p-4 flex flex-col md:flex-row md:gap-6">
-        <div className="space-y-4 md:flex-1">
+        <div className="p-3 flex flex-col md:flex-row md:gap-6">
+        <div className="space-y-3 md:flex-1">
           {/* 서비스 선택 (복수) */}
           <div>
             <label className="text-xs font-bold text-green-700 mb-2 block">서비스 종류 (복수 선택 가능)</label>
             <div className="flex flex-wrap gap-1.5">
               {ALL_SERVICES.map((s) => (
                 <button key={s} onClick={() => toggleService(s)}
-                  className={`px-2.5 py-1.5 rounded-lg text-xs font-medium border transition-colors ${services.find((x) => x.name === s) ? "bg-green-700 text-white border-green-700" : "bg-white text-gray-600 border-gray-200 active:bg-gray-50"}`}>
+                  className={`px-2 py-1 rounded-lg text-xs font-medium border transition-colors ${services.find((x) => x.name === s) ? "bg-green-700 text-white border-green-700" : "bg-white text-gray-600 border-gray-200 active:bg-gray-50"}`}>
                   {s}
                 </button>
               ))}
@@ -449,8 +449,8 @@ export default function SalesTab({ userName, onCreated }: SalesTabProps) {
           {/* 상담사 특이사항 */}
           <div>
             <label className="text-xs font-bold text-gray-500 mb-1 block">상담사 특이사항</label>
-            <textarea value={salesNote} onChange={(e) => setSalesNote(e.target.value)} rows={2}
-              placeholder="예) 외부유리창, 반분해에어컨청소, 세탁기청소, 곰팡이, 니코틴, 스티커, 걸비시공, 에어컨통, 테라스 특이사항을 기재해주세요"
+            <textarea value={salesNote} onChange={(e) => setSalesNote(e.target.value)} rows={1}
+              placeholder="외부유리창, 에어컨, 세탁기, 곰팡이, 니코틴 등"
               style={{ fontSize: "12px" }} className="w-full px-3 py-2 border border-gray-200 rounded-lg outline-none focus:border-green-500 resize-none" />
           </div>
 
@@ -474,23 +474,23 @@ export default function SalesTab({ userName, onCreated }: SalesTabProps) {
           {/* 미리보기 */}
           <div className="bg-green-50 border border-green-200 rounded-xl p-3">
             <div className="text-xs font-bold text-green-700 mb-2">고객에게 보낼 양식 미리보기</div>
-            <pre className="text-xs text-gray-700 whitespace-pre-wrap font-sans leading-relaxed max-h-[250px] md:max-h-none overflow-y-auto">{getFormText()}</pre>
+            <pre className="text-xs text-gray-700 whitespace-pre-wrap font-sans leading-relaxed max-h-[150px] md:max-h-none overflow-y-auto">{getFormText()}</pre>
           </div>
 
           {/* 버튼 */}
           <div className="flex gap-2">
             <button onClick={() => handleCopy(getFormText(), "form")}
-              className="flex-1 py-3 rounded-xl text-sm font-bold text-white" style={{ background: "linear-gradient(135deg, #1a6b3c, #22874c)" }}>
-              {copied.has("form") ? "✅ 복사됨!" : "1. 📋 양식 복사"}
+              className="flex-1 py-2.5 rounded-xl text-xs font-bold text-white" style={{ background: "linear-gradient(135deg, #1a6b3c, #22874c)" }}>
+              {copied.has("form") ? "✅ 복사됨!" : "1. 양식 복사"}
             </button>
             <button onClick={() => handleCopy(getDepositText(), "dep")}
-              className="flex-1 py-3 rounded-xl text-sm font-bold border-2 border-green-700 text-green-700 active:bg-green-50">
-              {copied.has("dep") ? "✅ 복사됨!" : "2. 💰 예약금 안내"}
+              className="flex-1 py-2.5 rounded-xl text-xs font-bold border-2 border-green-700 text-green-700 active:bg-green-50">
+              {copied.has("dep") ? "✅ 복사됨!" : "2. 예약금 안내"}
             </button>
           </div>
 
           <button onClick={() => { setStep(2); if (services.length > 0) setSchedules(services.map((s) => ({ service: s.name, date: "", time: "선택" }))); }}
-            className="w-full py-3 rounded-xl text-sm font-bold text-white" style={{ background: "linear-gradient(135deg, #1a6b3c, #22874c)" }}>
+            className="w-full py-2.5 rounded-xl text-xs font-bold text-white" style={{ background: "linear-gradient(135deg, #1a6b3c, #22874c)" }}>
             STEP 2 · 고객 답장 파싱으로 이동 →
           </button>
         </div>
@@ -499,8 +499,8 @@ export default function SalesTab({ userName, onCreated }: SalesTabProps) {
 
       {/* ===== STEP 2 ===== */}
       {step === 2 && (
-        <div className="p-4 flex flex-col md:flex-row md:gap-6">
-        <div className="space-y-4 md:flex-1">
+        <div className="p-3 flex flex-col md:flex-row md:gap-6">
+        <div className="space-y-3 md:flex-1">
           {/* 예약 보관함 */}
           <SavedBookings onLoad={(data) => {
             if (data.services) setServices(data.services);
@@ -518,8 +518,8 @@ export default function SalesTab({ userName, onCreated }: SalesTabProps) {
           {/* 고객 답장 붙여넣기 */}
           <div>
             <label className="text-xs font-bold text-green-700 mb-1 block">고객 답장 붙여넣기</label>
-            <textarea value={customerText} onChange={(e) => setCustomerText(e.target.value)} rows={20}
-              placeholder="고객이 보낸 1~5번 내용을 그대로 복사해서 붙여넣기&#10;&#10;양식 전체 + 고객 답변을 함께 붙여넣으세요"
+            <textarea value={customerText} onChange={(e) => setCustomerText(e.target.value)} rows={8}
+              placeholder="고객이 보낸 1~5번 내용을 그대로 복사해서 붙여넣기"
               style={{ fontSize: "12px" }} className="w-full px-3 py-2.5 border border-gray-200 rounded-lg outline-none focus:border-green-500 resize-y min-h-[300px]" />
             <button onClick={parseCustomer} disabled={parsing}
               className="mt-2 w-full py-3.5 rounded-xl text-sm font-bold text-white disabled:opacity-70" style={{ background: "#1c1c1e" }}>
@@ -615,7 +615,7 @@ export default function SalesTab({ userName, onCreated }: SalesTabProps) {
                   <span className="text-xs font-bold text-green-700">최종 확정 메시지 미리보기</span>
                   <button onClick={() => generateConfirmMsg()} className="text-xs text-green-600 font-bold">↻ 갱신</button>
                 </div>
-                <textarea value={confirmMsg} onChange={(e) => setConfirmMsg(e.target.value)} rows={10}
+                <textarea value={confirmMsg} onChange={(e) => setConfirmMsg(e.target.value)} rows={6}
                   style={{ fontSize: "12px" }}
                   className="w-full text-gray-700 font-sans leading-relaxed bg-transparent outline-none resize-y" />
               </div>
