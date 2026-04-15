@@ -472,26 +472,26 @@ export default function SalesTab({ userName, onCreated }: SalesTabProps) {
             </div>
           )}
           {/* 미리보기 */}
-          <div className="bg-green-50 border border-green-200 rounded-xl p-3">
-            <div className="text-xs font-bold text-green-700 mb-2">고객에게 보낼 양식 미리보기</div>
-            <pre className="text-xs text-gray-700 whitespace-pre-wrap font-sans leading-relaxed max-h-[150px] md:max-h-none overflow-y-auto">{getFormText()}</pre>
+          <div className="bg-green-50 border border-green-200 rounded-xl p-2">
+            <div className="text-xs font-bold text-green-700 mb-1">양식 미리보기</div>
+            <pre className="text-xs text-gray-700 whitespace-pre-wrap font-sans leading-tight max-h-[100px] overflow-y-auto">{getFormText()}</pre>
           </div>
 
           {/* 버튼 */}
           <div className="flex gap-2">
             <button onClick={() => handleCopy(getFormText(), "form")}
-              className="flex-1 py-2.5 rounded-xl text-xs font-bold text-white" style={{ background: "linear-gradient(135deg, #1a6b3c, #22874c)" }}>
-              {copied.has("form") ? "✅ 복사됨!" : "1. 양식 복사"}
+              className="flex-1 py-2 rounded-lg text-xs font-bold text-white" style={{ background: "#1a6b3c" }}>
+              {copied.has("form") ? "✅" : "1. 양식 복사"}
             </button>
             <button onClick={() => handleCopy(getDepositText(), "dep")}
-              className="flex-1 py-2.5 rounded-xl text-xs font-bold border-2 border-green-700 text-green-700 active:bg-green-50">
-              {copied.has("dep") ? "✅ 복사됨!" : "2. 예약금 안내"}
+              className="flex-1 py-2 rounded-lg text-xs font-bold border border-green-700 text-green-700">
+              {copied.has("dep") ? "✅" : "2. 예약금 안내"}
             </button>
           </div>
 
           <button onClick={() => { setStep(2); if (services.length > 0) setSchedules(services.map((s) => ({ service: s.name, date: "", time: "선택" }))); }}
-            className="w-full py-2.5 rounded-xl text-xs font-bold text-white" style={{ background: "linear-gradient(135deg, #1a6b3c, #22874c)" }}>
-            STEP 2 · 고객 답장 파싱으로 이동 →
+            className="w-full py-2 rounded-lg text-xs font-bold text-white" style={{ background: "#1a6b3c" }}>
+            STEP 2 · 파싱으로 이동 →
           </button>
         </div>
         </div>
