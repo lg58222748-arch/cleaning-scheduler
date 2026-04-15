@@ -116,9 +116,11 @@ export default function Home() {
         setSwapRequests(sw);
         // 알림: 대표는 전체, 나머지는 본인 이름 포함된 것만
         const allNotifs = notif.notifications as Notification[];
-        const myNotifs = currentUser.role === "ceo"
+        const uName = currentUser?.name || "";
+        const uRole = currentUser?.role || "";
+        const myNotifs = uRole === "ceo"
           ? allNotifs
-          : allNotifs.filter(n => n.message.includes(currentUser.name) || n.title.includes(currentUser.name));
+          : allNotifs.filter(n => n.message.includes(uName) || n.title.includes(uName));
         setNotifications(myNotifs);
         setUnreadCount(myNotifs.filter(n => !n.read).length);
         setAllUsers(usersData.users);
