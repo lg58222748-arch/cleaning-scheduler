@@ -261,10 +261,12 @@ function SalesStatsSection({ userName, userRole, allUsers }: {
 }) {
   const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [loading, setLoading] = useState(true);
+  const [filterMode, setFilterMode] = useState<"month" | "date">("month");
   const [selectedMonth, setSelectedMonth] = useState(() => {
     const now = new Date();
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
   });
+  const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().slice(0, 10));
 
   useEffect(() => { loadSchedules(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -275,83 +277,100 @@ function SalesStatsSection({ userName, userRole, allUsers }: {
     setLoading(false);
   }
 
-  // 영업건수: 영업탭에서 배정으로 보내고, 배정에서 입금확인까지 누른 것 = 제목에 /미입금 없고, U로 시작하는 것
-  // 미입금 = 제목에 /미입금 포함
-  // 월별 필터
-  const monthSchedules = schedules.filter(s => s.date.startsWith(selectedMonth));
+  // 필터링된 일정
+  const filteredSchedules = filterMode === "month"
+    ? schedules.filter(s => s.date.startsWith(selectedMonth))
+    : schedules.filter(s => s.date === selectedDate);
 
-  // 영업사원별 통계 계산
-  const salesUsers = userRole === "ceo"
-    ? allUsers.filter(u => u.role === "sales" || u.role === "ceo")
-    : allUsers.filter(u => u.name === userName);
+  const isCeo = userRole === "ceo";
 
-  function getStatsForUser(name: string) {
-    // 영업사원 이름이 제목에 포함된 일정
-    const userSchedules = monthSchedules.filter(s => {
+  // 본인 일정만 필터 (대표는 전체)
+  function getUserSchedules(name: string, source: Schedule[]) {
+    return source.filter(s => {
       const title = s.title.replace(/^\[.+?\]\s*/, "");
-      // 제목 형식: U고객이름/지역/영업사원이름/... 또는 u영업사원이름/미입금/고객이름
       return title.includes(`/${name}/`) || title.includes(`/${name}[`) || title.endsWith(`/${name}`) || title.startsWith(`u${name}/`);
     });
-
-    const confirmed = userSchedules.filter(s => !s.title.includes("/미입금")).length;
-    const pending = userSchedules.filter(s => s.title.includes("/미입금")).length;
-    const total = userSchedules.length;
-
-    return { total, confirmed, pending };
   }
+
+  // 대표: 전체 영업사원 / 그 외: 본인만
+  const salesUsers = isCeo
+    ? allUsers.filter(u => u.role === "sales" || u.role === "ceo")
+    : [{ name: userName, role: userRole }];
+
+  // 본인 기준 요약 (대표가 아닌 경우)
+  const mySchedules = isCeo ? filteredSchedules : getUserSchedules(userName, filteredSchedules);
+  const myConfirmed = mySchedules.filter(s => !s.title.includes("/미입금")).length;
+  const myPending = mySchedules.filter(s => s.title.includes("/미입금")).length;
 
   if (loading) return <div className="py-8 text-center text-gray-400 text-sm">로딩 중...</div>;
 
   return (
     <div className="px-4 py-4 space-y-4">
-      {/* 월 선택 */}
+      {/* 필터 모드 전환 */}
+      <div className="flex rounded-xl overflow-hidden border border-gray-200">
+        <button onClick={() => setFilterMode("month")}
+          className={`flex-1 py-2 text-xs font-bold ${filterMode === "month" ? "bg-blue-500 text-white" : "bg-white text-gray-500"}`}>
+          월별 조회
+        </button>
+        <button onClick={() => setFilterMode("date")}
+          className={`flex-1 py-2 text-xs font-bold ${filterMode === "date" ? "bg-blue-500 text-white" : "bg-white text-gray-500"}`}>
+          날짜별 조회
+        </button>
+      </div>
+
+      {/* 월/날짜 선택 */}
       <div className="flex items-center gap-2">
-        <input
-          type="month"
-          value={selectedMonth}
-          onChange={(e) => setSelectedMonth(e.target.value)}
-          className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-400"
-        />
+        {filterMode === "month" ? (
+          <input type="month" value={selectedMonth} onChange={(e) => setSelectedMonth(e.target.value)}
+            className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-400" />
+        ) : (
+          <input type="date" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)}
+            className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-400" />
+        )}
         <button onClick={loadSchedules} className="px-3 py-2 bg-blue-50 text-blue-600 rounded-lg text-xs font-bold active:bg-blue-100">새로고침</button>
       </div>
 
-      {/* 전체 요약 */}
+      {/* 요약 카드 */}
       <div className="grid grid-cols-3 gap-2">
         <div className="bg-blue-50 rounded-xl p-3 text-center">
-          <div className="text-lg font-extrabold text-blue-700">{monthSchedules.length}</div>
-          <div className="text-xs text-blue-500">전체 건수</div>
+          <div className="text-lg font-extrabold text-blue-700">{mySchedules.length}</div>
+          <div className="text-xs text-blue-500">{isCeo ? "전체" : "내"} 건수</div>
         </div>
         <div className="bg-green-50 rounded-xl p-3 text-center">
-          <div className="text-lg font-extrabold text-green-700">{monthSchedules.filter(s => !s.title.includes("/미입금")).length}</div>
+          <div className="text-lg font-extrabold text-green-700">{myConfirmed}</div>
           <div className="text-xs text-green-500">입금확인</div>
         </div>
         <div className="bg-red-50 rounded-xl p-3 text-center">
-          <div className="text-lg font-extrabold text-red-700">{monthSchedules.filter(s => s.title.includes("/미입금")).length}</div>
+          <div className="text-lg font-extrabold text-red-700">{myPending}</div>
           <div className="text-xs text-red-500">미입금</div>
         </div>
       </div>
 
-      {/* 영업사원별 상세 */}
+      {/* 영업사원별 상세 (대표만 전체, 나머진 본인만) */}
       <div className="space-y-2">
-        <div className="text-xs font-bold text-gray-500 uppercase tracking-wider">영업사원별 현황</div>
+        <div className="text-xs font-bold text-gray-500 uppercase tracking-wider">
+          {isCeo ? "영업사원별 현황" : "내 영업 현황"}
+        </div>
         {salesUsers.map((user) => {
-          const stats = getStatsForUser(user.name);
+          const userScheds = getUserSchedules(user.name, filteredSchedules);
+          const confirmed = userScheds.filter(s => !s.title.includes("/미입금")).length;
+          const pending = userScheds.filter(s => s.title.includes("/미입금")).length;
+          const total = userScheds.length;
+
           return (
             <div key={user.name} className="border border-gray-200 rounded-xl p-3">
               <div className="flex items-center justify-between mb-2">
                 <span className="text-sm font-bold text-gray-800">{user.name}</span>
-                <span className="text-xs px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full font-medium">{stats.total}건</span>
+                <span className="text-xs px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full font-medium">{total}건</span>
               </div>
               <div className="flex gap-3 text-xs">
-                <span className="text-green-600">✅ 입금확인 {stats.confirmed}건</span>
-                <span className="text-red-500">⏳ 미입금 {stats.pending}건</span>
+                <span className="text-green-600">✅ 입금확인 {confirmed}건</span>
+                <span className="text-red-500">⏳ 미입금 {pending}건</span>
               </div>
-              {stats.total > 0 && (
+              {total > 0 && (
                 <div className="mt-2 h-2 bg-gray-100 rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-green-500 rounded-full transition-all"
-                    style={{ width: `${Math.round((stats.confirmed / stats.total) * 100)}%` }}
-                  />
+                  <div className="h-full bg-green-500 rounded-full transition-all"
+                    style={{ width: `${Math.round((confirmed / total) * 100)}%` }} />
                 </div>
               )}
             </div>
