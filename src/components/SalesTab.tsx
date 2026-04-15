@@ -494,7 +494,7 @@ export default function SalesTab({ userName, onCreated }: SalesTabProps) {
           {/* 미리보기 */}
           <div className="bg-green-50 border border-green-200 rounded-xl p-2">
             <div className="text-xs font-bold text-green-700 mb-1">양식 미리보기</div>
-            <pre className="text-xs text-gray-700 whitespace-pre-wrap font-sans leading-tight max-h-[100px] overflow-y-auto">{getFormText()}</pre>
+            <pre className="text-xs text-gray-700 whitespace-pre-wrap font-sans leading-tight max-h-[100px] md:max-h-[500px] overflow-y-auto">{getFormText()}</pre>
           </div>
 
           {/* 버튼 */}
