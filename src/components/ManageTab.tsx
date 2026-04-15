@@ -399,6 +399,7 @@ function GoogleCalendarImport({ allUsers, members, onImported }: {
   const [importing, setImporting] = useState(false);
   const [importDone, setImportDone] = useState(false);
   const [importCount, setImportCount] = useState(0);
+  const [importProgress, setImportProgress] = useState(0); // 0~100
   const [error, setError] = useState("");
 
   async function handleFetchEvents() {
@@ -440,11 +441,12 @@ function GoogleCalendarImport({ allUsers, members, onImported }: {
     const toImport = events.filter(e => e.selected);
     if (toImport.length === 0) return;
     setImporting(true);
+    setImportProgress(0);
 
     let count = 0;
-    for (const ev of toImport) {
+    for (let i = 0; i < toImport.length; i++) {
+      const ev = toImport[i];
       try {
-        // 1. 미배정 일정으로 등록
         const created = await addUnassignedSchedule({
           title: ev.summary,
           date: ev.date,
@@ -452,7 +454,6 @@ function GoogleCalendarImport({ allUsers, members, onImported }: {
           endTime: "18:00",
           note: ev.description || "",
         });
-        // 2. 담당자가 선택된 경우 바로 배정
         if (ev.assignTo && created?.id) {
           const member = members.find(m => m.id === ev.assignTo);
           const fieldUser = allUsers.find(u => (u.id === ev.assignTo || u.name === ev.assignTo) && u.role === "field");
@@ -464,6 +465,7 @@ function GoogleCalendarImport({ allUsers, members, onImported }: {
         }
         count++;
       } catch { /* 개별 실패 무시 */ }
+      setImportProgress(Math.round(((i + 1) / toImport.length) * 100));
     }
 
     setImporting(false);
@@ -553,6 +555,28 @@ function GoogleCalendarImport({ allUsers, members, onImported }: {
                 </select>
               </div>
 
+              {/* 가져오기 버튼 + 진행률 */}
+              {importing ? (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-bold text-blue-600">가져오는 중...</span>
+                    <span className="font-bold text-blue-700">{importProgress}%</span>
+                  </div>
+                  <div className="h-3 bg-gray-200 rounded-full overflow-hidden">
+                    <div className="h-full bg-blue-500 rounded-full transition-all duration-300" style={{ width: `${importProgress}%` }} />
+                  </div>
+                </div>
+              ) : (
+                <button
+                  onClick={handleImport}
+                  disabled={events.filter(e => e.selected).length === 0}
+                  className="w-full py-3 bg-blue-500 text-white rounded-xl text-sm font-bold active:bg-blue-600 disabled:opacity-50"
+                >
+                  {events.filter(e => e.selected).length}건 가져오기
+                </button>
+              )}
+
+              {/* 일정 목록 */}
               <div className="space-y-1.5">
                 {events.map((ev, idx) => (
                   <div key={ev.id} className={`border rounded-xl p-2.5 ${ev.selected ? "border-blue-300 bg-blue-50/50" : "border-gray-200 bg-white"}`}>
@@ -583,14 +607,6 @@ function GoogleCalendarImport({ allUsers, members, onImported }: {
                   </div>
                 ))}
               </div>
-
-              <button
-                onClick={handleImport}
-                disabled={importing || events.filter(e => e.selected).length === 0}
-                className="w-full py-3 bg-blue-500 text-white rounded-xl text-sm font-bold active:bg-blue-600 disabled:opacity-50"
-              >
-                {importing ? `가져오는 중...` : `${events.filter(e => e.selected).length}건 가져오기`}
-              </button>
             </div>
           )}
         </>
