@@ -1094,7 +1094,12 @@ export default function Home() {
             consumeHash();
           }}
           onClose={() => { setDetailSchedule(null); consumeHash(); }}
-          onUpdated={() => loadData(undefined, true)}
+          onUpdated={() => {
+            // 전체 리로드 대신 해당 일정만 로컬 갱신
+            if (detailSchedule) {
+              setSchedules(prev => prev.map(s => s.id === detailSchedule.id ? { ...detailSchedule } : s));
+            }
+          }}
         />
       )}
       {showAdminPanel && (
