@@ -129,23 +129,28 @@ export default function ScheduleSettlement({ scheduleId, scheduleTitle = "", sch
     setShowShareModal(true);
     onCompleted?.();
 
-    // 백그라운드: 정산 저장 + 제목 U→A 변경
-    const timePrefix = scheduleTitle.match(/^\[.+?\]\s*/)?.[0] || "";
-    const oldTitle = scheduleTitle.replace(/^\[.+?\]\s*/, "");
-    let newTitle = oldTitle;
-    if (oldTitle.startsWith("U") || oldTitle.startsWith("u")) {
-      newTitle = "A" + oldTitle.slice(1);
-    } else if (!oldTitle.startsWith("A")) {
-      newTitle = "A" + oldTitle;
+    // 제목 U→A 변경
+    const updateData: Partial<import("@/types").Schedule> & Record<string, unknown> = { status: "completed" };
+    if (scheduleTitle) {
+      const timePrefix = scheduleTitle.match(/^\[.+?\]\s*/)?.[0] || "";
+      const bare = scheduleTitle.replace(/^\[.+?\]\s*/, "");
+      let newBare = bare;
+      if (bare.startsWith("U") || bare.startsWith("u")) {
+        newBare = "A" + bare.slice(1);
+      } else if (!bare.startsWith("A")) {
+        newBare = "A" + bare;
+      }
+      updateData.title = timePrefix + newBare;
     }
 
-    Promise.all([
+    // 정산 저장 + 일정 업데이트
+    await Promise.all([
       saveSettlement(scheduleId, {
         quote: q, deposit: d, extraCharge: e,
         paymentMethod, cashReceipt, customerName, customerPhone, note, status: "completed",
         depositorName, bankName, accountNumber,
       } as Record<string, unknown>),
-      apiUpdateSchedule(scheduleId, { status: "completed", title: timePrefix + newTitle } as Partial<import("@/types").Schedule>),
+      apiUpdateSchedule(scheduleId, updateData as Partial<import("@/types").Schedule>),
     ]).catch(() => {});
   }
 
@@ -322,8 +327,14 @@ export default function ScheduleSettlement({ scheduleId, scheduleTitle = "", sch
               <button onClick={handleCopy} className={`w-full py-3.5 rounded-xl text-sm font-bold flex items-center justify-center gap-2 ${copied ? "bg-green-500 text-white" : "bg-gray-200 text-gray-700"}`}>
                 <span>📋</span> {copied ? "복사됨!" : "텍스트 복사"}
               </button>
-              <button onClick={() => setShowShareModal(false)} className="w-full py-3 bg-gray-100 text-gray-500 rounded-xl text-sm font-bold">
-                닫기
+              <button onClick={() => {
+                setShowShareModal(false);
+                // 전송 후 입력값 초기화
+                setQuote(""); setDeposit(""); setExtraCharge("");
+                setPaymentMethod("transfer"); setCashReceipt(false);
+                setNote("");
+              }} className="w-full py-3 bg-gray-100 text-gray-500 rounded-xl text-sm font-bold">
+                닫기 (초기화)
               </button>
             </div>
           </div>
