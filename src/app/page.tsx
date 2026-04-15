@@ -363,7 +363,7 @@ export default function Home() {
   const isAdmin = role === "ceo";
   const canSales = role === "ceo" || role === "sales";
   const canAssign = role === "ceo" || role === "scheduler" || role === "sales";
-  const canManage = role === "ceo" || role === "field" || role === "scheduler";
+  const canManage = role === "ceo" || role === "sales" || role === "field" || role === "scheduler";
   const canManageAdvanced = role === "ceo";
 
   // Members — 낙관적 업데이트
@@ -766,7 +766,14 @@ export default function Home() {
         </div>
 
         <div style={{ display: activeTab === "manage" ? "block" : "none" }}>
-          <ManageTab isAdmin={canManageAdvanced} onRefresh={() => loadData(undefined, true)} />
+          <ManageTab
+            isAdmin={canManageAdvanced}
+            userRole={role}
+            userName={currentUser.name}
+            allUsers={allUsers.map(u => ({ id: u.id, name: u.name, username: u.username, role: u.role }))}
+            members={members.map(m => ({ id: m.id, name: m.name, linkedUsername: m.linkedUsername }))}
+            onRefresh={() => loadData(undefined, true)}
+          />
         </div>
 
         {canAssign && (

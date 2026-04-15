@@ -1,15 +1,116 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Schedule } from "@/types";
 import { fetchDeletedSchedules, restoreScheduleApi, emptyTrashApi, deleteAllSchedules, fetchSchedules, addUnassignedSchedule } from "@/lib/api";
 
+type ManageSubTab = "sales-stats" | "field" | "scheduler" | "ceo";
+
 interface ManageTabProps {
   isAdmin: boolean;
+  userRole: string;
+  userName?: string;
+  allUsers?: { id?: string; name: string; username?: string; role?: string }[];
+  members?: { id: string; name: string; linkedUsername?: string }[];
   onRefresh: () => void;
 }
 
-export default function ManageTab({ isAdmin, onRefresh }: ManageTabProps) {
+export default function ManageTab({ isAdmin, userRole, userName = "", allUsers = [], members = [], onRefresh }: ManageTabProps) {
+  // 역할별 기본 탭
+  const defaultTab: ManageSubTab =
+    userRole === "ceo" ? "ceo" :
+    userRole === "sales" ? "sales-stats" :
+    userRole === "field" ? "field" :
+    userRole === "scheduler" ? "scheduler" : "sales-stats";
+
+  const [activeSubTab, setActiveSubTab] = useState<ManageSubTab>(defaultTab);
+
+  // 표시할 탭 결정
+  const tabs: { id: ManageSubTab; label: string }[] = [];
+  if (userRole === "ceo") {
+    tabs.push({ id: "ceo", label: "대표" });
+    tabs.push({ id: "sales-stats", label: "영업팀" });
+    tabs.push({ id: "field", label: "현장팀" });
+    tabs.push({ id: "scheduler", label: "일정관리" });
+  } else if (userRole === "sales") {
+    tabs.push({ id: "sales-stats", label: "영업팀" });
+  } else if (userRole === "field") {
+    tabs.push({ id: "field", label: "현장팀" });
+  } else if (userRole === "scheduler") {
+    tabs.push({ id: "scheduler", label: "일정관리" });
+  }
+
+  return (
+    <div className="h-full overflow-y-auto bg-white">
+      <div className="px-4 py-4 border-b border-gray-100">
+        <h3 className="text-base font-bold text-gray-800">관리</h3>
+      </div>
+
+      {/* 역할별 서브탭 */}
+      {tabs.length > 1 && (
+        <div className="flex border-b border-gray-200 px-2 pt-1">
+          {tabs.map(t => (
+            <button
+              key={t.id}
+              onClick={() => setActiveSubTab(t.id)}
+              className={`flex-1 py-2.5 text-xs font-bold text-center transition-colors ${
+                activeSubTab === t.id
+                  ? "text-blue-500 border-b-2 border-blue-500"
+                  : "text-gray-400"
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* 대표 탭 */}
+      {activeSubTab === "ceo" && (
+        <CeoSection onRefresh={onRefresh} allUsers={allUsers} members={members} />
+      )}
+
+      {/* 영업팀 탭 */}
+      {activeSubTab === "sales-stats" && (
+        <SalesStatsSection userName={userName} userRole={userRole} allUsers={allUsers} />
+      )}
+
+      {/* 현장팀 탭 */}
+      {activeSubTab === "field" && (
+        <div className="px-4 py-12 text-center text-gray-400 text-sm">
+          <div className="w-12 h-12 mx-auto mb-3 bg-gray-100 rounded-full flex items-center justify-center">
+            <svg className="w-6 h-6 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+            </svg>
+          </div>
+          <p className="font-medium text-gray-500">현장팀 관리</p>
+          <p className="text-xs text-gray-400 mt-1">추후 업데이트 예정</p>
+        </div>
+      )}
+
+      {/* 일정관리자 탭 */}
+      {activeSubTab === "scheduler" && (
+        <div className="px-4 py-12 text-center text-gray-400 text-sm">
+          <div className="w-12 h-12 mx-auto mb-3 bg-gray-100 rounded-full flex items-center justify-center">
+            <svg className="w-6 h-6 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+            </svg>
+          </div>
+          <p className="font-medium text-gray-500">일정관리자</p>
+          <p className="text-xs text-gray-400 mt-1">추후 업데이트 예정</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+
+/* ════════════ 대표 전용 섹션 ════════════ */
+function CeoSection({ onRefresh, allUsers, members }: {
+  onRefresh: () => void;
+  allUsers: { id?: string; name: string; username?: string; role?: string }[];
+  members: { id: string; name: string; linkedUsername?: string }[];
+}) {
   const [trashItems, setTrashItems] = useState<Schedule[]>([]);
   const [loading, setLoading] = useState(false);
   const [showTrash, setShowTrash] = useState(false);
@@ -18,10 +119,9 @@ export default function ManageTab({ isAdmin, onRefresh }: ManageTabProps) {
   const [bulkDate, setBulkDate] = useState(new Date().toISOString().slice(0, 10));
   const [bulkAdding, setBulkAdding] = useState(false);
   const [totalCount, setTotalCount] = useState(0);
+  const [showGoogleImport, setShowGoogleImport] = useState(false);
 
-  useEffect(() => {
-    loadCounts();
-  }, []);
+  useEffect(() => { loadCounts(); }, []);
 
   async function loadCounts() {
     const all = await fetchSchedules();
@@ -56,32 +156,13 @@ export default function ManageTab({ isAdmin, onRefresh }: ManageTabProps) {
   async function handleBulkAdd() {
     if (!bulkText.trim()) return;
     setBulkAdding(true);
-    // 줄바꿈으로 구분 - 각 줄이 하나의 일정 제목
-    // 또는 전체를 하나의 일정 본문으로 등록
     const lines = bulkText.trim().split("\n").filter((l) => l.trim());
-
     if (lines.length === 1 || bulkText.includes("1)") || bulkText.includes("성함")) {
-      // 전체가 하나의 일정 (예약양식 붙여넣기)
       const titleLine = lines[0].slice(0, 50);
-      await addUnassignedSchedule({
-        title: titleLine,
-        date: bulkDate,
-        startTime: "09:00",
-        endTime: "18:00",
-        note: bulkText.trim(),
-      });
+      await addUnassignedSchedule({ title: titleLine, date: bulkDate, startTime: "09:00", endTime: "18:00", note: bulkText.trim() });
     } else {
-      // 여러 줄 → 각각 별도 일정
       for (const line of lines) {
-        if (line.trim()) {
-          await addUnassignedSchedule({
-            title: line.trim(),
-            date: bulkDate,
-            startTime: "09:00",
-            endTime: "18:00",
-            note: "",
-          });
-        }
+        if (line.trim()) await addUnassignedSchedule({ title: line.trim(), date: bulkDate, startTime: "09:00", endTime: "18:00", note: "" });
       }
     }
     setBulkText("");
@@ -103,139 +184,408 @@ export default function ManageTab({ isAdmin, onRefresh }: ManageTabProps) {
   }
 
   return (
-    <div className="h-full overflow-y-auto bg-white">
-      <div className="px-4 py-4 border-b border-gray-100">
-        <h3 className="text-base font-bold text-gray-800">{isAdmin ? "관리" : "더보기"}</h3>
-        <p className="text-xs text-gray-400 mt-0.5">전체 일정 {totalCount}건</p>
+    <div className="divide-y divide-gray-100">
+      <div className="px-4 py-3">
+        <p className="text-xs text-gray-400">전체 일정 {totalCount}건</p>
       </div>
 
-      <div className="divide-y divide-gray-100">
-        {!isAdmin && (
-          <div className="px-4 py-12 text-center text-gray-400 text-sm">
-            관리 기능은 관리자만 사용할 수 있습니다
-          </div>
+      {/* 구글 캘린더 가져오기 */}
+      <button
+        onClick={() => setShowGoogleImport(!showGoogleImport)}
+        className="w-full px-4 py-3.5 flex items-center gap-3 active:bg-gray-50"
+      >
+        <div className="w-9 h-9 bg-blue-50 rounded-xl flex items-center justify-center">
+          <svg className="w-5 h-5 text-blue-500" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 0C5.372 0 0 5.372 0 12s5.372 12 12 12 12-5.372 12-12S18.628 0 12 0zm6.28 14.78h-4.56v4.56h-3.44v-4.56H5.72v-3.44h4.56V6.78h3.44v4.56h4.56v3.44z"/>
+          </svg>
+        </div>
+        <div className="flex-1 text-left">
+          <div className="text-sm font-medium text-gray-800">구글 캘린더 가져오기</div>
+          <div className="text-xs text-gray-400">캘린더 ID로 일정 가져와서 현장팀 배정</div>
+        </div>
+        <svg className={`w-4 h-4 text-gray-400 transition-transform ${showGoogleImport ? "rotate-90" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+        </svg>
+      </button>
+
+      {showGoogleImport && (
+        <GoogleCalendarImport allUsers={allUsers} members={members} onImported={onRefresh} />
+      )}
+
+      {/* 일정 직접 등록 */}
+      <button
+        onClick={() => setShowBulkAdd(!showBulkAdd)}
+        className="w-full px-4 py-3.5 flex items-center gap-3 active:bg-gray-50"
+      >
+        <div className="w-9 h-9 bg-green-50 rounded-xl flex items-center justify-center">
+          <svg className="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+          </svg>
+        </div>
+        <div className="flex-1 text-left">
+          <div className="text-sm font-medium text-gray-800">일정 직접 등록</div>
+          <div className="text-xs text-gray-400">예약양식 붙여넣기로 등록</div>
+        </div>
+        <svg className={`w-4 h-4 text-gray-400 transition-transform ${showBulkAdd ? "rotate-90" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+        </svg>
+      </button>
+
+      {showBulkAdd && (
+        <div className="px-4 py-3 bg-gray-50 space-y-3">
+          <input type="date" value={bulkDate} onChange={(e) => setBulkDate(e.target.value)} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-green-400" />
+          <textarea value={bulkText} onChange={(e) => setBulkText(e.target.value)} rows={8} placeholder={"예약양식을 붙여넣으세요\n\n예시:\n1)성함: 홍길동\n2)주소: 서울시 강남구...\n3)연락처: 010-1234-5678\n\n또는 여러 건은 줄마다 제목 입력"} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-green-400 resize-y" />
+          <button onClick={handleBulkAdd} disabled={bulkAdding || !bulkText.trim()} className="w-full py-2.5 bg-green-500 text-white rounded-lg text-sm font-bold active:bg-green-600 disabled:opacity-50">{bulkAdding ? "등록 중..." : "배정탭에 등록"}</button>
+        </div>
+      )}
+
+      {/* 휴지통 */}
+      <button onClick={() => { setShowTrash(!showTrash); if (!showTrash) loadTrash(); }} className="w-full px-4 py-3.5 flex items-center gap-3 active:bg-gray-50">
+        <div className="w-9 h-9 bg-red-50 rounded-xl flex items-center justify-center">
+          <svg className="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+        </div>
+        <div className="flex-1 text-left">
+          <div className="text-sm font-medium text-gray-800">휴지통</div>
+          <div className="text-xs text-gray-400">삭제된 일정 보기 · 복원 가능</div>
+        </div>
+        <svg className={`w-4 h-4 text-gray-400 transition-transform ${showTrash ? "rotate-90" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+      </button>
+
+      {showTrash && (
+        <div className="bg-gray-50">
+          {loading ? <div className="py-6 text-center text-gray-400 text-sm">로딩 중...</div>
+           : trashItems.length === 0 ? <div className="py-6 text-center text-gray-400 text-sm">휴지통이 비어있습니다</div>
+           : <>
+              <div className="px-4 py-2 flex items-center justify-between">
+                <span className="text-xs text-gray-500">{trashItems.length}건</span>
+                <button onClick={handleEmptyTrash} className="text-xs text-red-500 font-medium">휴지통 비우기</button>
+              </div>
+              {trashItems.map((s) => (
+                <div key={s.id} className="px-4 py-2.5 flex items-center gap-2 border-t border-gray-100">
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm text-gray-700 truncate">{s.title.replace(/^\[.+?\]\s*/, "")}</div>
+                    <div className="text-xs text-gray-400">{s.date}</div>
+                  </div>
+                  <button onClick={() => handleRestore(s.id)} className="px-3 py-1.5 bg-blue-50 text-blue-600 rounded-lg text-xs font-medium active:bg-blue-100">복원</button>
+                </div>
+              ))}
+            </>}
+        </div>
+      )}
+
+      {/* 백업 */}
+      <button onClick={handleBackup} className="w-full px-4 py-3.5 flex items-center gap-3 active:bg-gray-50">
+        <div className="w-9 h-9 bg-blue-50 rounded-xl flex items-center justify-center">
+          <svg className="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+        </div>
+        <div className="flex-1 text-left">
+          <div className="text-sm font-medium text-gray-800">백업 다운로드</div>
+          <div className="text-xs text-gray-400">전체 일정을 JSON 파일로 저장</div>
+        </div>
+        <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+      </button>
+
+      {/* 전체 삭제 */}
+      <button
+        onClick={() => { if (confirm(`전체 ${totalCount}건 일정을 모두 삭제합니다. 정말 삭제하시겠습니까?`)) handleDeleteAll(); }}
+        className="w-full px-4 py-3.5 flex items-center gap-3 active:bg-red-50"
+      >
+        <div className="w-9 h-9 bg-red-50 rounded-xl flex items-center justify-center">
+          <svg className="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4.5c-.77-.834-2.694-.834-3.464 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z" /></svg>
+        </div>
+        <div className="flex-1 text-left">
+          <div className="text-sm font-medium text-red-600">전체 일정 삭제</div>
+          <div className="text-xs text-gray-400">모든 일정을 영구 삭제합니다</div>
+        </div>
+      </button>
+    </div>
+  );
+}
+
+
+/* ════════════ 영업팀 통계 섹션 ════════════ */
+function SalesStatsSection({ userName, userRole, allUsers }: {
+  userName: string;
+  userRole: string;
+  allUsers: { id?: string; name: string; username?: string; role?: string }[];
+}) {
+  const [schedules, setSchedules] = useState<Schedule[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedMonth, setSelectedMonth] = useState(() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  });
+
+  useEffect(() => { loadSchedules(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function loadSchedules() {
+    setLoading(true);
+    const all = await fetchSchedules();
+    setSchedules(all);
+    setLoading(false);
+  }
+
+  // 영업건수: 영업탭에서 배정으로 보내고, 배정에서 입금확인까지 누른 것 = 제목에 /미입금 없고, U로 시작하는 것
+  // 미입금 = 제목에 /미입금 포함
+  // 월별 필터
+  const monthSchedules = schedules.filter(s => s.date.startsWith(selectedMonth));
+
+  // 영업사원별 통계 계산
+  const salesUsers = userRole === "ceo"
+    ? allUsers.filter(u => u.role === "sales" || u.role === "ceo")
+    : allUsers.filter(u => u.name === userName);
+
+  function getStatsForUser(name: string) {
+    // 영업사원 이름이 제목에 포함된 일정
+    const userSchedules = monthSchedules.filter(s => {
+      const title = s.title.replace(/^\[.+?\]\s*/, "");
+      // 제목 형식: U고객이름/지역/영업사원이름/... 또는 u영업사원이름/미입금/고객이름
+      return title.includes(`/${name}/`) || title.includes(`/${name}[`) || title.endsWith(`/${name}`) || title.startsWith(`u${name}/`);
+    });
+
+    const confirmed = userSchedules.filter(s => !s.title.includes("/미입금")).length;
+    const pending = userSchedules.filter(s => s.title.includes("/미입금")).length;
+    const total = userSchedules.length;
+
+    return { total, confirmed, pending };
+  }
+
+  if (loading) return <div className="py-8 text-center text-gray-400 text-sm">로딩 중...</div>;
+
+  return (
+    <div className="px-4 py-4 space-y-4">
+      {/* 월 선택 */}
+      <div className="flex items-center gap-2">
+        <input
+          type="month"
+          value={selectedMonth}
+          onChange={(e) => setSelectedMonth(e.target.value)}
+          className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-400"
+        />
+        <button onClick={loadSchedules} className="px-3 py-2 bg-blue-50 text-blue-600 rounded-lg text-xs font-bold active:bg-blue-100">새로고침</button>
+      </div>
+
+      {/* 전체 요약 */}
+      <div className="grid grid-cols-3 gap-2">
+        <div className="bg-blue-50 rounded-xl p-3 text-center">
+          <div className="text-lg font-extrabold text-blue-700">{monthSchedules.length}</div>
+          <div className="text-xs text-blue-500">전체 건수</div>
+        </div>
+        <div className="bg-green-50 rounded-xl p-3 text-center">
+          <div className="text-lg font-extrabold text-green-700">{monthSchedules.filter(s => !s.title.includes("/미입금")).length}</div>
+          <div className="text-xs text-green-500">입금확인</div>
+        </div>
+        <div className="bg-red-50 rounded-xl p-3 text-center">
+          <div className="text-lg font-extrabold text-red-700">{monthSchedules.filter(s => s.title.includes("/미입금")).length}</div>
+          <div className="text-xs text-red-500">미입금</div>
+        </div>
+      </div>
+
+      {/* 영업사원별 상세 */}
+      <div className="space-y-2">
+        <div className="text-xs font-bold text-gray-500 uppercase tracking-wider">영업사원별 현황</div>
+        {salesUsers.map((user) => {
+          const stats = getStatsForUser(user.name);
+          return (
+            <div key={user.name} className="border border-gray-200 rounded-xl p-3">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm font-bold text-gray-800">{user.name}</span>
+                <span className="text-xs px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full font-medium">{stats.total}건</span>
+              </div>
+              <div className="flex gap-3 text-xs">
+                <span className="text-green-600">✅ 입금확인 {stats.confirmed}건</span>
+                <span className="text-red-500">⏳ 미입금 {stats.pending}건</span>
+              </div>
+              {stats.total > 0 && (
+                <div className="mt-2 h-2 bg-gray-100 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-green-500 rounded-full transition-all"
+                    style={{ width: `${Math.round((stats.confirmed / stats.total) * 100)}%` }}
+                  />
+                </div>
+              )}
+            </div>
+          );
+        })}
+        {salesUsers.length === 0 && (
+          <div className="py-4 text-center text-gray-400 text-sm">영업팀 사용자가 없습니다</div>
         )}
+      </div>
+    </div>
+  );
+}
 
-        {isAdmin && (
-          <>
-            {/* 일정 직접 등록 */}
-            <button
-              onClick={() => setShowBulkAdd(!showBulkAdd)}
-              className="w-full px-4 py-3.5 flex items-center gap-3 active:bg-gray-50"
-            >
-              <div className="w-9 h-9 bg-green-50 rounded-xl flex items-center justify-center">
-                <svg className="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                </svg>
-              </div>
-              <div className="flex-1 text-left">
-                <div className="text-sm font-medium text-gray-800">일정 직접 등록</div>
-                <div className="text-xs text-gray-400">예약양식 붙여넣기로 등록</div>
-              </div>
-              <svg className={`w-4 h-4 text-gray-400 transition-transform ${showBulkAdd ? "rotate-90" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-              </svg>
-            </button>
 
-            {showBulkAdd && (
-              <div className="px-4 py-3 bg-gray-50 space-y-3">
-                <input
-                  type="date" value={bulkDate} onChange={(e) => setBulkDate(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-green-400"
-                />
-                <textarea
-                  value={bulkText} onChange={(e) => setBulkText(e.target.value)}
-                  rows={8} placeholder={"예약양식을 붙여넣으세요\n\n예시:\n1)성함: 홍길동\n2)주소: 서울시 강남구...\n3)연락처: 010-1234-5678\n\n또는 여러 건은 줄마다 제목 입력"}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-green-400 resize-y"
-                />
-                <button
-                  onClick={handleBulkAdd} disabled={bulkAdding || !bulkText.trim()}
-                  className="w-full py-2.5 bg-green-500 text-white rounded-lg text-sm font-bold active:bg-green-600 disabled:opacity-50"
-                >
-                  {bulkAdding ? "등록 중..." : "배정탭에 등록"}
-                </button>
-              </div>
-            )}
+/* ════════════ 구글 캘린더 가져오기 (대표 전용) ════════════ */
+function GoogleCalendarImport({ allUsers, members, onImported }: {
+  allUsers: { id?: string; name: string; username?: string; role?: string }[];
+  members: { id: string; name: string; linkedUsername?: string }[];
+  onImported: () => void;
+}) {
+  const [calendarId, setCalendarId] = useState(() => typeof window !== "undefined" ? localStorage.getItem("google_calendar_id") || "" : "");
+  const [events, setEvents] = useState<{ id: string; summary: string; date: string; description?: string; selected: boolean; assignTo: string }[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [error, setError] = useState("");
 
-            {/* 휴지통 */}
-            <button
-              onClick={() => { setShowTrash(!showTrash); if (!showTrash) loadTrash(); }}
-              className="w-full px-4 py-3.5 flex items-center gap-3 active:bg-gray-50"
-            >
-              <div className="w-9 h-9 bg-red-50 rounded-xl flex items-center justify-center">
-                <svg className="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                </svg>
-              </div>
-              <div className="flex-1 text-left">
-                <div className="text-sm font-medium text-gray-800">휴지통</div>
-                <div className="text-xs text-gray-400">삭제된 일정 보기 · 복원 가능</div>
-              </div>
-              <svg className={`w-4 h-4 text-gray-400 transition-transform ${showTrash ? "rotate-90" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-              </svg>
-            </button>
+  const fieldUsers = allUsers.filter(u => u.role === "field");
 
-            {showTrash && (
-              <div className="bg-gray-50">
-                {loading ? (
-                  <div className="py-6 text-center text-gray-400 text-sm">로딩 중...</div>
-                ) : trashItems.length === 0 ? (
-                  <div className="py-6 text-center text-gray-400 text-sm">휴지통이 비어있습니다</div>
-                ) : (
-                  <>
-                    <div className="px-4 py-2 flex items-center justify-between">
-                      <span className="text-xs text-gray-500">{trashItems.length}건</span>
-                      <button onClick={handleEmptyTrash} className="text-xs text-red-500 font-medium">휴지통 비우기</button>
-                    </div>
-                    {trashItems.map((s) => (
-                      <div key={s.id} className="px-4 py-2.5 flex items-center gap-2 border-t border-gray-100">
-                        <div className="flex-1 min-w-0">
-                          <div className="text-sm text-gray-700 truncate">{s.title.replace(/^\[.+?\]\s*/, "")}</div>
-                          <div className="text-xs text-gray-400">{s.date}</div>
-                        </div>
-                        <button onClick={() => handleRestore(s.id)} className="px-3 py-1.5 bg-blue-50 text-blue-600 rounded-lg text-xs font-medium active:bg-blue-100">복원</button>
-                      </div>
+  async function handleFetchEvents() {
+    if (!calendarId.trim()) { setError("캘린더 ID를 입력해주세요"); return; }
+    setLoading(true);
+    setError("");
+    localStorage.setItem("google_calendar_id", calendarId.trim());
+
+    try {
+      const refreshToken = localStorage.getItem("google_refresh_token");
+      if (!refreshToken) {
+        // OAuth 인증 필요
+        const authRes = await fetch(`/api/calendar?action=auth-url`);
+        const authData = await authRes.json();
+        if (authData.needSetup) {
+          setError("Google Calendar API가 설정되지 않았습니다. 환경변수(GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET)를 확인하세요.");
+        } else if (authData.authUrl) {
+          window.location.href = `/api/calendar?action=auth-redirect`;
+        } else {
+          setError("인증 URL 생성 실패");
+        }
+        setLoading(false);
+        return;
+      }
+
+      const res = await fetch("/api/calendar", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "auto-sync", refreshToken, calendarId: calendarId.trim() }),
+      });
+      const data = await res.json();
+
+      if (data.needReauth) {
+        localStorage.removeItem("google_refresh_token");
+        setError("인증이 만료되었습니다. 다시 가져오기를 눌러주세요.");
+        setLoading(false);
+        return;
+      }
+
+      if (data.error) { setError(data.error); setLoading(false); return; }
+
+      const items = (data.items || []).map((ev: { id: string; summary?: string; start?: { date?: string; dateTime?: string }; description?: string }) => ({
+        id: ev.id,
+        summary: ev.summary || "(제목 없음)",
+        date: ev.start?.date || (ev.start?.dateTime ? ev.start.dateTime.slice(0, 10) : ""),
+        description: ev.description || "",
+        selected: true,
+        assignTo: "",
+      }));
+      setEvents(items);
+    } catch {
+      setError("캘린더 연결 실패");
+    }
+    setLoading(false);
+  }
+
+  async function handleImport() {
+    const toImport = events.filter(e => e.selected);
+    if (toImport.length === 0) return;
+    setImporting(true);
+
+    for (const ev of toImport) {
+      await addUnassignedSchedule({
+        title: ev.summary,
+        date: ev.date,
+        startTime: "09:00",
+        endTime: "18:00",
+        note: ev.description || "",
+        ...(ev.assignTo ? { memberId: ev.assignTo, memberName: fieldUsers.find(u => u.id === ev.assignTo)?.name || members.find(m => m.id === ev.assignTo)?.name || "" } : {}),
+      });
+    }
+
+    setImporting(false);
+    setEvents([]);
+    onImported();
+    alert(`${toImport.length}건 가져오기 완료`);
+  }
+
+  function toggleAll(checked: boolean) {
+    setEvents(prev => prev.map(e => ({ ...e, selected: checked })));
+  }
+
+  return (
+    <div className="px-4 py-3 bg-gray-50 space-y-3">
+      {/* 캘린더 ID 입력 */}
+      <div className="space-y-1">
+        <label className="text-xs font-bold text-gray-500">구글 캘린더 ID</label>
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={calendarId}
+            onChange={(e) => setCalendarId(e.target.value)}
+            placeholder="example@gmail.com 또는 캘린더ID"
+            className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-400"
+          />
+          <button onClick={handleFetchEvents} disabled={loading} className="px-4 py-2 bg-blue-500 text-white rounded-lg text-xs font-bold active:bg-blue-600 disabled:opacity-50 shrink-0">
+            {loading ? "로딩..." : "가져오기"}
+          </button>
+        </div>
+        <p className="text-xs text-gray-400">구글 캘린더 설정 → 캘린더 통합 → 캘린더 ID 복사</p>
+      </div>
+
+      {error && <div className="p-2 bg-red-50 border border-red-200 rounded-lg text-xs text-red-600">{error}</div>}
+
+      {/* 이벤트 목록 */}
+      {events.length > 0 && (
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-gray-600">{events.filter(e => e.selected).length}/{events.length}건 선택</span>
+            <div className="flex gap-2">
+              <button onClick={() => toggleAll(true)} className="text-xs text-blue-500 font-medium">전체선택</button>
+              <button onClick={() => toggleAll(false)} className="text-xs text-gray-400 font-medium">전체해제</button>
+            </div>
+          </div>
+
+          <div className="max-h-[40vh] overflow-y-auto space-y-1.5">
+            {events.map((ev, idx) => (
+              <div key={ev.id} className={`border rounded-xl p-2.5 ${ev.selected ? "border-blue-300 bg-blue-50/50" : "border-gray-200 bg-white"}`}>
+                <div className="flex items-start gap-2">
+                  <input
+                    type="checkbox"
+                    checked={ev.selected}
+                    onChange={(e) => setEvents(prev => prev.map((x, i) => i === idx ? { ...x, selected: e.target.checked } : x))}
+                    className="mt-0.5 w-4 h-4 rounded border-gray-300 text-blue-500 shrink-0"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-medium text-gray-800 truncate">{ev.summary}</div>
+                    <div className="text-xs text-gray-400">{ev.date}</div>
+                  </div>
+                </div>
+                {ev.selected && (
+                  <select
+                    value={ev.assignTo}
+                    onChange={(e) => setEvents(prev => prev.map((x, i) => i === idx ? { ...x, assignTo: e.target.value } : x))}
+                    className="mt-2 w-full px-2 py-1.5 border border-gray-200 rounded-lg text-xs outline-none bg-white"
+                  >
+                    <option value="">배정 안 함 (미배정)</option>
+                    {fieldUsers.map(u => (
+                      <option key={u.id || u.name} value={u.id || ""}>{u.name} (현장팀)</option>
                     ))}
-                  </>
+                    {members.filter(m => !fieldUsers.find(u => u.name === m.name)).map(m => (
+                      <option key={m.id} value={m.id}>{m.name}</option>
+                    ))}
+                  </select>
                 )}
               </div>
-            )}
+            ))}
+          </div>
 
-            {/* 백업 */}
-            <button onClick={handleBackup} className="w-full px-4 py-3.5 flex items-center gap-3 active:bg-gray-50">
-              <div className="w-9 h-9 bg-blue-50 rounded-xl flex items-center justify-center">
-                <svg className="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                </svg>
-              </div>
-              <div className="flex-1 text-left">
-                <div className="text-sm font-medium text-gray-800">백업 다운로드</div>
-                <div className="text-xs text-gray-400">전체 일정을 JSON 파일로 저장</div>
-              </div>
-              <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-              </svg>
-            </button>
-
-            {/* 전체 삭제 */}
-            <button
-              onClick={() => { if (confirm(`전체 ${totalCount}건 일정을 모두 삭제합니다. 정말 삭제하시겠습니까?`)) handleDeleteAll(); }}
-              className="w-full px-4 py-3.5 flex items-center gap-3 active:bg-red-50"
-            >
-              <div className="w-9 h-9 bg-red-50 rounded-xl flex items-center justify-center">
-                <svg className="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4.5c-.77-.834-2.694-.834-3.464 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z" />
-                </svg>
-              </div>
-              <div className="flex-1 text-left">
-                <div className="text-sm font-medium text-red-600">전체 일정 삭제</div>
-                <div className="text-xs text-gray-400">모든 일정을 영구 삭제합니다</div>
-              </div>
-            </button>
-          </>
-        )}
-      </div>
+          <button
+            onClick={handleImport}
+            disabled={importing || events.filter(e => e.selected).length === 0}
+            className="w-full py-3 bg-blue-500 text-white rounded-xl text-sm font-bold active:bg-blue-600 disabled:opacity-50"
+          >
+            {importing ? "가져오는 중..." : `${events.filter(e => e.selected).length}건 가져오기`}
+          </button>
+        </div>
+      )}
     </div>
   );
 }
