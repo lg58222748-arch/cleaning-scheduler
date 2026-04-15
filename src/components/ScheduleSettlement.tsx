@@ -129,29 +129,31 @@ export default function ScheduleSettlement({ scheduleId, scheduleTitle = "", sch
     setShowShareModal(true);
     onCompleted?.();
 
-    // 제목 U→A 변경
-    const updateData: Partial<import("@/types").Schedule> & Record<string, unknown> = { status: "completed" };
-    if (scheduleTitle) {
-      const timePrefix = scheduleTitle.match(/^\[.+?\]\s*/)?.[0] || "";
-      const bare = scheduleTitle.replace(/^\[.+?\]\s*/, "");
-      let newBare = bare;
-      if (bare.startsWith("U") || bare.startsWith("u")) {
-        newBare = "A" + bare.slice(1);
-      } else if (!bare.startsWith("A")) {
-        newBare = "A" + bare;
-      }
-      updateData.title = timePrefix + newBare;
-    }
-
-    // 정산 저장 + 일정 업데이트
+    // 정산 저장 + 상태만 완료로
     await Promise.all([
       saveSettlement(scheduleId, {
         quote: q, deposit: d, extraCharge: e,
         paymentMethod, cashReceipt, customerName, customerPhone, note, status: "completed",
         depositorName, bankName, accountNumber,
       } as Record<string, unknown>),
-      apiUpdateSchedule(scheduleId, updateData as Partial<import("@/types").Schedule>),
+      apiUpdateSchedule(scheduleId, { status: "completed" } as Partial<import("@/types").Schedule>),
     ]).catch(() => {});
+  }
+
+  // 전송 후 제목 U→A 변경
+  async function changeTitleToA() {
+    if (!scheduleTitle) return;
+    const timePrefix = scheduleTitle.match(/^\[.+?\]\s*/)?.[0] || "";
+    const bare = scheduleTitle.replace(/^\[.+?\]\s*/, "");
+    let newBare = bare;
+    if (bare.startsWith("U") || bare.startsWith("u")) {
+      newBare = "A" + bare.slice(1);
+    } else if (!bare.startsWith("A")) {
+      newBare = "A" + bare;
+    }
+    if (newBare !== bare) {
+      await apiUpdateSchedule(scheduleId, { title: timePrefix + newBare } as Partial<import("@/types").Schedule>).catch(() => {});
+    }
   }
 
   function handleSendSMS() {
@@ -162,6 +164,7 @@ export default function ScheduleSettlement({ scheduleId, scheduleTitle = "", sch
     window.location.href = phone
       ? `sms:${phone}${isIOS ? "&" : "?"}body=${encoded}`
       : `sms:${isIOS ? "&" : "?"}body=${encoded}`;
+    changeTitleToA(); // 전송 후 U→A
   }
 
   async function handleSendKakao() {
@@ -169,16 +172,18 @@ export default function ScheduleSettlement({ scheduleId, scheduleTitle = "", sch
     // Capacitor Share 플러그인 → 네이티브 공유 시트 (카카오톡 선택 가능)
     try {
       await Share.share({ text });
+      changeTitleToA(); // 전송 후 U→A
       return;
     } catch { /* Capacitor 미지원 환경 */ }
     // fallback: 웹 navigator.share
     if (navigator.share) {
-      try { await navigator.share({ text }); return; } catch { /* 취소 */ }
+      try { await navigator.share({ text }); changeTitleToA(); return; } catch { /* 취소 */ }
     }
     // 최종 fallback: 클립보드 복사
     try { await navigator.clipboard.writeText(text); } catch {
       const ta = document.createElement("textarea"); ta.value = text; document.body.appendChild(ta); ta.select(); document.execCommand("copy"); document.body.removeChild(ta);
     }
+    changeTitleToA(); // 복사 후에도 U→A
     setCopied(true); setTimeout(() => setCopied(false), 2000);
   }
 
@@ -311,7 +316,12 @@ export default function ScheduleSettlement({ scheduleId, scheduleTitle = "", sch
           <div className="bg-white rounded-t-2xl w-full max-w-md p-5 pb-8 animate-[modalIn_0.2s_ease-out]">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-base font-bold text-green-700">✅ 작업 완료</h3>
-              <button onClick={() => setShowShareModal(false)} className="text-gray-400 text-xl">&times;</button>
+              <button onClick={() => {
+                setShowShareModal(false);
+                setQuote(""); setDeposit(""); setExtraCharge("");
+                setPaymentMethod("transfer"); setCashReceipt(false);
+                setNote("");
+              }} className="text-gray-400 text-xl">&times;</button>
             </div>
             <div className="bg-gray-50 rounded-xl p-4 mb-4 max-h-[35vh] overflow-y-auto">
               <pre className="text-xs text-gray-700 whitespace-pre-wrap font-sans leading-relaxed">{getShareText()}</pre>
@@ -327,14 +337,8 @@ export default function ScheduleSettlement({ scheduleId, scheduleTitle = "", sch
               <button onClick={handleCopy} className={`w-full py-3.5 rounded-xl text-sm font-bold flex items-center justify-center gap-2 ${copied ? "bg-green-500 text-white" : "bg-gray-200 text-gray-700"}`}>
                 <span>📋</span> {copied ? "복사됨!" : "텍스트 복사"}
               </button>
-              <button onClick={() => {
-                setShowShareModal(false);
-                // 전송 후 입력값 초기화
-                setQuote(""); setDeposit(""); setExtraCharge("");
-                setPaymentMethod("transfer"); setCashReceipt(false);
-                setNote("");
-              }} className="w-full py-3 bg-gray-100 text-gray-500 rounded-xl text-sm font-bold">
-                닫기 (초기화)
+              <button onClick={() => setShowShareModal(false)} className="w-full py-3 bg-gray-100 text-gray-500 rounded-xl text-sm font-bold">
+                닫기
               </button>
             </div>
           </div>
