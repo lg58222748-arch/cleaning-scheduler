@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { Settlement, PaymentMethod } from "@/types";
 import { fetchSettlement, saveSettlement, updateSchedule as apiUpdateSchedule } from "@/lib/api";
+import { Share } from "@capacitor/share";
 
 interface ScheduleSettlementProps {
   scheduleId: string;
@@ -148,24 +149,20 @@ export default function ScheduleSettlement({ scheduleId, scheduleNote, customerN
 
   async function handleSendKakao() {
     const text = getShareText();
-    // 1. 클립보드에 먼저 복사
-    try { await navigator.clipboard.writeText(text); } catch {
-      const ta = document.createElement("textarea"); ta.value = text; document.body.appendChild(ta); ta.select(); document.execCommand("copy"); document.body.removeChild(ta);
-    }
-    // 2. 카카오톡 앱 열기 시도 (Android intent → kakao scheme → 공유시트 순서)
-    const encoded = encodeURIComponent(text);
-    const isAndroid = /Android/i.test(navigator.userAgent);
-    if (isAndroid) {
-      // Android intent scheme - 카카오톡 앱 직접 호출
-      window.location.href = `intent://send?text=${encoded}#Intent;scheme=kakaotalk;package=com.kakao.talk;end`;
+    // Capacitor Share 플러그인 → 네이티브 공유 시트 (카카오톡 선택 가능)
+    try {
+      await Share.share({ title: "새집느낌 정산서", text, dialogTitle: "정산서 보내기" });
       return;
-    }
-    // iOS 또는 기타 - 네이티브 공유 시트
+    } catch { /* Capacitor 미지원 환경 */ }
+    // fallback: 웹 navigator.share
     if (navigator.share) {
       try { await navigator.share({ title: "새집느낌 정산서", text }); return; } catch { /* 취소 */ }
     }
-    // 최종 fallback
-    window.location.href = `kakaotalk://send?text=${encoded}`;
+    // 최종 fallback: 클립보드 복사
+    try { await navigator.clipboard.writeText(text); } catch {
+      const ta = document.createElement("textarea"); ta.value = text; document.body.appendChild(ta); ta.select(); document.execCommand("copy"); document.body.removeChild(ta);
+    }
+    setCopied(true); setTimeout(() => setCopied(false), 2000);
   }
 
   async function handleCopy() {
