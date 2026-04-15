@@ -126,6 +126,23 @@ export default function ScheduleSettlement({ scheduleId, scheduleNote, customerN
     if (s) setS({ ...s, status: "completed" as const });
     setShowShareModal(true);
     onCompleted?.();
+    // 제목 U→A 변경 (작업완료 표시)
+    let titleUpdate: Record<string, unknown> = { status: "completed" };
+    try {
+      const res = await fetch(`/api/schedules/${scheduleId}`);
+      const sched = await res.json();
+      if (sched?.title) {
+        const oldTitle = sched.title.replace(/^\[.+?\]\s*/, "");
+        const timePrefix = sched.title.match(/^\[.+?\]\s*/)?.[0] || "";
+        let newTitle = oldTitle;
+        if (oldTitle.startsWith("U")) {
+          newTitle = "A" + oldTitle.slice(1);
+        } else if (!oldTitle.startsWith("A")) {
+          newTitle = "A" + oldTitle;
+        }
+        titleUpdate = { status: "completed", title: timePrefix + newTitle };
+      }
+    } catch { /* 제목 변경 실패해도 정산은 진행 */ }
     // API 병렬 처리 (백그라운드)
     Promise.all([
       saveSettlement(scheduleId, {
@@ -133,7 +150,7 @@ export default function ScheduleSettlement({ scheduleId, scheduleNote, customerN
         paymentMethod, cashReceipt, customerName, customerPhone, note, status: "completed",
         depositorName, bankName, accountNumber,
       } as Record<string, unknown>),
-      apiUpdateSchedule(scheduleId, { status: "completed" } as Partial<import("@/types").Schedule>),
+      apiUpdateSchedule(scheduleId, titleUpdate as Partial<import("@/types").Schedule>),
     ]).catch(() => {});
   }
 
@@ -151,12 +168,12 @@ export default function ScheduleSettlement({ scheduleId, scheduleNote, customerN
     const text = getShareText();
     // Capacitor Share 플러그인 → 네이티브 공유 시트 (카카오톡 선택 가능)
     try {
-      await Share.share({ title: "새집느낌 정산서", text, dialogTitle: "정산서 보내기" });
+      await Share.share({ text, dialogTitle: "정산서 보내기" });
       return;
     } catch { /* Capacitor 미지원 환경 */ }
     // fallback: 웹 navigator.share
     if (navigator.share) {
-      try { await navigator.share({ title: "새집느낌 정산서", text }); return; } catch { /* 취소 */ }
+      try { await navigator.share({ text }); return; } catch { /* 취소 */ }
     }
     // 최종 fallback: 클립보드 복사
     try { await navigator.clipboard.writeText(text); } catch {
