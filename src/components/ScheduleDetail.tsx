@@ -134,20 +134,20 @@ export default function ScheduleDetail({
   // 인라인 저장
   async function handleSaveNote() {
     setSaving(true);
-    await apiUpdateSchedule(schedule.id, { note: noteText });
     schedule.note = noteText;
     setNoteChanged(false);
     setSaving(false);
     onUpdated?.();
+    apiUpdateSchedule(schedule.id, { note: noteText }).catch(() => {});
   }
 
   async function handleSaveTitle() {
     setSaving(true);
-    await apiUpdateSchedule(schedule.id, { title: titleText });
     schedule.title = titleText;
     setEditingTitle(false);
     setSaving(false);
     onUpdated?.();
+    apiUpdateSchedule(schedule.id, { title: titleText }).catch(() => {});
   }
 
   async function handleTimeSlotChange(slot: string) {
@@ -158,15 +158,15 @@ export default function ScheduleDetail({
     const newTitle = newSlot ? `[${newSlot}] ${bare}` : bare;
     schedule.title = newTitle;
     setTitleText(newTitle);
-    apiUpdateSchedule(schedule.id, { title: newTitle });
     onUpdated?.();
+    apiUpdateSchedule(schedule.id, { title: newTitle }).catch(() => {});
   }
 
   async function handleColorChange(color: string) {
     setSchedColor(color);
     schedule.color = color;
-    await apiUpdateSchedule(schedule.id, { color });
     onUpdated?.();
+    apiUpdateSchedule(schedule.id, { color }).catch(() => {});
   }
 
   function formatTime(dateStr: string): string {
@@ -520,14 +520,14 @@ export default function ScheduleDetail({
           {mode === "assign" && (
             <>
               <button
-                onClick={async () => {
+                onClick={() => {
                   if (titleText.includes("/미입금")) {
                     const originalMatch = schedule.note?.match(/원래제목:\s*(.+)/);
                     const newTitle = originalMatch ? originalMatch[1].trim() : titleText.replace(/\/미입금/g, "");
                     schedule.title = newTitle;
                     setTitleText(newTitle);
-                    await apiUpdateSchedule(schedule.id, { title: newTitle });
                     onUpdated?.();
+                    apiUpdateSchedule(schedule.id, { title: newTitle }).catch(() => {});
                   }
                 }}
                 className={`flex-1 py-3 rounded-xl text-sm font-bold active:opacity-90 ${titleText.includes("/미입금") ? "text-white" : "text-green-600 bg-green-50 border border-green-200"}`}
@@ -537,12 +537,12 @@ export default function ScheduleDetail({
               </button>
               {!titleText.includes("/미입금") && (
                 <button
-                  onClick={async () => {
+                  onClick={() => {
                     const newTitle = `${titleText}/미입금`;
                     schedule.title = newTitle;
                     setTitleText(newTitle);
-                    await apiUpdateSchedule(schedule.id, { title: newTitle });
                     onUpdated?.();
+                    apiUpdateSchedule(schedule.id, { title: newTitle }).catch(() => {});
                   }}
                   className="flex-1 py-3 rounded-xl text-sm font-bold text-red-500 bg-red-50 border border-red-200 active:opacity-90"
                 >
@@ -552,23 +552,17 @@ export default function ScheduleDetail({
             </>
           )}
           <button
-            onClick={async () => {
+            onClick={() => {
               setSaving(true);
-              // 제목 변경 저장
-              if (titleText !== schedule.title) {
-                await apiUpdateSchedule(schedule.id, { title: titleText });
-                schedule.title = titleText;
-                setEditingTitle(false);
-              }
-              // 메모 변경 저장
-              if (noteChanged) {
-                await apiUpdateSchedule(schedule.id, { note: noteText });
-                schedule.note = noteText;
-                setNoteChanged(false);
+              const updates: Record<string, unknown> = {};
+              if (titleText !== schedule.title) { updates.title = titleText; schedule.title = titleText; setEditingTitle(false); }
+              if (noteChanged) { updates.note = noteText; schedule.note = noteText; setNoteChanged(false); }
+              if (Object.keys(updates).length > 0) {
+                apiUpdateSchedule(schedule.id, updates as Partial<import("@/types").Schedule>).catch(() => {});
               }
               setSaving(false);
               onUpdated?.();
-              if (titleText === schedule.title && !noteChanged) onClose();
+              onClose();
             }}
             disabled={saving}
             className="flex-1 py-2 bg-blue-500 text-white rounded-xl text-xs font-bold active:bg-blue-600 disabled:opacity-50"

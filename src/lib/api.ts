@@ -2,16 +2,20 @@ import { Member, Schedule, SwapRequest } from "@/types";
 
 const BASE = "";
 
-// 안전한 fetch 래퍼 - 네트워크 오류/비정상 응답 처리
+// 안전한 fetch 래퍼 - 자동 재시도 (최대 3회, 1초 간격)
 async function safeFetch(url: string, options?: RequestInit): Promise<Response> {
-  try {
-    const res = await fetch(url, options);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    return res;
-  } catch (e) {
-    console.error(`API 오류 [${options?.method || "GET"} ${url}]:`, e);
-    throw e;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const res = await fetch(url, options);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return res;
+    } catch (e) {
+      console.error(`API 오류 (${attempt + 1}/3) [${options?.method || "GET"} ${url}]:`, e);
+      if (attempt < 2) await new Promise(r => setTimeout(r, 1000));
+      else throw e;
+    }
   }
+  throw new Error("unreachable");
 }
 
 async function safeJson<T>(url: string, fallback: T, options?: RequestInit): Promise<T> {
