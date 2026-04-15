@@ -147,15 +147,18 @@ export default function ScheduleSettlement({ scheduleId, scheduleNote, customerN
       : `sms:${isIOS ? "&" : "?"}body=${encoded}`;
   }
 
-  const [kakaoCopied, setKakaoCopied] = useState(false);
-
   async function handleSendKakao() {
     const text = getShareText();
+    // 클립보드에 먼저 복사 (공유 실패 대비)
     try { await navigator.clipboard.writeText(text); } catch {
       const ta = document.createElement("textarea"); ta.value = text; document.body.appendChild(ta); ta.select(); document.execCommand("copy"); document.body.removeChild(ta);
     }
-    setKakaoCopied(true);
-    setTimeout(() => setKakaoCopied(false), 3000);
+    // 네이티브 공유 시트 열기 (카카오톡 선택 가능)
+    if (navigator.share) {
+      try { await navigator.share({ title: "새집느낌 정산서", text }); return; } catch { /* 취소 또는 미지원 */ }
+    }
+    // 공유 시트 미지원 시 카카오톡 앱 직접 열기 시도
+    window.location.href = `kakaotalk://msg/text/${encodeURIComponent(text)}`;
   }
 
   async function handleCopy() {
@@ -274,38 +277,34 @@ export default function ScheduleSettlement({ scheduleId, scheduleNote, customerN
           작업 완료
         </button>
       ) : (
-        <div className="flex gap-2">
-          <button onClick={handleSendSMS} className="flex-1 py-3 bg-blue-500 text-white rounded-xl text-sm font-bold active:bg-blue-600">
-            문자 전송
-          </button>
-          <button onClick={handleSendKakao} className="flex-1 py-3 rounded-xl text-sm font-bold active:opacity-90"
-            style={{ background: "#FEE500", color: "#3C1E1E" }}>
-            {kakaoCopied ? "복사됨! 카톡에 붙여넣기" : "카톡용 복사"}
-          </button>
-        </div>
+        <button onClick={() => setShowShareModal(true)}
+          className="w-full py-4 rounded-xl text-base font-bold text-white active:opacity-90"
+          style={{ background: "linear-gradient(135deg, #0f4c81, #1a6bb5)" }}>
+          마무리 · 정산서 전송
+        </button>
       )}
 
-      {/* 작업 완료 모달 */}
+      {/* 마무리 모달 - 문자/카톡 전송 */}
       {showShareModal && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-end justify-center" onClick={(e) => { if (e.target === e.currentTarget) setShowShareModal(false); }}>
           <div className="bg-white rounded-t-2xl w-full max-w-md p-5 pb-8 animate-[modalIn_0.2s_ease-out]">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-base font-bold text-green-700">작업 완료</h3>
+              <h3 className="text-base font-bold text-green-700">✅ 작업 완료</h3>
               <button onClick={() => setShowShareModal(false)} className="text-gray-400 text-xl">&times;</button>
             </div>
             <div className="bg-gray-50 rounded-xl p-4 mb-4 max-h-[35vh] overflow-y-auto">
               <pre className="text-xs text-gray-700 whitespace-pre-wrap font-sans leading-relaxed">{getShareText()}</pre>
             </div>
             <div className="space-y-2">
-              <button onClick={handleSendSMS} className="w-full py-3.5 bg-blue-500 text-white rounded-xl text-sm font-bold active:bg-blue-600">
-                문자로 보내기{customerPhone ? ` (${customerPhone})` : ""}
+              <button onClick={handleSendSMS} className="w-full py-3.5 bg-blue-500 text-white rounded-xl text-sm font-bold active:bg-blue-600 flex items-center justify-center gap-2">
+                <span>💬</span> 문자 전송{customerPhone ? ` (${customerPhone})` : ""}
               </button>
-              <button onClick={handleSendKakao} className="w-full py-3.5 rounded-xl text-sm font-bold active:opacity-90"
+              <button onClick={handleSendKakao} className="w-full py-3.5 rounded-xl text-sm font-bold active:opacity-90 flex items-center justify-center gap-2"
                 style={{ background: "#FEE500", color: "#3C1E1E" }}>
-                {kakaoCopied ? "✅ 복사됨! 카카오톡에 붙여넣기 해주세요" : "카카오톡용 복사"}
+                <span>💛</span> 카카오톡 전송
               </button>
-              <button onClick={handleCopy} className={`w-full py-3.5 rounded-xl text-sm font-bold ${copied ? "bg-green-500 text-white" : "bg-gray-200 text-gray-700"}`}>
-                {copied ? "복사됨!" : "텍스트 복사"}
+              <button onClick={handleCopy} className={`w-full py-3.5 rounded-xl text-sm font-bold flex items-center justify-center gap-2 ${copied ? "bg-green-500 text-white" : "bg-gray-200 text-gray-700"}`}>
+                <span>📋</span> {copied ? "복사됨!" : "텍스트 복사"}
               </button>
               <button onClick={() => setShowShareModal(false)} className="w-full py-3 bg-gray-100 text-gray-500 rounded-xl text-sm font-bold">
                 닫기
