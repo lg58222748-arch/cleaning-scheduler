@@ -366,7 +366,7 @@ export default function Home() {
   }
 
   const role = currentUser.role;
-  const isAdmin = role === "ceo";
+  const isAdmin = role === "ceo" || role === "scheduler";
   const canSales = role === "ceo" || role === "sales";
   const canAssign = role === "ceo" || role === "scheduler" || role === "sales";
   const canManage = role === "ceo" || role === "sales" || role === "field" || role === "scheduler";
