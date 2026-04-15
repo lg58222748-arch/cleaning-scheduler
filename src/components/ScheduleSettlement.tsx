@@ -195,12 +195,6 @@ export default function ScheduleSettlement({ scheduleId, scheduleTitle = "", sch
 
   return (
     <div className="space-y-3 px-4 pt-3 pb-4">
-      {isCompleted && (
-        <div className="p-2.5 bg-green-50 border border-green-200 rounded-xl text-xs text-green-700 text-center font-bold">
-          작업 완료됨
-        </div>
-      )}
-
       {/* 결제 방식 */}
       <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value as PaymentMethod)}
         className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm outline-none bg-white" style={{ fontSize: "14px" }}>
@@ -289,23 +283,28 @@ export default function ScheduleSettlement({ scheduleId, scheduleTitle = "", sch
         <div className="text-xs text-white/50 mt-1">{cashReceipt ? "부가세 포함" : "부가세 미포함 (공급가액)"}</div>
       </div>
 
-      {/* 작업 완료 버튼 */}
-      {!isCompleted && (
-        <button onClick={handleComplete}
-          className="w-full py-4 rounded-xl text-base font-bold text-white active:opacity-90"
-          style={{ background: "linear-gradient(135deg, #00c473, #00a35e)" }}>
-          작업 완료
-        </button>
-      )}
-
-      {/* 정산서 전송 버튼 - 작업완료 후에만 */}
-      {isCompleted && (
-        <button onClick={() => setShowShareModal(true)}
-          className="w-full py-4 rounded-xl text-base font-bold text-white active:opacity-90"
-          style={{ background: "linear-gradient(135deg, #0f4c81, #1a6bb5)" }}>
-          정산서 전송
-        </button>
-      )}
+      {/* 작업 완료 + 정산서 전송 */}
+      <div className="space-y-2">
+        {!isCompleted ? (
+          <button onClick={handleComplete}
+            className="w-full py-4 rounded-xl text-base font-bold text-white active:opacity-90"
+            style={{ background: "linear-gradient(135deg, #00c473, #00a35e)" }}>
+            작업 완료
+          </button>
+        ) : (
+          <>
+            <button disabled
+              className="w-full py-3 rounded-xl text-sm font-bold bg-green-100 text-green-700 border border-green-300">
+              ✅ 작업 완료됨
+            </button>
+            <button onClick={() => setShowShareModal(true)}
+              className="w-full py-4 rounded-xl text-base font-bold text-white active:opacity-90"
+              style={{ background: "linear-gradient(135deg, #0f4c81, #1a6bb5)" }}>
+              정산서 전송
+            </button>
+          </>
+        )}
+      </div>
 
       {/* 마무리 모달 - 문자/카톡 전송 */}
       {showShareModal && (
