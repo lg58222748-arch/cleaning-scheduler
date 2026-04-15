@@ -18,6 +18,9 @@ body {
   overscroll-behavior-y: contain;
   overflow-x: hidden;
   position: relative;
+  /* APK(Capacitor) 상태바/네비바 영역 확보 */
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 
 /* Safe area for notch devices */
