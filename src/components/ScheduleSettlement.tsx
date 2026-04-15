@@ -124,6 +124,14 @@ export default function ScheduleSettlement({ scheduleId, scheduleTitle = "", sch
     return lines.join("\n");
   }
 
+  // API 재시도 함수
+  async function retryApi<T>(fn: () => Promise<T>, retries = 3): Promise<T | null> {
+    for (let i = 0; i < retries; i++) {
+      try { return await fn(); } catch { if (i < retries - 1) await new Promise(r => setTimeout(r, 1000)); }
+    }
+    return null;
+  }
+
   function handleComplete() {
     // 1. UI 즉시 변경
     if (s) setS({ ...s, status: "completed" as const });
@@ -136,17 +144,17 @@ export default function ScheduleSettlement({ scheduleId, scheduleTitle = "", sch
     else if (newTitle.startsWith("u")) newTitle = "A" + newTitle.slice(1);
     else if (newTitle && !newTitle.startsWith("A") && !newTitle.match(/^\[/)) newTitle = "A" + newTitle;
 
-    // 3. API 백그라운드 (안 기다림)
-    saveSettlement(scheduleId, {
+    // 3. API 백그라운드 + 실패 시 3회 재시도
+    retryApi(() => saveSettlement(scheduleId, {
       quote: q, deposit: d, extraCharge: e,
       paymentMethod, cashReceipt, customerName, customerPhone, note, status: "completed",
       depositorName, bankName, accountNumber,
-    } as Record<string, unknown>).catch(() => {});
+    } as Record<string, unknown>));
 
-    apiUpdateSchedule(scheduleId, {
+    retryApi(() => apiUpdateSchedule(scheduleId, {
       status: "completed",
       ...(newTitle ? { title: newTitle, color: "#D1FAE5" } : {}),
-    } as Partial<import("@/types").Schedule>).catch(() => {});
+    } as Partial<import("@/types").Schedule>));
 
     // 4. 부모 알림
     onCompleted?.();
