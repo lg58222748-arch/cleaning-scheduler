@@ -272,7 +272,14 @@ export default function ScheduleDetail({
             {(() => {
               const note = schedule.note || "";
               const titleParts = schedule.title.replace(/^\[.+?\]\s*/, "").split("/");
-              const customerName = titleParts.find(p => /^U?.+$/.test(p) && p.length <= 10)?.replace(/^U/, "") || titleParts[0] || "";
+              // note에서 성함/고객명 우선, 없으면 제목에서 파싱
+              const customerName =
+                note.match(/1\)성함\s*[:：]\s*(.+)/)?.[1]?.trim()
+                || note.match(/고객명\s*[:：]\s*(.+)/)?.[1]?.trim()
+                || note.match(/성함\s*[:：]\s*(.+)/)?.[1]?.trim()
+                || titleParts.find(p => /^U.+$/.test(p))?.replace(/^U/, "")
+                || titleParts[0]
+                || "";
               const phoneMatch = note.match(/(01[0-9][-.\s]?\d{3,4}[-.\s]?\d{4})/);
               const customerPhone = phoneMatch ? phoneMatch[1] : "";
               const locationPart = titleParts.find(p => /[시구동]/.test(p)) || schedule.location || "";
