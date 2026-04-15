@@ -67,10 +67,12 @@ export async function POST(req: NextRequest) {
   if (body.action === "unassign" && body.scheduleId) {
     const schedule = await unassignSchedule(body.scheduleId);
     if (!schedule) return Response.json({ error: "Not found" }, { status: 404 });
+    const who = body.returnedBy || "";
+    const reason = body.reason || "";
     await addNotification(
       "schedule_updated",
       "일정 반환",
-      `"${schedule.title}" 일정이 대기방으로 반환되었습니다.`,
+      `${who ? who + "님이 " : ""}"${schedule.title}" 일정을 반환했습니다.${reason ? " 사유: " + reason : ""}`,
       schedule.id
     );
     return Response.json(schedule);

@@ -117,7 +117,7 @@ export default function Home() {
         const allNotifs = notif.notifications as Notification[];
         const uName = currentUser?.name || "";
         const uRole = currentUser?.role || "";
-        const myNotifs = uRole === "ceo"
+        const myNotifs = (uRole === "ceo" || uRole === "scheduler")
           ? allNotifs
           : allNotifs.filter(n => n.message.includes(uName) || n.title.includes(uName));
         setNotifications(myNotifs);
@@ -428,7 +428,7 @@ export default function Home() {
       setUnassignedSchedules((prev) => [...prev, { ...target, memberId: "", memberName: "미배정", status: "unassigned" as const }]);
       setReturnAlerts((prev) => [...prev, { id: target.id, title: target.title.replace(/^\[.+?\]\s*/, ""), date: target.date, reason }]);
     }
-    await unassignScheduleApi(id);
+    await unassignScheduleApi(id, currentUser?.name || "", reason);
   }
   function handleEditSchedule(schedule: Schedule) {
     setEditingSchedule(schedule);

@@ -124,11 +124,11 @@ export async function assignScheduleApi(scheduleId: string, memberId: string, me
   return res.json();
 }
 
-export async function unassignScheduleApi(scheduleId: string): Promise<Schedule> {
+export async function unassignScheduleApi(scheduleId: string, returnedBy?: string, reason?: string): Promise<Schedule> {
   const res = await safeFetch(`${BASE}/api/schedules`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ action: "unassign", scheduleId }),
+    body: JSON.stringify({ action: "unassign", scheduleId, returnedBy, reason }),
   });
   return res.json();
 }
