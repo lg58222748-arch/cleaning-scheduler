@@ -33,6 +33,7 @@ export default function ScheduleSettlement({ scheduleId, scheduleTitle = "", sch
   const [loading, setLoading] = useState(true);
   const [showBankEdit, setShowBankEdit] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
+  const [brandName, setBrandName] = useState(() => typeof window !== "undefined" ? localStorage.getItem("settlement_brand") || "새집느낌" : "새집느낌");
 
   // 계좌정보: localStorage에서 불러오기 (한번 저장하면 계속 사용)
   const [depositorName, setDepositorName] = useState(() => typeof window !== "undefined" ? localStorage.getItem("bank_depositor") || "" : "");
@@ -96,7 +97,7 @@ export default function ScheduleSettlement({ scheduleId, scheduleTitle = "", sch
     const memberDisplay = memberBranch ? `${memberBranch} 관리점 ${memberName}` : memberName;
 
     const lines: string[] = [];
-    lines.push("🏠 새집느낌 정산서");
+    lines.push(`🏠 ${brandName} 정산서`);
     lines.push("─────────────");
     lines.push(`고객명: ${customerName || "-"}님`);
     lines.push(`연락처: ${customerPhone || "-"}`);
@@ -122,7 +123,7 @@ export default function ScheduleSettlement({ scheduleId, scheduleTitle = "", sch
     lines.push("");
     lines.push("문제있으시면 관리점 대표인 저에게 편하게 연락 부탁드립니다!! 😊");
     lines.push("");
-    lines.push(`${dateStr} · 새집느낌`);
+    lines.push(`${dateStr} · ${brandName}`);
     return lines.join("\n");
   }
 
@@ -156,6 +157,14 @@ export default function ScheduleSettlement({ scheduleId, scheduleTitle = "", sch
 
   return (
     <div className="space-y-3 px-4 pt-3 pb-4">
+      {/* 업체명 */}
+      <div className="flex items-center gap-2">
+        <span className="text-xs text-gray-500 shrink-0">업체명</span>
+        <input type="text" value={brandName} onChange={(e) => { setBrandName(e.target.value); localStorage.setItem("settlement_brand", e.target.value); }}
+          placeholder="새집느낌"
+          className="flex-1 px-3 py-2 border border-gray-200 rounded-xl text-sm outline-none" />
+      </div>
+
       {/* 결제 방식 */}
       <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value as PaymentMethod)}
         className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm outline-none bg-white" style={{ fontSize: "14px" }}>
