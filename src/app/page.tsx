@@ -63,7 +63,7 @@ export default function Home() {
     const t = setTimeout(() => {
       setShowSplash(false);
       setAppReady(true);
-    }, 3000);
+    }, 1500);
     return () => clearTimeout(t);
   }, []);
   const [members, setMembers] = useState<Member[]>([]);
@@ -343,8 +343,8 @@ export default function Home() {
   // 스플래시: 1초, 로고 이미지 배경과 동일 색상
   if (showSplash) {
     return (
-      <div className="fixed inset-0 bg-white flex flex-col items-center justify-center">
-        <img src="/logo.jpg" alt="새집느낌" className="w-64 h-64 object-contain" />
+      <div className="fixed inset-0 bg-white flex flex-col items-center justify-center" style={{ paddingTop: "env(safe-area-inset-top, 0px)", paddingBottom: "env(safe-area-inset-bottom, 0px)" }}>
+        <img src="/logo.jpg" alt="새집느낌" className="w-64 h-64 object-contain" loading="eager" />
         <span className="text-2xl font-bold text-[#3a9ad9] mt-2 tracking-wider">파트너</span>
       </div>
     );
@@ -503,10 +503,10 @@ export default function Home() {
     .sort((a, b) => a.startTime.localeCompare(b.startTime));
 
   return (
-    <div className="h-[100dvh] bg-white pb-14 flex flex-col overflow-hidden">
+    <div className="h-[100dvh] bg-white pb-14 flex flex-col overflow-hidden" style={{ paddingTop: "env(safe-area-inset-top, 0px)" }}>
       {/* 카카오톡 인앱브라우저 감지 → 외부 브라우저 이동 */}
       {isInApp && (
-        <div className="fixed inset-0 bg-black/80 z-[100] flex items-center justify-center p-6">
+        <div className="fixed inset-0 bg-black/80 z-[100] flex items-center justify-center p-6" style={{ paddingTop: "env(safe-area-inset-top, 0px)", paddingBottom: "env(safe-area-inset-bottom, 0px)" }}>
           <div className="bg-white rounded-2xl p-6 text-center max-w-sm w-full">
             <div className="text-3xl mb-3">⚠️</div>
             <h2 className="text-lg font-bold text-gray-900 mb-2">외부 브라우저에서 열어주세요</h2>
@@ -529,7 +529,7 @@ export default function Home() {
 
       {/* PWA 설치 - 대문짝만하게 */}
       {showInstallBanner && !isInApp && (
-        <div className="fixed inset-0 bg-black/70 z-[90] flex items-center justify-center p-6">
+        <div className="fixed inset-0 bg-black/70 z-[90] flex items-center justify-center p-6" style={{ paddingTop: "env(safe-area-inset-top, 0px)", paddingBottom: "env(safe-area-inset-bottom, 0px)" }}>
           <div className="bg-white rounded-2xl p-6 text-center max-w-sm w-full">
             <div className="text-4xl mb-3">📲</div>
             <h2 className="text-xl font-bold text-gray-900 mb-2">새집느낌 파트너 설치</h2>
@@ -869,7 +869,7 @@ export default function Home() {
 
         {/* Sales tab */}
         {canSales && (
-          <div className="h-full overflow-y-auto" style={{ display: activeTab === "sales" ? "block" : "none" }}>
+          <div className="h-full flex flex-col" style={{ display: activeTab === "sales" ? "flex" : "none" }}>
             <SalesTab userName={currentUser.name} onCreated={() => loadData(undefined, true)} />
           </div>
         )}
@@ -888,7 +888,7 @@ export default function Home() {
       )}
 
       {/* Bottom tab bar - mobile style */}
-      <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-40 safe-area-bottom">
+      <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-40" style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}>
         <div className="flex items-center justify-around h-14 max-w-lg mx-auto">
           {/* 영업 */}
           {canSales && (
@@ -1003,7 +1003,7 @@ export default function Home() {
       )}
       {/* 날짜 클릭 팝업 - 삼성 캘린더 스타일 (달력탭에서만) */}
       {showDayPopup && activeTab === "calendar" && (
-        <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50 px-5" onClick={(e) => { if (e.target === e.currentTarget) { setShowDayPopup(false); consumeHash(); } }}>
+        <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50 px-5" style={{ paddingTop: "env(safe-area-inset-top, 0px)", paddingBottom: "env(safe-area-inset-bottom, 0px)" }} onClick={(e) => { if (e.target === e.currentTarget) { setShowDayPopup(false); consumeHash(); } }}>
           <div className="bg-white rounded-3xl shadow-2xl w-full max-w-[380px] animate-[modalIn_0.15s_ease-out]">
             {/* 날짜 헤더 */}
             <div className="px-5 pt-5 pb-3 flex items-center justify-between">
@@ -1094,7 +1094,7 @@ export default function Home() {
       )}
       {/* 신상정보 팝업 */}
       {profileUser && (
-        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center px-6" onClick={(e) => { if (e.target === e.currentTarget) { setProfileUser(null); consumeHash(); } }}>
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center px-6" style={{ paddingTop: "env(safe-area-inset-top, 0px)", paddingBottom: "env(safe-area-inset-bottom, 0px)" }} onClick={(e) => { if (e.target === e.currentTarget) { setProfileUser(null); consumeHash(); } }}>
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm animate-[modalIn_0.15s_ease-out]">
             <div className="px-5 pt-5 pb-3 flex items-center justify-between">
               <h3 className="text-base font-bold text-gray-800">신상정보</h3>

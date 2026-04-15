@@ -89,7 +89,7 @@ export default function ScheduleForm({
   const activeMembers = members.filter((m) => m.active);
 
   return (
-    <div className="fixed inset-0 bg-white z-50 flex flex-col animate-[modalIn_0.15s_ease-out]">
+    <div className="fixed inset-0 bg-white z-50 flex flex-col animate-[modalIn_0.15s_ease-out]" style={{ paddingTop: "env(safe-area-inset-top, 0px)", paddingBottom: "env(safe-area-inset-bottom, 0px)" }}>
       <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
         <button type="button" onClick={onCancel} className="p-1.5 active:bg-gray-100 rounded-lg">
           <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">

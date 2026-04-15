@@ -42,7 +42,7 @@ export default function NotificationPanel({
 
   return (
     <div className="fixed inset-0 bg-black/30 z-50" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="bg-white rounded-b-2xl shadow-xl w-full max-w-md mx-auto max-h-[70vh] flex flex-col animate-[slideDown_0.25s_ease-out]" style={{ paddingTop: "env(safe-area-inset-top, 0px)" }}>
+      <div className="bg-white rounded-b-2xl shadow-xl w-full max-w-md mx-auto max-h-[70vh] flex flex-col animate-[slideDown_0.25s_ease-out]" style={{ paddingTop: "env(safe-area-inset-top, 0px)", paddingBottom: "env(safe-area-inset-bottom, 0px)" }}>
         <div className="px-4 py-2 border-b border-gray-100 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <h3 className="text-base font-bold text-gray-800">알림</h3>

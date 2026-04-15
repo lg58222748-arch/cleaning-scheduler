@@ -18,9 +18,7 @@ body {
   overscroll-behavior-y: contain;
   overflow-x: hidden;
   position: relative;
-  /* APK(Capacitor) 상태바/네비바 영역 확보 */
-  padding-top: env(safe-area-inset-top, 0px);
-  padding-bottom: env(safe-area-inset-bottom, 0px);
+  /* safe-area padding is handled by each page/modal individually */
 }
 
 /* Safe area for notch devices */
@@ -32,29 +30,11 @@ body {
 .overflow-y-auto,
 .overflow-y-scroll {
   -webkit-overflow-scrolling: touch;
-  will-change: scroll-position;
-}
-
-/* 하드웨어 가속 + 부드러운 스크롤 */
-html, body {
-  scroll-behavior: smooth;
-  -webkit-overflow-scrolling: touch;
-}
-
-.min-h-screen {
-  transform: translateZ(0);
-  -webkit-backface-visibility: hidden;
-  backface-visibility: hidden;
 }
 
 /* 모바일 터치 스크롤 최적화 */
-main, .divide-y, .space-y-3 {
+main {
   contain: layout style;
-}
-
-/* 스크롤 성능 향상 */
-* {
-  -webkit-font-smoothing: antialiased;
 }
 
 /* 터치 지연 제거 */
@@ -64,20 +44,28 @@ button, a, [role="button"] {
 
 /* 리스트 스크롤 최적화 */
 
-/* 모달 팝업 애니메이션 */
+/* 모달 팝업 애니메이션 - 짧은 duration으로 빠른 느낌 */
 @keyframes modalIn {
-  from { opacity: 0; transform: scale(0.95) translateY(10px); }
-  to { opacity: 1; transform: scale(1) translateY(0); }
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 @keyframes modalOut {
-  from { opacity: 1; transform: scale(1); }
-  to { opacity: 0; transform: scale(0.95); }
+  from { opacity: 1; }
+  to { opacity: 0; }
 }
 
 @keyframes slideDown {
   from { opacity: 0; transform: translateY(-100%); }
   to { opacity: 1; transform: translateY(0); }
+}
+
+/* will-change only on actively animating elements */
+[class*="animate-[modalIn"] {
+  will-change: transform, opacity;
+}
+[class*="animate-[slideDown"] {
+  will-change: transform, opacity;
 }
 
 /* Remove input zoom on iOS */

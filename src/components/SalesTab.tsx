@@ -349,9 +349,9 @@ export default function SalesTab({ userName, onCreated }: SalesTabProps) {
   }
 
   return (
-    <div className="h-full overflow-y-auto bg-white">
+    <div className="h-full flex flex-col bg-white">
       {/* 탭 */}
-      <div className="flex border-b border-gray-200 sticky top-0 bg-white z-10">
+      <div className="flex border-b border-gray-200 bg-white z-10 shrink-0">
         <button onClick={() => setStep(1)} className={`flex-1 py-2.5 text-xs font-bold text-center ${step === 1 ? "text-green-700 border-b-2 border-green-700 bg-green-50" : "text-gray-400"}`}>
           양식 발송
         </button>
@@ -363,6 +363,8 @@ export default function SalesTab({ userName, onCreated }: SalesTabProps) {
         </button>
       </div>
 
+      {/* Scrollable content area */}
+      <div className="flex-1 overflow-y-auto">
       {/* ===== STEP 1 ===== */}
       {step === 1 && (
         <div className="p-4 flex flex-col md:flex-row md:gap-6">
@@ -680,6 +682,7 @@ export default function SalesTab({ userName, onCreated }: SalesTabProps) {
           ))}
         </div>
       )}
+      </div>{/* end scrollable content */}
     </div>
   );
 }
