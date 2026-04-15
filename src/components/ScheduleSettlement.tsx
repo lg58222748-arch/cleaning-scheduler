@@ -169,7 +169,9 @@ export default function ScheduleSettlement({ scheduleId, scheduleTitle = "", sch
     }
   }
 
-  function handleSendSMS() {
+  async function handleSendSMS() {
+    // 먼저 제목 변경 후 전송
+    await changeTitleToA();
     const text = getShareText();
     const phone = customerPhone.replace(/[^0-9]/g, "");
     const encoded = encodeURIComponent(text);
@@ -177,30 +179,27 @@ export default function ScheduleSettlement({ scheduleId, scheduleTitle = "", sch
     window.location.href = phone
       ? `sms:${phone}${isIOS ? "&" : "?"}body=${encoded}`
       : `sms:${isIOS ? "&" : "?"}body=${encoded}`;
-    changeTitleToA(); // 전송 후 U→A
   }
 
   async function handleSendKakao() {
+    // 먼저 제목 변경 후 전송
+    await changeTitleToA();
     const text = getShareText();
-    // Capacitor Share 플러그인 → 네이티브 공유 시트 (카카오톡 선택 가능)
     try {
       await Share.share({ text });
-      changeTitleToA(); // 전송 후 U→A
       return;
-    } catch { /* Capacitor 미지원 환경 */ }
-    // fallback: 웹 navigator.share
+    } catch { /* Capacitor 미지원 */ }
     if (navigator.share) {
-      try { await navigator.share({ text }); changeTitleToA(); return; } catch { /* 취소 */ }
+      try { await navigator.share({ text }); return; } catch { /* 취소 */ }
     }
-    // 최종 fallback: 클립보드 복사
     try { await navigator.clipboard.writeText(text); } catch {
       const ta = document.createElement("textarea"); ta.value = text; document.body.appendChild(ta); ta.select(); document.execCommand("copy"); document.body.removeChild(ta);
     }
-    changeTitleToA(); // 복사 후에도 U→A
     setCopied(true); setTimeout(() => setCopied(false), 2000);
   }
 
   async function handleCopy() {
+    await changeTitleToA();
     const text = getShareText();
     try { await navigator.clipboard.writeText(text); } catch {
       const ta = document.createElement("textarea"); ta.value = text; document.body.appendChild(ta); ta.select(); document.execCommand("copy"); document.body.removeChild(ta);
