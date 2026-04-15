@@ -113,7 +113,9 @@ export default function ScheduleSettlement({ scheduleId, scheduleNote, customerN
     if (accountNumber && bankName) lines.push(`🏦 ${bankName} ${accountNumber}`);
     if (memberDisplay) lines.push(`${memberDisplay} 관리사`);
     lines.push("");
-    lines.push("감사합니다 😊");
+    lines.push("감사합니다! 가족분들과 항상 건강하시고 행복한 일들만 가득하세요!!");
+    lines.push("");
+    lines.push("문제있으시면 관리점 대표인 저에게 편하게 연락 부탁드립니다!! 😊");
     lines.push(`${dateStr} · 새집느낌`);
     return lines.join("\n");
   }
