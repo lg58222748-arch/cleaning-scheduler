@@ -33,7 +33,7 @@ export default function ScheduleSettlement({ scheduleId, scheduleTitle = "", sch
   const [loading, setLoading] = useState(true);
   const [showBankEdit, setShowBankEdit] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
-  const [brandName, setBrandName] = useState(() => typeof window !== "undefined" ? localStorage.getItem("settlement_brand") || "새집느낌" : "새집느낌");
+  const [brandName, setBrandName] = useState("새집느낌");
 
   // 계좌정보: localStorage에서 불러오기 (한번 저장하면 계속 사용)
   const [depositorName, setDepositorName] = useState(() => typeof window !== "undefined" ? localStorage.getItem("bank_depositor") || "" : "");
@@ -271,6 +271,7 @@ export default function ScheduleSettlement({ scheduleId, scheduleTitle = "", sch
                 setQuote(""); setDeposit(""); setExtraCharge("");
                 setPaymentMethod("transfer"); setCashReceipt(false);
                 setNote("");
+                setBrandName("새집느낌");
               }} className="text-gray-400 text-xl">&times;</button>
             </div>
             <div className="bg-gray-50 rounded-xl p-4 mb-4 max-h-[35vh] overflow-y-auto">
