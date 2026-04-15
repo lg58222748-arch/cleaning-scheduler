@@ -122,9 +122,6 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
               >
                 {loading ? "로그인 중..." : "로그인"}
               </button>
-              <p className="text-xs text-gray-400 text-center">
-                관리자 계정: admin / 1234
-              </p>
             </>
           ) : (
             <>
@@ -180,8 +177,13 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
                 </div>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">주민등록번호</label>
-                <input value={residentNumber} onChange={(e) => setResidentNumber(e.target.value)} placeholder="000000-0000000" className={inputClass} />
+                <label className="block text-sm font-medium text-gray-700 mb-1">생년월일 (뒤 1자리)</label>
+                <input value={residentNumber} onChange={(e) => {
+                  let v = e.target.value.replace(/[^0-9]/g, "");
+                  if (v.length > 7) v = v.slice(0, 7);
+                  if (v.length > 6) v = v.slice(0, 6) + "-" + v.slice(6);
+                  setResidentNumber(v);
+                }} placeholder="990101-1" maxLength={8} className={inputClass} />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">사업자등록증</label>

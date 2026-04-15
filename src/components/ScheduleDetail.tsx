@@ -436,7 +436,6 @@ export default function ScheduleDetail({
             />}
           </div>
         </div>
-      </div>
 
       {/* 하단 고정 - 정보탭에서만 표시 */}
       {activeTab === "info" && (
@@ -580,6 +579,7 @@ export default function ScheduleDetail({
         </div>
       </div>
       )}
+      </div>
     </div>
   );
 }
