@@ -33,7 +33,7 @@ export default function ScheduleSettlement({ scheduleId, scheduleTitle = "", sch
   const [loading, setLoading] = useState(true);
   const [showBankEdit, setShowBankEdit] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
-  const [showCompleteAlert, setShowCompleteAlert] = useState(false);
+  const [completed, setCompleted] = useState(false);
   const [copied, setCopied] = useState(false);
 
   // 계좌정보: localStorage에서 불러오기 (한번 저장하면 계속 사용)
@@ -53,6 +53,7 @@ export default function ScheduleSettlement({ scheduleId, scheduleTitle = "", sch
     const data = await fetchSettlement(scheduleId);
     if (data) {
       setS(data);
+      if (data.status === "completed") setCompleted(true);
       const hasExisting = data.quote > 0 || data.deposit > 0;
       if (hasExisting) {
         setQuote(String(data.quote));
@@ -124,40 +125,42 @@ export default function ScheduleSettlement({ scheduleId, scheduleTitle = "", sch
     return lines.join("\n");
   }
 
-  // API 재시도 함수
-  async function retryApi<T>(fn: () => Promise<T>, retries = 3): Promise<T | null> {
-    for (let i = 0; i < retries; i++) {
-      try { return await fn(); } catch { if (i < retries - 1) await new Promise(r => setTimeout(r, 1000)); }
-    }
-    return null;
-  }
-
   function handleComplete() {
-    // 1. UI 즉시 변경
-    if (s) setS({ ...s, status: "completed" as const });
+    if (completed) {
+      // 작업완료 취소
+      setCompleted(false);
+      // 제목 A→U 복원
+      let restoreTitle = scheduleTitle || "";
+      if (/^\[.+?\]\s*A/.test(restoreTitle)) restoreTitle = restoreTitle.replace(/^(\[.+?\]\s*)A/, "$1U");
+      else if (restoreTitle.startsWith("A")) restoreTitle = "U" + restoreTitle.slice(1);
+      apiUpdateSchedule(scheduleId, {
+        status: "confirmed",
+        ...(restoreTitle !== scheduleTitle ? { title: restoreTitle, color: "#FDDCCC" } : {}),
+      } as Partial<import("@/types").Schedule>).catch(() => {});
+    } else {
+      // 작업완료
+      setCompleted(true);
+      // 제목 U→A
+      let newTitle = scheduleTitle || "";
+      if (/^\[.+?\]\s*U/.test(newTitle)) newTitle = newTitle.replace(/^(\[.+?\]\s*)U/, "$1A");
+      else if (/^\[.+?\]\s*u/.test(newTitle)) newTitle = newTitle.replace(/^(\[.+?\]\s*)u/, "$1A");
+      else if (newTitle.startsWith("U")) newTitle = "A" + newTitle.slice(1);
+      else if (newTitle.startsWith("u")) newTitle = "A" + newTitle.slice(1);
+      else if (newTitle && !newTitle.startsWith("A") && !newTitle.match(/^\[/)) newTitle = "A" + newTitle;
 
-    // 2. 제목 U→A 계산
-    let newTitle = scheduleTitle || "";
-    if (/^\[.+?\]\s*U/.test(newTitle)) newTitle = newTitle.replace(/^(\[.+?\]\s*)U/, "$1A");
-    else if (/^\[.+?\]\s*u/.test(newTitle)) newTitle = newTitle.replace(/^(\[.+?\]\s*)u/, "$1A");
-    else if (newTitle.startsWith("U")) newTitle = "A" + newTitle.slice(1);
-    else if (newTitle.startsWith("u")) newTitle = "A" + newTitle.slice(1);
-    else if (newTitle && !newTitle.startsWith("A") && !newTitle.match(/^\[/)) newTitle = "A" + newTitle;
+      saveSettlement(scheduleId, {
+        quote: q, deposit: d, extraCharge: e,
+        paymentMethod, cashReceipt, customerName, customerPhone, note, status: "completed",
+        depositorName, bankName, accountNumber,
+      } as Record<string, unknown>).catch(() => {});
 
-    // 3. API 백그라운드 + 실패 시 3회 재시도
-    retryApi(() => saveSettlement(scheduleId, {
-      quote: q, deposit: d, extraCharge: e,
-      paymentMethod, cashReceipt, customerName, customerPhone, note, status: "completed",
-      depositorName, bankName, accountNumber,
-    } as Record<string, unknown>));
+      apiUpdateSchedule(scheduleId, {
+        status: "completed",
+        ...(newTitle !== scheduleTitle ? { title: newTitle, color: "#D1FAE5" } : {}),
+      } as Partial<import("@/types").Schedule>).catch(() => {});
 
-    retryApi(() => apiUpdateSchedule(scheduleId, {
-      status: "completed",
-      ...(newTitle ? { title: newTitle, color: "#D1FAE5" } : {}),
-    } as Partial<import("@/types").Schedule>));
-
-    // 4. 부모 알림
-    onCompleted?.();
+      onCompleted?.();
+    }
   }
 
   function handleSendSMS() {
@@ -194,8 +197,6 @@ export default function ScheduleSettlement({ scheduleId, scheduleTitle = "", sch
   }
 
   if (loading) return <div className="py-8 text-center text-gray-400 text-sm">로딩 중...</div>;
-
-  const isCompleted = s?.status === "completed";
 
   return (
     <div className="space-y-3 px-4 pt-3 pb-4">
@@ -289,19 +290,18 @@ export default function ScheduleSettlement({ scheduleId, scheduleTitle = "", sch
 
       {/* 작업 완료 + 정산서 발행 (가로 2개) */}
       <div className="flex gap-2">
-        <button onClick={() => { if (!isCompleted) handleComplete(); }}
-          className={`flex-1 py-4 rounded-xl text-sm font-bold active:opacity-90 ${isCompleted ? "bg-green-100 text-green-700 border border-green-300" : "text-white"}`}
-          style={!isCompleted ? { background: "linear-gradient(135deg, #00c473, #00a35e)" } : {}}>
-          {isCompleted ? "✅ 완료" : "작업 완료"}
+        <button onClick={() => { if (!completed) handleComplete(); }}
+          className={`flex-1 py-4 rounded-xl text-sm font-bold active:opacity-90 ${completed ? "bg-green-100 text-green-700 border border-green-300" : "text-white"}`}
+          style={!completed ? { background: "linear-gradient(135deg, #00c473, #00a35e)" } : {}}>
+          {completed ? "✅ 완료" : "작업 완료"}
         </button>
         <button onClick={() => setShowShareModal(true)}
-          disabled={!isCompleted}
-          className={`flex-1 py-4 rounded-xl text-sm font-bold active:opacity-90 text-white ${!isCompleted ? "opacity-40" : ""}`}
+          disabled={!completed}
+          className={`flex-1 py-4 rounded-xl text-sm font-bold active:opacity-90 text-white ${!completed ? "opacity-40" : ""}`}
           style={{ background: "linear-gradient(135deg, #0f4c81, #1a6bb5)" }}>
           정산서 발행
         </button>
       </div>
-      )}
 
       {/* 마무리 모달 - 문자/카톡 전송 */}
       {showShareModal && (
