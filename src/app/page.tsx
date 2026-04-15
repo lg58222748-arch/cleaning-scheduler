@@ -557,26 +557,15 @@ export default function Home() {
           </div>
         </div>
       )}
-      {/* 반환 알림 배너 - 관리자만 */}
-      {canAssign && returnAlerts.length > 0 && (
-        <div className="bg-orange-500 text-white z-50 animate-[slideDown_0.3s_ease-out]">
-          {returnAlerts.slice(0, 5).map((alert) => (
-            <div key={alert.id} className="px-3 py-1.5 flex items-center gap-2 border-b border-orange-400/30 last:border-0">
-              <span className="text-xs">↩</span>
-              <div className="flex-1 min-w-0">
-                <div className="text-xs font-medium truncate">{alert.title}</div>
-                <div className="text-xs opacity-70">{alert.date} · {alert.reason}</div>
-              </div>
-              <button onClick={() => setReturnAlerts((prev) => prev.filter((a) => a.id !== alert.id))} className="text-white/60 active:text-white ml-1 shrink-0">
-                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" /></svg>
-              </button>
+      {/* 반환 알림 배너 - 관리자/일정관리자: 미배정 일정이 있으면 표시 */}
+      {canAssign && unassignedSchedules.length > 0 && (
+        <div className="bg-orange-500 text-white z-50">
+          <button onClick={() => switchTab("assign")} className="w-full px-3 py-2 flex items-center justify-between active:bg-orange-600">
+            <div className="flex items-center gap-2">
+              <span className="text-sm">↩</span>
+              <span className="text-xs font-bold">미배정 일정 {unassignedSchedules.length}건</span>
             </div>
-          ))}
-          {returnAlerts.length > 5 && (
-            <div className="px-3 py-1 text-xs opacity-80 text-center">+{returnAlerts.length - 5}건 더</div>
-          )}
-          <button onClick={() => { setReturnAlerts([]); switchTab("assign"); }} className="w-full py-1.5 text-xs font-medium bg-orange-600/50 active:bg-orange-600">
-            배정탭에서 처리 →
+            <span className="text-xs opacity-80">배정탭에서 처리 →</span>
           </button>
         </div>
       )}
