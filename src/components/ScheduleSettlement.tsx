@@ -92,40 +92,28 @@ export default function ScheduleSettlement({ scheduleId, scheduleNote, customerN
 
     const lines: string[] = [];
     lines.push("🏠 새집느낌 정산서");
-    lines.push("");
-    lines.push("👤 고객 정보");
-    lines.push(`├ 고객명: ${customerName || "-"}님`);
-    lines.push(`├ 연락처: ${customerPhone || "-"}`);
-    lines.push(`├ 결제방식: ${pm}`);
-    lines.push(`└ 현금영수증: ${cashReceipt ? "✅ 신청" : "미신청"}`);
-    if (depositorName || bankName || accountNumber) {
-      lines.push("");
-      lines.push("🏦 계좌 정보");
-      if (depositorName) lines.push(`├ 입금주: ${depositorName}`);
-      if (bankName) lines.push(`├ 은행명: ${bankName}`);
-      if (accountNumber) lines.push(`└ 계좌번호: ${accountNumber}`);
-    }
+    lines.push("──────────────────");
+    lines.push(`고객명: ${customerName || "-"}님`);
+    lines.push(`연락처: ${customerPhone || "-"}`);
+    lines.push(`결제방식: ${pm}`);
+    lines.push(`현금영수증: ${cashReceipt ? "신청" : "미신청"}`);
     lines.push("");
     lines.push("📋 비용 상세");
-    lines.push(`├ 공급가액: ${formatWon(q)}`);
-    lines.push(`├ 예약금(선납완료): -${formatWon(d)}`);
-    lines.push(`├ 잔금: ${formatWon(balance)}`);
-    if (e > 0) lines.push(`├ 현장 추가금: +${formatWon(e)}`);
-    if (cashReceipt) lines.push(`└ 부가세(10%): +${formatWon(vatTotal)}`);
+    lines.push(`공급가액: ${formatWon(q)}`);
+    lines.push(`예약금(선납완료): -${formatWon(d)}`);
+    lines.push(`잔금: ${formatWon(balance)}`);
+    if (e > 0) lines.push(`현장 추가금: +${formatWon(e)}`);
+    if (cashReceipt) lines.push(`부가세(10%): +${formatWon(vatTotal)}`);
     lines.push("");
-    lines.push("💰 최종 결제 금액");
-    lines.push(`┌─────────────────┐`);
-    lines.push(`│  ${formatWon(total)}  │`);
-    lines.push(`└─────────────────┘`);
-    lines.push(cashReceipt ? "※ 부가세 포함 금액" : "※ 부가세 미포함 (공급가액)");
+    lines.push(`💰 최종 결제 금액: ${formatWon(total)}`);
+    lines.push(cashReceipt ? "※ 부가세 포함" : "※ 부가세 미포함 (공급가액)");
     lines.push("");
-    lines.push("📌 안내사항");
     lines.push(receiptMsg);
     lines.push("");
     if (accountNumber && bankName) lines.push(`🏦 ${bankName} ${accountNumber}`);
-    if (memberDisplay) lines.push(`👷 ${memberDisplay} 관리사`);
+    if (memberDisplay) lines.push(`${memberDisplay} 관리사`);
     lines.push("");
-    lines.push("감사합니다! 😊");
+    lines.push("감사합니다 😊");
     lines.push(`${dateStr} · 새집느낌`);
     return lines.join("\n");
   }
