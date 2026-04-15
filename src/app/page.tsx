@@ -557,18 +557,30 @@ export default function Home() {
           </div>
         </div>
       )}
-      {/* 반환 알림 배너 - 관리자/일정관리자: 미배정 일정이 있으면 표시 */}
-      {canAssign && unassignedSchedules.length > 0 && (
-        <div className="bg-orange-500 text-white z-50">
-          <button onClick={() => switchTab("assign")} className="w-full px-3 py-2 flex items-center justify-between active:bg-orange-600">
-            <div className="flex items-center gap-2">
-              <span className="text-sm">↩</span>
-              <span className="text-xs font-bold">미배정 일정 {unassignedSchedules.length}건</span>
-            </div>
-            <span className="text-xs opacity-80">배정탭에서 처리 →</span>
-          </button>
-        </div>
-      )}
+      {/* 반환 알림 배너 - 대표/일정관리자: DB 알림 기반 */}
+      {(() => {
+        const returnNotifs = notifications.filter(n => n.title === "일정 반환" && !n.read);
+        if (!canAssign || returnNotifs.length === 0) return null;
+        return (
+          <div className="bg-orange-500 text-white z-50">
+            {returnNotifs.slice(0, 5).map((n) => (
+              <div key={n.id} className="px-3 py-2 flex items-center gap-2 border-b border-orange-400/30 last:border-0">
+                <span className="text-sm">↩</span>
+                <div className="flex-1 min-w-0">
+                  <div className="text-xs font-medium">{n.message}</div>
+                  <div className="text-xs opacity-70">{new Date(n.createdAt).toLocaleString("ko")}</div>
+                </div>
+                <button onClick={() => handleMarkRead(n.id)} className="text-white/60 active:text-white shrink-0 p-1">
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" /></svg>
+                </button>
+              </div>
+            ))}
+            {returnNotifs.length > 5 && (
+              <div className="px-3 py-1 text-xs opacity-80 text-center">+{returnNotifs.length - 5}건 더</div>
+            )}
+          </div>
+        );
+      })()}
       {/* Compact mobile header */}
       <header className="bg-white border-b border-gray-200 sticky top-0 z-40">
         <div className="px-4 flex items-center justify-between h-11">
