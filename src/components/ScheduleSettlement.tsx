@@ -272,20 +272,12 @@ export default function ScheduleSettlement({ scheduleId, scheduleTitle = "", sch
         <div className="text-xs text-white/50 mt-1">{cashReceipt ? "부가세 포함" : "부가세 미포함 (공급가액)"}</div>
       </div>
 
-      {/* 작업 완료 + 정산서 발행 (가로 2개) */}
-      <div className="flex gap-2">
-        <button onClick={() => { if (!completed) handleComplete(); }}
-          className={`flex-1 py-4 rounded-xl text-sm font-bold active:opacity-90 ${completed ? "bg-green-100 text-green-700 border border-green-300" : "text-white"}`}
-          style={!completed ? { background: "linear-gradient(135deg, #00c473, #00a35e)" } : {}}>
-          {completed ? "✅ 완료" : "작업 완료"}
-        </button>
-        <button onClick={() => setShowShareModal(true)}
-          disabled={!completed}
-          className={`flex-1 py-4 rounded-xl text-sm font-bold active:opacity-90 text-white ${!completed ? "opacity-40" : ""}`}
-          style={{ background: "linear-gradient(135deg, #0f4c81, #1a6bb5)" }}>
-          정산서 발행
-        </button>
-      </div>
+      {/* 정산서 발행 */}
+      <button onClick={() => setShowShareModal(true)}
+        className="w-full py-4 rounded-xl text-base font-bold text-white active:opacity-90"
+        style={{ background: "linear-gradient(135deg, #0f4c81, #1a6bb5)" }}>
+        정산서 발행
+      </button>
 
       {/* 마무리 모달 - 문자/카톡 전송 */}
       {showShareModal && (
