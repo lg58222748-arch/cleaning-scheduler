@@ -137,7 +137,6 @@ export default function ScheduleDetail({
     schedule.note = noteText;
     setNoteChanged(false);
     setSaving(false);
-    onUpdated?.();
     apiUpdateSchedule(schedule.id, { note: noteText }).catch(() => {});
   }
 
@@ -146,26 +145,22 @@ export default function ScheduleDetail({
     schedule.title = titleText;
     setEditingTitle(false);
     setSaving(false);
-    onUpdated?.();
     apiUpdateSchedule(schedule.id, { title: titleText }).catch(() => {});
   }
 
   async function handleTimeSlotChange(slot: string) {
     const newSlot = timeSlot === slot ? "" : slot; // 토글
     setTimeSlot(newSlot);
-    // 제목에서 기존 시간대 제거 후 새로 추가
     const bare = schedule.title.replace(/^\[.+?\]\s*/, "");
     const newTitle = newSlot ? `[${newSlot}] ${bare}` : bare;
     schedule.title = newTitle;
     setTitleText(newTitle);
-    onUpdated?.();
     apiUpdateSchedule(schedule.id, { title: newTitle }).catch(() => {});
   }
 
   async function handleColorChange(color: string) {
     setSchedColor(color);
     schedule.color = color;
-    onUpdated?.();
     apiUpdateSchedule(schedule.id, { color }).catch(() => {});
   }
 
@@ -430,7 +425,7 @@ export default function ScheduleDetail({
               }
               memberName={schedule.memberName}
               memberBranch={memberBranch}
-              onCompleted={() => { schedule.status = "completed"; onUpdated?.(); }}
+              onCompleted={() => { schedule.status = "completed"; }}
             />}
           </div>
         </div>
@@ -526,7 +521,6 @@ export default function ScheduleDetail({
                     const newTitle = originalMatch ? originalMatch[1].trim() : titleText.replace(/\/미입금/g, "");
                     schedule.title = newTitle;
                     setTitleText(newTitle);
-                    onUpdated?.();
                     apiUpdateSchedule(schedule.id, { title: newTitle }).catch(() => {});
                   }
                 }}
@@ -541,7 +535,6 @@ export default function ScheduleDetail({
                     const newTitle = `${titleText}/미입금`;
                     schedule.title = newTitle;
                     setTitleText(newTitle);
-                    onUpdated?.();
                     apiUpdateSchedule(schedule.id, { title: newTitle }).catch(() => {});
                   }}
                   className="flex-1 py-3 rounded-xl text-sm font-bold text-red-500 bg-red-50 border border-red-200 active:opacity-90"
@@ -557,12 +550,14 @@ export default function ScheduleDetail({
               const updates: Record<string, unknown> = {};
               if (titleText !== schedule.title) { updates.title = titleText; schedule.title = titleText; setEditingTitle(false); }
               if (noteChanged) { updates.note = noteText; schedule.note = noteText; setNoteChanged(false); }
-              if (Object.keys(updates).length > 0) {
-                apiUpdateSchedule(schedule.id, updates as Partial<import("@/types").Schedule>).catch(() => {});
-              }
               setSaving(false);
-              onUpdated?.();
               onClose();
+              // API + 리로드는 닫은 후 백그라운드
+              if (Object.keys(updates).length > 0) {
+                apiUpdateSchedule(schedule.id, updates as Partial<import("@/types").Schedule>).then(() => onUpdated?.()).catch(() => {});
+              } else {
+                onUpdated?.();
+              }
             }}
             disabled={saving}
             className="flex-1 py-2 bg-blue-500 text-white rounded-xl text-xs font-bold active:bg-blue-600 disabled:opacity-50"
