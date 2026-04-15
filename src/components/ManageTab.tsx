@@ -385,7 +385,9 @@ function SalesStatsSection({ userName, userRole, allUsers }: {
 }
 
 
-/* ════════════ 구글 캘린더 가져오기 (대표 전용) ════════════ */
+/* ════════════ 구글 캘린더 가져오기 (GAS 프록시, OAuth 불필요) ════════════ */
+const GAS_URL = "https://script.google.com/macros/s/AKfycbzBMfzBsdC5YKHDPUhHVZuPLKqb2MTYKT_zTGoNVl_h8jhGTsAiqnkxBgtO414TzWdVEw/exec";
+
 function GoogleCalendarImport({ allUsers, members, onImported }: {
   allUsers: { id?: string; name: string; username?: string; role?: string }[];
   members: { id: string; name: string; linkedUsername?: string }[];
@@ -407,48 +409,29 @@ function GoogleCalendarImport({ allUsers, members, onImported }: {
     localStorage.setItem("google_calendar_id", calendarId.trim());
 
     try {
-      const refreshToken = localStorage.getItem("google_refresh_token");
-      if (!refreshToken) {
-        const authRes = await fetch(`/api/calendar?action=auth-url`);
-        const authData = await authRes.json();
-        if (authData.needSetup) {
-          setError("Google Calendar API가 설정되지 않았습니다. 환경변수(GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET)를 확인하세요.");
-        } else if (authData.authUrl) {
-          window.location.href = `/api/calendar?action=auth-redirect`;
-        } else {
-          setError("인증 URL 생성 실패");
-        }
-        setLoading(false);
-        return;
-      }
-
-      const res = await fetch("/api/calendar", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "auto-sync", refreshToken, calendarId: calendarId.trim() }),
-      });
+      // GAS를 통해 캘린더 이벤트 조회 (OAuth 불필요)
+      const url = `${GAS_URL}?action=fetchEvents&calendarId=${encodeURIComponent(calendarId.trim())}&days=60`;
+      const res = await fetch(url);
       const data = await res.json();
 
-      if (data.needReauth) {
-        localStorage.removeItem("google_refresh_token");
-        setError("인증이 만료되었습니다. 다시 가져오기를 눌러주세요.");
+      if (data.status === "error") {
+        setError(data.message || "캘린더 조회 실패");
         setLoading(false);
         return;
       }
 
-      if (data.error) { setError(data.error); setLoading(false); return; }
-
-      const items = (data.items || []).map((ev: { id: string; summary?: string; start?: { date?: string; dateTime?: string }; description?: string }) => ({
+      const items = (data.items || []).map((ev: { id: string; summary: string; date: string; description?: string }) => ({
         id: ev.id,
         summary: ev.summary || "(제목 없음)",
-        date: ev.start?.date || (ev.start?.dateTime ? ev.start.dateTime.slice(0, 10) : ""),
+        date: ev.date || "",
         description: ev.description || "",
         selected: true,
-        assignTo: "", // "" = 배정탭으로, member id = 직접 배정
+        assignTo: "",
       }));
       setEvents(items);
+      if (items.length === 0) setError("가져올 일정이 없습니다 (향후 60일)");
     } catch {
-      setError("캘린더 연결 실패");
+      setError("GAS 연결 실패. 네트워크를 확인하세요.");
     }
     setLoading(false);
   }

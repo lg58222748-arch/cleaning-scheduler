@@ -798,12 +798,12 @@ export default function Home() {
           </div>
         )}
 
-        {/* 팀원 탭 */}
+        {/* 사용자 탭 */}
         <div className="h-full overflow-y-auto" style={{ display: activeTab === "members" ? "block" : "none" }}>
           <div className="p-3 space-y-3 pb-20">
-            {/* 전체 팀원 */}
+            {/* 전체 사용자 */}
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
-              <h3 className="text-sm font-bold text-gray-800 mb-3">팀원 ({allUsers.filter(u => u.username !== "admin").length}{canManageAdvanced && pendingUsers.length > 0 ? ` + 대기 ${pendingUsers.length}` : ""})</h3>
+              <h3 className="text-sm font-bold text-gray-800 mb-3">사용자 ({allUsers.filter(u => u.username !== "admin").length}{canManageAdvanced && pendingUsers.length > 0 ? ` + 대기 ${pendingUsers.length}` : ""})</h3>
               <div className="space-y-2.5">
                 {[...allUsers, ...(canManageAdvanced ? pendingUsers : [])].filter(u => u.username !== "admin").sort((a, b) => {
                   if (a.username === currentUser.username) return -1;
@@ -940,7 +940,7 @@ export default function Home() {
             <span className="text-xs font-medium">달력</span>
           </button>
 
-          {/* 팀원 */}
+          {/* 사용자 */}
           <button
             onClick={() => switchTab("members")}
             className={`flex flex-col items-center justify-center gap-0.5 w-16 h-full ${
@@ -950,7 +950,7 @@ export default function Home() {
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={activeTab === "members" ? 2.5 : 1.5} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
             </svg>
-            <span className="text-xs font-medium">팀원</span>
+            <span className="text-xs font-medium">사용자</span>
           </button>
 
           {/* 관리 */}
