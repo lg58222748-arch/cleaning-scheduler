@@ -150,22 +150,32 @@ export default function ScheduleChecklist({ scheduleId, onComplete }: ScheduleCh
         </label>
       </div>
 
-      {/* 검수 완료 버튼 */}
-      <div className="px-4 pb-4">
-        <button
-          onClick={async () => {
-            if (!checklist.submittedAt) await handleSubmit();
-            onComplete?.();
-          }}
-          disabled={progress < 100}
-          className={`w-full py-3 rounded-xl font-bold text-sm ${
-            checklist.submittedAt
-              ? "bg-blue-500 text-white active:bg-blue-600"
-              : "bg-green-500 text-white active:bg-green-600 disabled:opacity-40 disabled:cursor-not-allowed"
-          }`}
-        >
-          {checklist.submittedAt ? "정산으로 이동" : progress < 100 ? `${checklist.totalCount - checklist.completedCount}개 항목 남음` : "검수 완료"}
-        </button>
+      {/* 검수 완료 + 정산 이동 버튼 */}
+      <div className="px-4 pb-4 space-y-2">
+        {/* 검수 완료 버튼 */}
+        {!checklist.submittedAt ? (
+          <button
+            onClick={handleSubmit}
+            disabled={progress < 100}
+            className="w-full py-3 rounded-xl font-bold text-sm bg-green-500 text-white active:bg-green-600 disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            {progress < 100 ? `${checklist.totalCount - checklist.completedCount}개 항목 남음` : "검수 완료"}
+          </button>
+        ) : (
+          <div className="p-2.5 bg-green-50 border border-green-200 rounded-xl text-xs text-green-700 text-center font-bold">
+            ✅ 검수 완료됨 ({new Date(checklist.submittedAt).toLocaleString("ko")})
+          </div>
+        )}
+
+        {/* 정산으로 이동 버튼 - 검수 완료 후에만 표시 */}
+        {checklist.submittedAt && (
+          <button
+            onClick={() => onComplete?.()}
+            className="w-full py-3 rounded-xl font-bold text-sm bg-blue-500 text-white active:bg-blue-600"
+          >
+            정산으로 이동 →
+          </button>
+        )}
       </div>
     </div>
   );

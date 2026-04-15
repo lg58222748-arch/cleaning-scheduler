@@ -122,17 +122,19 @@ export default function ScheduleSettlement({ scheduleId, scheduleNote, customerN
   }
 
   async function handleComplete() {
-    // 정산 저장
-    await saveSettlement(scheduleId, {
-      quote: q, deposit: d, extraCharge: e,
-      paymentMethod, cashReceipt, customerName, customerPhone, note, status: "completed",
-      depositorName, bankName, accountNumber,
-    } as Record<string, unknown>);
-    // 일정에 작업완료 표시
-    await apiUpdateSchedule(scheduleId, { status: "completed" } as Partial<import("@/types").Schedule>);
+    // 낙관적 업데이트: 모달 먼저 표시
     if (s) setS({ ...s, status: "completed" as const });
     setShowShareModal(true);
     onCompleted?.();
+    // API 병렬 처리 (백그라운드)
+    Promise.all([
+      saveSettlement(scheduleId, {
+        quote: q, deposit: d, extraCharge: e,
+        paymentMethod, cashReceipt, customerName, customerPhone, note, status: "completed",
+        depositorName, bankName, accountNumber,
+      } as Record<string, unknown>),
+      apiUpdateSchedule(scheduleId, { status: "completed" } as Partial<import("@/types").Schedule>),
+    ]).catch(() => {});
   }
 
   function handleSendSMS() {
@@ -145,13 +147,15 @@ export default function ScheduleSettlement({ scheduleId, scheduleNote, customerN
       : `sms:${isIOS ? "&" : "?"}body=${encoded}`;
   }
 
-  function handleSendKakao() {
+  const [kakaoCopied, setKakaoCopied] = useState(false);
+
+  async function handleSendKakao() {
     const text = getShareText();
-    if (navigator.share) {
-      navigator.share({ title: "새집느낌 정산서", text }).catch(() => {});
-    } else {
-      handleCopy();
+    try { await navigator.clipboard.writeText(text); } catch {
+      const ta = document.createElement("textarea"); ta.value = text; document.body.appendChild(ta); ta.select(); document.execCommand("copy"); document.body.removeChild(ta);
     }
+    setKakaoCopied(true);
+    setTimeout(() => setKakaoCopied(false), 3000);
   }
 
   async function handleCopy() {
@@ -173,12 +177,6 @@ export default function ScheduleSettlement({ scheduleId, scheduleNote, customerN
           작업 완료됨
         </div>
       )}
-
-      {/* 고객 정보 (자동, 읽기 전용) */}
-      <div className="bg-blue-50 rounded-xl p-3 space-y-1">
-        <div className="text-xs text-blue-700"><span className="font-bold">고객:</span> {customerName || "-"}</div>
-        <div className="text-xs text-blue-700"><span className="font-bold">연락처:</span> {customerPhone || "-"}</div>
-      </div>
 
       {/* 결제 방식 */}
       <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value as PaymentMethod)}
@@ -282,7 +280,7 @@ export default function ScheduleSettlement({ scheduleId, scheduleNote, customerN
           </button>
           <button onClick={handleSendKakao} className="flex-1 py-3 rounded-xl text-sm font-bold active:opacity-90"
             style={{ background: "#FEE500", color: "#3C1E1E" }}>
-            카톡 전송
+            {kakaoCopied ? "복사됨! 카톡에 붙여넣기" : "카톡용 복사"}
           </button>
         </div>
       )}
@@ -304,7 +302,7 @@ export default function ScheduleSettlement({ scheduleId, scheduleNote, customerN
               </button>
               <button onClick={handleSendKakao} className="w-full py-3.5 rounded-xl text-sm font-bold active:opacity-90"
                 style={{ background: "#FEE500", color: "#3C1E1E" }}>
-                카카오톡으로 보내기
+                {kakaoCopied ? "✅ 복사됨! 카카오톡에 붙여넣기 해주세요" : "카카오톡용 복사"}
               </button>
               <button onClick={handleCopy} className={`w-full py-3.5 rounded-xl text-sm font-bold ${copied ? "bg-green-500 text-white" : "bg-gray-200 text-gray-700"}`}>
                 {copied ? "복사됨!" : "텍스트 복사"}
