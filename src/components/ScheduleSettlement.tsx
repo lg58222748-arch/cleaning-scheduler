@@ -124,54 +124,39 @@ export default function ScheduleSettlement({ scheduleId, scheduleTitle = "", sch
   }
 
   async function handleComplete() {
-    // 낙관적 업데이트: 모달 먼저 표시
     if (s) setS({ ...s, status: "completed" as const });
-    setShowShareModal(true);
     onCompleted?.();
 
-    // 정산 저장 + 상태만 완료로
+    // 정산 저장 + U→A 제목 변경 + 초록색
+    const updateData: Record<string, unknown> = { status: "completed" };
+    if (scheduleTitle) {
+      let newTitle = scheduleTitle;
+      if (/^\[.+?\]\s*U/.test(newTitle)) {
+        newTitle = newTitle.replace(/^(\[.+?\]\s*)U/, "$1A");
+      } else if (/^\[.+?\]\s*u/.test(newTitle)) {
+        newTitle = newTitle.replace(/^(\[.+?\]\s*)u/, "$1A");
+      } else if (newTitle.startsWith("U")) {
+        newTitle = "A" + newTitle.slice(1);
+      } else if (newTitle.startsWith("u")) {
+        newTitle = "A" + newTitle.slice(1);
+      } else if (!newTitle.startsWith("A") && !newTitle.match(/^\[/)) {
+        newTitle = "A" + newTitle;
+      }
+      updateData.title = newTitle;
+      updateData.color = "#D1FAE5";
+    }
+
     await Promise.all([
       saveSettlement(scheduleId, {
         quote: q, deposit: d, extraCharge: e,
         paymentMethod, cashReceipt, customerName, customerPhone, note, status: "completed",
         depositorName, bankName, accountNumber,
       } as Record<string, unknown>),
-      apiUpdateSchedule(scheduleId, { status: "completed" } as Partial<import("@/types").Schedule>),
+      apiUpdateSchedule(scheduleId, updateData as Partial<import("@/types").Schedule>),
     ]).catch(() => {});
   }
 
-  // 전송 후 제목 U→A 변경
-  async function changeTitleToA() {
-    console.log("[changeTitleToA] scheduleTitle:", scheduleTitle, "scheduleId:", scheduleId);
-    if (!scheduleTitle) return;
-    // 제목 전체에서 U→A 변경 (시간대 접두사 유지)
-    let newTitle = scheduleTitle;
-    // [오전] U이름/... 형태
-    if (/^\[.+?\]\s*U/.test(newTitle)) {
-      newTitle = newTitle.replace(/^(\[.+?\]\s*)U/, "$1A");
-    } else if (/^\[.+?\]\s*u/.test(newTitle)) {
-      newTitle = newTitle.replace(/^(\[.+?\]\s*)u/, "$1A");
-    } else if (newTitle.startsWith("U")) {
-      newTitle = "A" + newTitle.slice(1);
-    } else if (newTitle.startsWith("u")) {
-      newTitle = "A" + newTitle.slice(1);
-    } else if (!newTitle.startsWith("A") && !newTitle.match(/^\[/)) {
-      newTitle = "A" + newTitle;
-    }
-    console.log("[changeTitleToA] newTitle:", newTitle);
-    if (newTitle !== scheduleTitle) {
-      try {
-        await apiUpdateSchedule(scheduleId, { title: newTitle, color: "#D1FAE5" } as Partial<import("@/types").Schedule>);
-        console.log("[changeTitleToA] 성공!");
-      } catch (err) {
-        console.error("[changeTitleToA] 실패:", err);
-      }
-    }
-  }
-
-  async function handleSendSMS() {
-    // 먼저 제목 변경 후 전송
-    await changeTitleToA();
+  function handleSendSMS() {
     const text = getShareText();
     const phone = customerPhone.replace(/[^0-9]/g, "");
     const encoded = encodeURIComponent(text);
@@ -182,8 +167,6 @@ export default function ScheduleSettlement({ scheduleId, scheduleTitle = "", sch
   }
 
   async function handleSendKakao() {
-    // 먼저 제목 변경 후 전송
-    await changeTitleToA();
     const text = getShareText();
     try {
       await Share.share({ text });
@@ -199,7 +182,6 @@ export default function ScheduleSettlement({ scheduleId, scheduleTitle = "", sch
   }
 
   async function handleCopy() {
-    await changeTitleToA();
     const text = getShareText();
     try { await navigator.clipboard.writeText(text); } catch {
       const ta = document.createElement("textarea"); ta.value = text; document.body.appendChild(ta); ta.select(); document.execCommand("copy"); document.body.removeChild(ta);
@@ -308,17 +290,20 @@ export default function ScheduleSettlement({ scheduleId, scheduleTitle = "", sch
       </div>
 
       {/* 작업 완료 버튼 */}
-      {!isCompleted ? (
+      {!isCompleted && (
         <button onClick={handleComplete}
           className="w-full py-4 rounded-xl text-base font-bold text-white active:opacity-90"
           style={{ background: "linear-gradient(135deg, #00c473, #00a35e)" }}>
           작업 완료
         </button>
-      ) : (
+      )}
+
+      {/* 정산서 전송 버튼 - 작업완료 후에만 */}
+      {isCompleted && (
         <button onClick={() => setShowShareModal(true)}
           className="w-full py-4 rounded-xl text-base font-bold text-white active:opacity-90"
           style={{ background: "linear-gradient(135deg, #0f4c81, #1a6bb5)" }}>
-          마무리 · 정산서 전송
+          정산서 전송
         </button>
       )}
 
