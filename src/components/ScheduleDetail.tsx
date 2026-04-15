@@ -204,8 +204,8 @@ export default function ScheduleDetail({
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
-    <div ref={detailRef} className="fixed inset-0 bg-white z-50 flex flex-col animate-[modalIn_0.15s_ease-out]" style={{ paddingTop: "env(safe-area-inset-top, 0px)", paddingBottom: "env(safe-area-inset-bottom, 0px)" }}>
-      <div className="flex-1 flex flex-col overflow-hidden">
+    <div ref={detailRef} className="fixed inset-0 z-50 md:flex md:justify-end animate-[modalIn_0.15s_ease-out]" style={{ paddingTop: "env(safe-area-inset-top, 0px)", paddingBottom: "env(safe-area-inset-bottom, 0px)" }} onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="h-full w-full md:w-[420px] md:ml-auto md:shadow-2xl bg-white flex flex-col overflow-hidden">
         {/* Header */}
         <div className="px-4 py-1.5 border-b border-gray-100 flex items-center justify-between">
           <button onClick={onClose} className="p-1.5 active:bg-gray-100 rounded-lg">
