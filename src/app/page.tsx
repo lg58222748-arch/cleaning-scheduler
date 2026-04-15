@@ -765,7 +765,7 @@ export default function Home() {
           />
         </div>
 
-        <div style={{ display: activeTab === "manage" ? "block" : "none" }}>
+        <div className="h-full" style={{ display: activeTab === "manage" ? "block" : "none" }}>
           <ManageTab
             isAdmin={canManageAdvanced}
             userRole={role}

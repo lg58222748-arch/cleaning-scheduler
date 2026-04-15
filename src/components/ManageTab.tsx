@@ -41,7 +41,7 @@ export default function ManageTab({ isAdmin, userRole, userName = "", allUsers =
   }
 
   return (
-    <div className="h-full overflow-y-auto bg-white">
+    <div className="h-full overflow-y-auto bg-white pb-20">
       <div className="px-4 py-4 border-b border-gray-100">
         <h3 className="text-base font-bold text-gray-800">관리</h3>
       </div>

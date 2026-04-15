@@ -91,32 +91,41 @@ export default function ScheduleSettlement({ scheduleId, scheduleNote, customerN
     const memberDisplay = memberBranch ? `${memberBranch} 관리점 ${memberName}` : memberName;
 
     const lines: string[] = [];
-    lines.push("새집느낌 정산서");
-    lines.push("──── 고객 정보 ────");
-    lines.push(`고객명: ${customerName || "-"}님`);
-    lines.push(`연락처: ${customerPhone || "-"}`);
-    lines.push(`결제방식: ${pm}`);
-    lines.push(`현금영수증: ${cashReceipt ? "신청" : "미신청"}`);
+    lines.push("🏠 새집느낌 정산서");
+    lines.push("");
+    lines.push("👤 고객 정보");
+    lines.push(`├ 고객명: ${customerName || "-"}님`);
+    lines.push(`├ 연락처: ${customerPhone || "-"}`);
+    lines.push(`├ 결제방식: ${pm}`);
+    lines.push(`└ 현금영수증: ${cashReceipt ? "✅ 신청" : "미신청"}`);
     if (depositorName || bankName || accountNumber) {
-      lines.push("──── 계좌 정보 ────");
-      if (depositorName) lines.push(`입금주: ${depositorName}`);
-      if (bankName) lines.push(`은행명: ${bankName}`);
-      if (accountNumber) lines.push(`계좌번호: ${accountNumber}`);
+      lines.push("");
+      lines.push("🏦 계좌 정보");
+      if (depositorName) lines.push(`├ 입금주: ${depositorName}`);
+      if (bankName) lines.push(`├ 은행명: ${bankName}`);
+      if (accountNumber) lines.push(`└ 계좌번호: ${accountNumber}`);
     }
-    lines.push("──── 비용 참고사항 ────");
-    lines.push(`공급가액: ${formatWon(q)}`);
-    lines.push(`예약금(선납완료): ${formatWon(d)}`);
-    lines.push(`잔금: ${formatWon(balance)}`);
-    lines.push(`현장 추가금: ${formatWon(e)}`);
-    lines.push("──── 최종 결제 안내 ────");
+    lines.push("");
+    lines.push("📋 비용 상세");
+    lines.push(`├ 공급가액: ${formatWon(q)}`);
+    lines.push(`├ 예약금(선납완료): -${formatWon(d)}`);
+    lines.push(`├ 잔금: ${formatWon(balance)}`);
+    if (e > 0) lines.push(`├ 현장 추가금: +${formatWon(e)}`);
+    if (cashReceipt) lines.push(`└ 부가세(10%): +${formatWon(vatTotal)}`);
+    lines.push("");
+    lines.push("💰 최종 결제 금액");
+    lines.push(`┌─────────────────┐`);
+    lines.push(`│  ${formatWon(total)}  │`);
+    lines.push(`└─────────────────┘`);
+    lines.push(cashReceipt ? "※ 부가세 포함 금액" : "※ 부가세 미포함 (공급가액)");
+    lines.push("");
+    lines.push("📌 안내사항");
     lines.push(receiptMsg);
     lines.push("");
-    if (memberDisplay) lines.push(`${memberDisplay} 관리사`);
-    if (accountNumber && bankName) lines.push(`${bankName} ${accountNumber}`);
-    lines.push(`최종 결제 금액: ${formatWon(total)}`);
+    if (accountNumber && bankName) lines.push(`🏦 ${bankName} ${accountNumber}`);
+    if (memberDisplay) lines.push(`👷 ${memberDisplay} 관리사`);
     lines.push("");
-    lines.push("이용해주셔서 너무 감사드립니다.");
-    lines.push("━━━━━━━━━━━━━━━");
+    lines.push("감사합니다! 😊");
     lines.push(`${dateStr} · 새집느낌`);
     return lines.join("\n");
   }
@@ -149,16 +158,24 @@ export default function ScheduleSettlement({ scheduleId, scheduleNote, customerN
 
   async function handleSendKakao() {
     const text = getShareText();
-    // 클립보드에 먼저 복사 (공유 실패 대비)
+    // 1. 클립보드에 먼저 복사
     try { await navigator.clipboard.writeText(text); } catch {
       const ta = document.createElement("textarea"); ta.value = text; document.body.appendChild(ta); ta.select(); document.execCommand("copy"); document.body.removeChild(ta);
     }
-    // 네이티브 공유 시트 열기 (카카오톡 선택 가능)
-    if (navigator.share) {
-      try { await navigator.share({ title: "새집느낌 정산서", text }); return; } catch { /* 취소 또는 미지원 */ }
+    // 2. 카카오톡 앱 열기 시도 (Android intent → kakao scheme → 공유시트 순서)
+    const encoded = encodeURIComponent(text);
+    const isAndroid = /Android/i.test(navigator.userAgent);
+    if (isAndroid) {
+      // Android intent scheme - 카카오톡 앱 직접 호출
+      window.location.href = `intent://send?text=${encoded}#Intent;scheme=kakaotalk;package=com.kakao.talk;end`;
+      return;
     }
-    // 공유 시트 미지원 시 카카오톡 앱 직접 열기 시도
-    window.location.href = `kakaotalk://msg/text/${encodeURIComponent(text)}`;
+    // iOS 또는 기타 - 네이티브 공유 시트
+    if (navigator.share) {
+      try { await navigator.share({ title: "새집느낌 정산서", text }); return; } catch { /* 취소 */ }
+    }
+    // 최종 fallback
+    window.location.href = `kakaotalk://send?text=${encoded}`;
   }
 
   async function handleCopy() {
