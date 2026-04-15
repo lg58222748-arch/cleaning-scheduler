@@ -78,7 +78,6 @@ export default function Home() {
   const [showSwapPanel, setShowSwapPanel] = useState(false);
   const [swapMode, setSwapMode] = useState(false);
   const [swapFirstSchedule, setSwapFirstSchedule] = useState<Schedule | null>(null);
-  // showGoogleSync 제거됨
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [showNotifications, setShowNotifications] = useState(false);
@@ -129,8 +128,8 @@ export default function Home() {
         const rangeScheds = await fetchSchedules(start, end);
         setSchedules(rangeScheds);
       }
-    } catch (e) {
-      console.error("데이터 로드 실패:", e);
+    } catch {
+      // 데이터 로드 실패 - 자동 재시도됨
     }
   }, [selectedDate]);
 

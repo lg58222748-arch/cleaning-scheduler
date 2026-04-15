@@ -33,7 +33,6 @@ export default function ScheduleSettlement({ scheduleId, scheduleTitle = "", sch
   const [loading, setLoading] = useState(true);
   const [showBankEdit, setShowBankEdit] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
-  const [completed, setCompleted] = useState(false);
   const [copied, setCopied] = useState(false);
 
   // 계좌정보: localStorage에서 불러오기 (한번 저장하면 계속 사용)
@@ -53,7 +52,6 @@ export default function ScheduleSettlement({ scheduleId, scheduleTitle = "", sch
     const data = await fetchSettlement(scheduleId);
     if (data) {
       setS(data);
-      if (data.status === "completed") setCompleted(true);
       const hasExisting = data.quote > 0 || data.deposit > 0;
       if (hasExisting) {
         setQuote(String(data.quote));
@@ -123,28 +121,6 @@ export default function ScheduleSettlement({ scheduleId, scheduleTitle = "", sch
     lines.push("");
     lines.push(`${dateStr} · 새집느낌`);
     return lines.join("\n");
-  }
-
-  function handleComplete() {
-    if (completed) {
-      // 작업완료 취소 → 원래 색상으로
-      setCompleted(false);
-      apiUpdateSchedule(scheduleId, {
-        status: "confirmed", color: "#FDDCCC",
-      } as Partial<import("@/types").Schedule>).catch(() => {});
-    } else {
-      // 작업완료 → 연두색으로
-      setCompleted(true);
-      saveSettlement(scheduleId, {
-        quote: q, deposit: d, extraCharge: e,
-        paymentMethod, cashReceipt, customerName, customerPhone, note, status: "completed",
-        depositorName, bankName, accountNumber,
-      } as Record<string, unknown>).catch(() => {});
-      apiUpdateSchedule(scheduleId, {
-        status: "completed", color: "#FEF3C7",
-      } as Partial<import("@/types").Schedule>).catch(() => {});
-      onCompleted?.();
-    }
   }
 
   function handleSendSMS() {
