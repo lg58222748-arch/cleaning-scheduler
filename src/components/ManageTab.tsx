@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { Schedule } from "@/types";
-import { fetchDeletedSchedules, restoreScheduleApi, emptyTrashApi, deleteAllSchedules, fetchSchedules, addUnassignedSchedule } from "@/lib/api";
+import { fetchDeletedSchedules, restoreScheduleApi, emptyTrashApi, deleteAllSchedules, fetchSchedules, addUnassignedSchedule, assignScheduleApi } from "@/lib/api";
 
 type ManageSubTab = "sales-stats" | "field" | "scheduler" | "ceo";
 
@@ -376,20 +376,20 @@ function GoogleCalendarImport({ allUsers, members, onImported }: {
   const [events, setEvents] = useState<{ id: string; summary: string; date: string; description?: string; selected: boolean; assignTo: string }[]>([]);
   const [loading, setLoading] = useState(false);
   const [importing, setImporting] = useState(false);
+  const [importDone, setImportDone] = useState(false);
+  const [importCount, setImportCount] = useState(0);
   const [error, setError] = useState("");
-
-  const fieldUsers = allUsers.filter(u => u.role === "field");
 
   async function handleFetchEvents() {
     if (!calendarId.trim()) { setError("캘린더 ID를 입력해주세요"); return; }
     setLoading(true);
     setError("");
+    setImportDone(false);
     localStorage.setItem("google_calendar_id", calendarId.trim());
 
     try {
       const refreshToken = localStorage.getItem("google_refresh_token");
       if (!refreshToken) {
-        // OAuth 인증 필요
         const authRes = await fetch(`/api/calendar?action=auth-url`);
         const authData = await authRes.json();
         if (authData.needSetup) {
@@ -425,7 +425,7 @@ function GoogleCalendarImport({ allUsers, members, onImported }: {
         date: ev.start?.date || (ev.start?.dateTime ? ev.start.dateTime.slice(0, 10) : ""),
         description: ev.description || "",
         selected: true,
-        assignTo: "",
+        assignTo: "", // "" = 배정탭으로, member id = 직접 배정
       }));
       setEvents(items);
     } catch {
@@ -439,102 +439,143 @@ function GoogleCalendarImport({ allUsers, members, onImported }: {
     if (toImport.length === 0) return;
     setImporting(true);
 
+    let count = 0;
     for (const ev of toImport) {
-      await addUnassignedSchedule({
-        title: ev.summary,
-        date: ev.date,
-        startTime: "09:00",
-        endTime: "18:00",
-        note: ev.description || "",
-        ...(ev.assignTo ? { memberId: ev.assignTo, memberName: fieldUsers.find(u => u.id === ev.assignTo)?.name || members.find(m => m.id === ev.assignTo)?.name || "" } : {}),
-      });
+      try {
+        // 1. 미배정 일정으로 등록
+        const created = await addUnassignedSchedule({
+          title: ev.summary,
+          date: ev.date,
+          startTime: "09:00",
+          endTime: "18:00",
+          note: ev.description || "",
+        });
+        // 2. 담당자가 선택된 경우 바로 배정
+        if (ev.assignTo && created?.id) {
+          const member = members.find(m => m.id === ev.assignTo);
+          if (member) {
+            await assignScheduleApi(created.id, member.id, member.name);
+          }
+        }
+        count++;
+      } catch { /* 개별 실패 무시 */ }
     }
 
     setImporting(false);
+    setImportCount(count);
+    setImportDone(true);
     setEvents([]);
     onImported();
-    alert(`${toImport.length}건 가져오기 완료`);
   }
 
   function toggleAll(checked: boolean) {
     setEvents(prev => prev.map(e => ({ ...e, selected: checked })));
   }
 
+  // 전체 일괄 배정 변경
+  function setAllAssign(value: string) {
+    setEvents(prev => prev.map(e => e.selected ? { ...e, assignTo: value } : e));
+  }
+
   return (
     <div className="px-4 py-3 bg-gray-50 space-y-3">
+      {/* 완료 메시지 */}
+      {importDone && (
+        <div className="p-3 bg-green-50 border border-green-200 rounded-xl text-center">
+          <div className="text-sm font-bold text-green-700">✅ {importCount}건 가져오기 완료!</div>
+          <button onClick={() => setImportDone(false)} className="mt-2 text-xs text-blue-500 font-medium">다시 가져오기</button>
+        </div>
+      )}
+
       {/* 캘린더 ID 입력 */}
-      <div className="space-y-1">
-        <label className="text-xs font-bold text-gray-500">구글 캘린더 ID</label>
-        <div className="flex gap-2">
-          <input
-            type="text"
-            value={calendarId}
-            onChange={(e) => setCalendarId(e.target.value)}
-            placeholder="example@gmail.com 또는 캘린더ID"
-            className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-400"
-          />
-          <button onClick={handleFetchEvents} disabled={loading} className="px-4 py-2 bg-blue-500 text-white rounded-lg text-xs font-bold active:bg-blue-600 disabled:opacity-50 shrink-0">
-            {loading ? "로딩..." : "가져오기"}
-          </button>
-        </div>
-        <p className="text-xs text-gray-400">구글 캘린더 설정 → 캘린더 통합 → 캘린더 ID 복사</p>
-      </div>
-
-      {error && <div className="p-2 bg-red-50 border border-red-200 rounded-lg text-xs text-red-600">{error}</div>}
-
-      {/* 이벤트 목록 */}
-      {events.length > 0 && (
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-gray-600">{events.filter(e => e.selected).length}/{events.length}건 선택</span>
+      {!importDone && (
+        <>
+          <div className="space-y-1">
+            <label className="text-xs font-bold text-gray-500">구글 캘린더 ID</label>
             <div className="flex gap-2">
-              <button onClick={() => toggleAll(true)} className="text-xs text-blue-500 font-medium">전체선택</button>
-              <button onClick={() => toggleAll(false)} className="text-xs text-gray-400 font-medium">전체해제</button>
+              <input
+                type="text"
+                value={calendarId}
+                onChange={(e) => setCalendarId(e.target.value)}
+                placeholder="example@gmail.com 또는 캘린더ID"
+                className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-400"
+              />
+              <button onClick={handleFetchEvents} disabled={loading} className="px-4 py-2 bg-blue-500 text-white rounded-lg text-xs font-bold active:bg-blue-600 disabled:opacity-50 shrink-0">
+                {loading ? "로딩..." : "가져오기"}
+              </button>
             </div>
+            <p className="text-xs text-gray-400">구글 캘린더 설정 → 캘린더 통합 → 캘린더 ID 복사</p>
           </div>
 
-          <div className="max-h-[40vh] overflow-y-auto space-y-1.5">
-            {events.map((ev, idx) => (
-              <div key={ev.id} className={`border rounded-xl p-2.5 ${ev.selected ? "border-blue-300 bg-blue-50/50" : "border-gray-200 bg-white"}`}>
-                <div className="flex items-start gap-2">
-                  <input
-                    type="checkbox"
-                    checked={ev.selected}
-                    onChange={(e) => setEvents(prev => prev.map((x, i) => i === idx ? { ...x, selected: e.target.checked } : x))}
-                    className="mt-0.5 w-4 h-4 rounded border-gray-300 text-blue-500 shrink-0"
-                  />
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium text-gray-800 truncate">{ev.summary}</div>
-                    <div className="text-xs text-gray-400">{ev.date}</div>
-                  </div>
+          {error && <div className="p-2 bg-red-50 border border-red-200 rounded-lg text-xs text-red-600">{error}</div>}
+
+          {/* 이벤트 목록 */}
+          {events.length > 0 && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-gray-600">{events.filter(e => e.selected).length}/{events.length}건 선택</span>
+                <div className="flex gap-2">
+                  <button onClick={() => toggleAll(true)} className="text-xs text-blue-500 font-medium">전체선택</button>
+                  <button onClick={() => toggleAll(false)} className="text-xs text-gray-400 font-medium">전체해제</button>
                 </div>
-                {ev.selected && (
-                  <select
-                    value={ev.assignTo}
-                    onChange={(e) => setEvents(prev => prev.map((x, i) => i === idx ? { ...x, assignTo: e.target.value } : x))}
-                    className="mt-2 w-full px-2 py-1.5 border border-gray-200 rounded-lg text-xs outline-none bg-white"
-                  >
-                    <option value="">배정 안 함 (미배정)</option>
-                    {fieldUsers.map(u => (
-                      <option key={u.id || u.name} value={u.id || ""}>{u.name} (현장팀)</option>
-                    ))}
-                    {members.filter(m => !fieldUsers.find(u => u.name === m.name)).map(m => (
-                      <option key={m.id} value={m.id}>{m.name}</option>
-                    ))}
-                  </select>
-                )}
               </div>
-            ))}
-          </div>
 
-          <button
-            onClick={handleImport}
-            disabled={importing || events.filter(e => e.selected).length === 0}
-            className="w-full py-3 bg-blue-500 text-white rounded-xl text-sm font-bold active:bg-blue-600 disabled:opacity-50"
-          >
-            {importing ? "가져오는 중..." : `${events.filter(e => e.selected).length}건 가져오기`}
-          </button>
-        </div>
+              {/* 일괄 배정 */}
+              <div className="bg-white border border-gray-200 rounded-xl p-2.5">
+                <label className="text-xs font-bold text-gray-500 mb-1 block">선택된 일정 일괄 배정</label>
+                <select
+                  onChange={(e) => setAllAssign(e.target.value)}
+                  className="w-full px-2 py-2 border border-gray-200 rounded-lg text-xs outline-none bg-white"
+                  defaultValue=""
+                >
+                  <option value="">배정탭으로 보내기 (미배정)</option>
+                  {members.map(m => (
+                    <option key={m.id} value={m.id}>📅 {m.name} 달력에 직접 배정</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="max-h-[40vh] overflow-y-auto space-y-1.5">
+                {events.map((ev, idx) => (
+                  <div key={ev.id} className={`border rounded-xl p-2.5 ${ev.selected ? "border-blue-300 bg-blue-50/50" : "border-gray-200 bg-white"}`}>
+                    <div className="flex items-start gap-2">
+                      <input
+                        type="checkbox"
+                        checked={ev.selected}
+                        onChange={(e) => setEvents(prev => prev.map((x, i) => i === idx ? { ...x, selected: e.target.checked } : x))}
+                        className="mt-0.5 w-4 h-4 rounded border-gray-300 text-blue-500 shrink-0"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-medium text-gray-800 truncate">{ev.summary}</div>
+                        <div className="text-xs text-gray-400">{ev.date}</div>
+                      </div>
+                    </div>
+                    {ev.selected && (
+                      <select
+                        value={ev.assignTo}
+                        onChange={(e) => setEvents(prev => prev.map((x, i) => i === idx ? { ...x, assignTo: e.target.value } : x))}
+                        className="mt-2 w-full px-2 py-1.5 border border-gray-200 rounded-lg text-xs outline-none bg-white"
+                      >
+                        <option value="">📋 배정탭으로 보내기</option>
+                        {members.map(m => (
+                          <option key={m.id} value={m.id}>📅 {m.name} 달력에 직접 배정</option>
+                        ))}
+                      </select>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              <button
+                onClick={handleImport}
+                disabled={importing || events.filter(e => e.selected).length === 0}
+                className="w-full py-3 bg-blue-500 text-white rounded-xl text-sm font-bold active:bg-blue-600 disabled:opacity-50"
+              >
+                {importing ? `가져오는 중...` : `${events.filter(e => e.selected).length}건 가져오기`}
+              </button>
+            </div>
+          )}
+        </>
       )}
     </div>
   );
