@@ -161,7 +161,7 @@ export default function ScheduleSettlement({ scheduleId, scheduleTitle = "", sch
     console.log("[changeTitleToA] newTitle:", newTitle);
     if (newTitle !== scheduleTitle) {
       try {
-        await apiUpdateSchedule(scheduleId, { title: newTitle } as Partial<import("@/types").Schedule>);
+        await apiUpdateSchedule(scheduleId, { title: newTitle, color: "#D1FAE5" } as Partial<import("@/types").Schedule>);
         console.log("[changeTitleToA] 성공!");
       } catch (err) {
         console.error("[changeTitleToA] 실패:", err);
