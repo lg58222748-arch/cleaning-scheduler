@@ -127,40 +127,22 @@ export default function ScheduleSettlement({ scheduleId, scheduleTitle = "", sch
 
   function handleComplete() {
     if (completed) {
-      // 작업완료 취소
+      // 작업완료 취소 → 원래 색상으로
       setCompleted(false);
-      // 제목 A→U 복원
-      let restoreTitle = scheduleTitle || "";
-      if (/^\[.+?\]\s*A/.test(restoreTitle)) restoreTitle = restoreTitle.replace(/^(\[.+?\]\s*)A/, "$1U");
-      else if (restoreTitle.startsWith("A")) restoreTitle = "U" + restoreTitle.slice(1);
       apiUpdateSchedule(scheduleId, {
-        status: "confirmed",
-        title: restoreTitle || scheduleTitle,
-        color: "#FDDCCC",
+        status: "confirmed", color: "#FDDCCC",
       } as Partial<import("@/types").Schedule>).catch(() => {});
     } else {
-      // 작업완료
+      // 작업완료 → 연두색으로
       setCompleted(true);
-      // 제목 U→A
-      let newTitle = scheduleTitle || "";
-      if (/^\[.+?\]\s*U/.test(newTitle)) newTitle = newTitle.replace(/^(\[.+?\]\s*)U/, "$1A");
-      else if (/^\[.+?\]\s*u/.test(newTitle)) newTitle = newTitle.replace(/^(\[.+?\]\s*)u/, "$1A");
-      else if (newTitle.startsWith("U")) newTitle = "A" + newTitle.slice(1);
-      else if (newTitle.startsWith("u")) newTitle = "A" + newTitle.slice(1);
-      else if (newTitle && !newTitle.startsWith("A") && !newTitle.match(/^\[/)) newTitle = "A" + newTitle;
-
       saveSettlement(scheduleId, {
         quote: q, deposit: d, extraCharge: e,
         paymentMethod, cashReceipt, customerName, customerPhone, note, status: "completed",
         depositorName, bankName, accountNumber,
       } as Record<string, unknown>).catch(() => {});
-
       apiUpdateSchedule(scheduleId, {
-        status: "completed",
-        title: newTitle || scheduleTitle,
-        color: "#C8F7DC",
+        status: "completed", color: "#D1FAE5",
       } as Partial<import("@/types").Schedule>).catch(() => {});
-
       onCompleted?.();
     }
   }
