@@ -84,7 +84,7 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
             onClick={() => { setMode("register"); setError(""); setSuccess(""); }}
             className={`flex-1 py-3 text-sm font-medium text-center ${mode === "register" ? "text-blue-500 border-b-2 border-blue-500" : "text-gray-400"}`}
           >
-            관리사 등록
+            회원가입
           </button>
         </div>
 
