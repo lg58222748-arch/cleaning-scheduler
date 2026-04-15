@@ -142,17 +142,30 @@ export default function ScheduleSettlement({ scheduleId, scheduleTitle = "", sch
 
   // 전송 후 제목 U→A 변경
   async function changeTitleToA() {
+    console.log("[changeTitleToA] scheduleTitle:", scheduleTitle, "scheduleId:", scheduleId);
     if (!scheduleTitle) return;
-    const timePrefix = scheduleTitle.match(/^\[.+?\]\s*/)?.[0] || "";
-    const bare = scheduleTitle.replace(/^\[.+?\]\s*/, "");
-    let newBare = bare;
-    if (bare.startsWith("U") || bare.startsWith("u")) {
-      newBare = "A" + bare.slice(1);
-    } else if (!bare.startsWith("A")) {
-      newBare = "A" + bare;
+    // 제목 전체에서 U→A 변경 (시간대 접두사 유지)
+    let newTitle = scheduleTitle;
+    // [오전] U이름/... 형태
+    if (/^\[.+?\]\s*U/.test(newTitle)) {
+      newTitle = newTitle.replace(/^(\[.+?\]\s*)U/, "$1A");
+    } else if (/^\[.+?\]\s*u/.test(newTitle)) {
+      newTitle = newTitle.replace(/^(\[.+?\]\s*)u/, "$1A");
+    } else if (newTitle.startsWith("U")) {
+      newTitle = "A" + newTitle.slice(1);
+    } else if (newTitle.startsWith("u")) {
+      newTitle = "A" + newTitle.slice(1);
+    } else if (!newTitle.startsWith("A") && !newTitle.match(/^\[/)) {
+      newTitle = "A" + newTitle;
     }
-    if (newBare !== bare) {
-      await apiUpdateSchedule(scheduleId, { title: timePrefix + newBare } as Partial<import("@/types").Schedule>).catch(() => {});
+    console.log("[changeTitleToA] newTitle:", newTitle);
+    if (newTitle !== scheduleTitle) {
+      try {
+        await apiUpdateSchedule(scheduleId, { title: newTitle } as Partial<import("@/types").Schedule>);
+        console.log("[changeTitleToA] 성공!");
+      } catch (err) {
+        console.error("[changeTitleToA] 실패:", err);
+      }
     }
   }
 
@@ -336,9 +349,6 @@ export default function ScheduleSettlement({ scheduleId, scheduleTitle = "", sch
               </button>
               <button onClick={handleCopy} className={`w-full py-3.5 rounded-xl text-sm font-bold flex items-center justify-center gap-2 ${copied ? "bg-green-500 text-white" : "bg-gray-200 text-gray-700"}`}>
                 <span>📋</span> {copied ? "복사됨!" : "텍스트 복사"}
-              </button>
-              <button onClick={() => setShowShareModal(false)} className="w-full py-3 bg-gray-100 text-gray-500 rounded-xl text-sm font-bold">
-                닫기
               </button>
             </div>
           </div>
