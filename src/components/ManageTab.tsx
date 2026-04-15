@@ -455,8 +455,11 @@ function GoogleCalendarImport({ allUsers, members, onImported }: {
         // 2. 담당자가 선택된 경우 바로 배정
         if (ev.assignTo && created?.id) {
           const member = members.find(m => m.id === ev.assignTo);
-          if (member) {
-            await assignScheduleApi(created.id, member.id, member.name);
+          const fieldUser = allUsers.find(u => (u.id === ev.assignTo || u.name === ev.assignTo) && u.role === "field");
+          const assignId = member?.id || fieldUser?.id || ev.assignTo;
+          const assignName = member?.name || fieldUser?.name || ev.assignTo;
+          if (assignId) {
+            await assignScheduleApi(created.id, assignId, assignName);
           }
         }
         count++;
@@ -478,6 +481,19 @@ function GoogleCalendarImport({ allUsers, members, onImported }: {
   function setAllAssign(value: string) {
     setEvents(prev => prev.map(e => e.selected ? { ...e, assignTo: value } : e));
   }
+
+  // 배정 가능한 사람 목록: members(팀원) + 현장팀 사용자 (중복 제거)
+  const assignableList: { id: string; name: string; source: string }[] = [];
+  // members 먼저
+  members.forEach(m => {
+    assignableList.push({ id: m.id, name: m.name, source: "팀원" });
+  });
+  // 현장팀 사용자 중 members에 없는 사람 추가
+  allUsers.filter(u => u.role === "field").forEach(u => {
+    if (!assignableList.find(a => a.name === u.name)) {
+      assignableList.push({ id: u.id || u.name, name: u.name, source: "현장팀" });
+    }
+  });
 
   return (
     <div className="px-4 py-3 bg-gray-50 space-y-3">
@@ -531,13 +547,13 @@ function GoogleCalendarImport({ allUsers, members, onImported }: {
                   defaultValue=""
                 >
                   <option value="">배정탭으로 보내기 (미배정)</option>
-                  {members.map(m => (
-                    <option key={m.id} value={m.id}>📅 {m.name} 달력에 직접 배정</option>
+                  {assignableList.map(a => (
+                    <option key={a.id} value={a.id}>📅 {a.name} 달력에 직접 배정</option>
                   ))}
                 </select>
               </div>
 
-              <div className="max-h-[40vh] overflow-y-auto space-y-1.5">
+              <div className="space-y-1.5">
                 {events.map((ev, idx) => (
                   <div key={ev.id} className={`border rounded-xl p-2.5 ${ev.selected ? "border-blue-300 bg-blue-50/50" : "border-gray-200 bg-white"}`}>
                     <div className="flex items-start gap-2">
@@ -559,8 +575,8 @@ function GoogleCalendarImport({ allUsers, members, onImported }: {
                         className="mt-2 w-full px-2 py-1.5 border border-gray-200 rounded-lg text-xs outline-none bg-white"
                       >
                         <option value="">📋 배정탭으로 보내기</option>
-                        {members.map(m => (
-                          <option key={m.id} value={m.id}>📅 {m.name} 달력에 직접 배정</option>
+                        {assignableList.map(a => (
+                          <option key={a.id} value={a.id}>📅 {a.name} 달력에 직접 배정</option>
                         ))}
                       </select>
                     )}
