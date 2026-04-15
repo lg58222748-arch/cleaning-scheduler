@@ -286,32 +286,18 @@ export default function ScheduleSettlement({ scheduleId, scheduleTitle = "", sch
 
       {/* 작업 완료 + 정산서 발행 (가로 2개) */}
       <div className="flex gap-2">
-        <button onClick={async () => {
-          await handleComplete();
-          setShowCompleteAlert(true);
-          setTimeout(() => setShowCompleteAlert(false), 3000);
-        }}
-          disabled={isCompleted}
+        <button onClick={() => { if (!isCompleted) handleComplete(); }}
           className={`flex-1 py-4 rounded-xl text-sm font-bold active:opacity-90 ${isCompleted ? "bg-green-100 text-green-700 border border-green-300" : "text-white"}`}
           style={!isCompleted ? { background: "linear-gradient(135deg, #00c473, #00a35e)" } : {}}>
-          {isCompleted ? "✅ 완료됨" : "작업 완료"}
+          {isCompleted ? "✅ 완료" : "작업 완료"}
         </button>
-        <button onClick={() => {
-          if (!isCompleted) { alert("작업 완료를 먼저 눌러주세요!"); return; }
-          setShowShareModal(true);
-        }}
+        <button onClick={() => setShowShareModal(true)}
+          disabled={!isCompleted}
           className={`flex-1 py-4 rounded-xl text-sm font-bold active:opacity-90 text-white ${!isCompleted ? "opacity-40" : ""}`}
           style={{ background: "linear-gradient(135deg, #0f4c81, #1a6bb5)" }}>
           정산서 발행
         </button>
       </div>
-
-      {/* 작업 완료 알림 */}
-      {showCompleteAlert && (
-        <div className="p-3 bg-green-50 border border-green-200 rounded-xl text-center animate-[modalIn_0.2s_ease-out]">
-          <div className="text-sm font-bold text-green-700">작업 완료 수고하셨습니다! 👏</div>
-          <div className="text-xs text-green-600 mt-1">이어서 정산을 진행해주세요</div>
-        </div>
       )}
 
       {/* 마무리 모달 - 문자/카톡 전송 */}
