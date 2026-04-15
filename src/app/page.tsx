@@ -560,7 +560,7 @@ export default function Home() {
       {/* 반환 알림 배너 - 대표/일정관리자: DB 알림 기반 */}
       {(() => {
         const returnNotifs = notifications.filter(n => n.title === "일정 반환" && !n.read);
-        if (!canAssign || returnNotifs.length === 0) return null;
+        if (!isAdmin || returnNotifs.length === 0) return null;
         return (
           <div className="bg-orange-500 text-white z-50">
             {returnNotifs.slice(0, 5).map((n) => (
@@ -643,7 +643,7 @@ export default function Home() {
       </header>
 
       {/* 팀원 필터 패널 - 달력에서만 */}
-      {showMemberFilter && canManageAdvanced && activeTab === "calendar" && (
+      {showMemberFilter && canAssign && activeTab === "calendar" && (
         <div className="bg-white border-b border-gray-200 px-4 py-3 z-30 max-h-[50vh] overflow-y-auto">
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs font-bold text-gray-700">팀원 필터</span>
