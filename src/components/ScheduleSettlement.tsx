@@ -33,7 +33,6 @@ export default function ScheduleSettlement({ scheduleId, scheduleTitle = "", sch
   const [loading, setLoading] = useState(true);
   const [showBankEdit, setShowBankEdit] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
-  const [copied, setCopied] = useState(false);
 
   // 계좌정보: localStorage에서 불러오기 (한번 저장하면 계속 사용)
   const [depositorName, setDepositorName] = useState(() => typeof window !== "undefined" ? localStorage.getItem("bank_depositor") || "" : "");
@@ -65,8 +64,8 @@ export default function ScheduleSettlement({ scheduleId, scheduleTitle = "", sch
       setExtraCharge(data.extraCharge > 0 ? String(data.extraCharge) : "");
       setPaymentMethod(data.paymentMethod);
       setCashReceipt(data.cashReceipt);
-      setCustomerName(data.customerName || customerNameFromSchedule || "");
-      setCustomerPhone(data.customerPhone || customerPhoneFromSchedule || "");
+      setCustomerName(data.customerName?.trim() || customerNameFromSchedule || "");
+      setCustomerPhone(data.customerPhone?.trim() || customerPhoneFromSchedule || "");
       setNote(data.note);
     }
     setLoading(false);
@@ -142,19 +141,12 @@ export default function ScheduleSettlement({ scheduleId, scheduleTitle = "", sch
     if (navigator.share) {
       try { await navigator.share({ text }); return; } catch { /* 취소 */ }
     }
+    // 최종 fallback: 클립보드 복사
     try { await navigator.clipboard.writeText(text); } catch {
       const ta = document.createElement("textarea"); ta.value = text; document.body.appendChild(ta); ta.select(); document.execCommand("copy"); document.body.removeChild(ta);
     }
-    setCopied(true); setTimeout(() => setCopied(false), 2000);
   }
 
-  async function handleCopy() {
-    const text = getShareText();
-    try { await navigator.clipboard.writeText(text); } catch {
-      const ta = document.createElement("textarea"); ta.value = text; document.body.appendChild(ta); ta.select(); document.execCommand("copy"); document.body.removeChild(ta);
-    }
-    setCopied(true); setTimeout(() => setCopied(false), 2000);
-  }
 
   if (loading) return <div className="py-8 text-center text-gray-400 text-sm">로딩 중...</div>;
 
@@ -257,8 +249,8 @@ export default function ScheduleSettlement({ scheduleId, scheduleTitle = "", sch
 
       {/* 마무리 모달 - 문자/카톡 전송 */}
       {showShareModal && (
-        <div className="fixed inset-0 bg-black/40 z-50 flex items-end justify-center" onClick={(e) => { if (e.target === e.currentTarget) setShowShareModal(false); }}>
-          <div className="bg-white rounded-t-2xl w-full max-w-md p-5 pb-8 animate-[modalIn_0.2s_ease-out]">
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={(e) => { if (e.target === e.currentTarget) setShowShareModal(false); }}>
+          <div className="bg-white rounded-2xl w-full max-w-md p-5 animate-[modalIn_0.2s_ease-out]">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-base font-bold text-green-700">✅ 작업 완료</h3>
               <button onClick={() => {
@@ -278,9 +270,6 @@ export default function ScheduleSettlement({ scheduleId, scheduleTitle = "", sch
               <button onClick={handleSendKakao} className="w-full py-3.5 rounded-xl text-sm font-bold active:opacity-90 flex items-center justify-center gap-2"
                 style={{ background: "#FEE500", color: "#3C1E1E" }}>
                 <span>💛</span> 카카오톡 전송
-              </button>
-              <button onClick={handleCopy} className={`w-full py-3.5 rounded-xl text-sm font-bold flex items-center justify-center gap-2 ${copied ? "bg-green-500 text-white" : "bg-gray-200 text-gray-700"}`}>
-                <span>📋</span> {copied ? "복사됨!" : "텍스트 복사"}
               </button>
             </div>
           </div>
