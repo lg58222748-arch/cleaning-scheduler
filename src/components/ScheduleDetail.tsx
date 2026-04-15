@@ -415,6 +415,7 @@ export default function ScheduleDetail({
           <div style={{ display: activeTab === "settlement" ? "block" : "none" }}>
             {preloadSettlement && <ScheduleSettlement
               scheduleId={schedule.id}
+              scheduleTitle={schedule.title}
               scheduleNote={schedule.note}
               customerNameFromSchedule={
                 schedule.note?.match(/1\)성함\s*[:：]\s*(.+)/)?.[1]?.trim()

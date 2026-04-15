@@ -7,6 +7,7 @@ import { Share } from "@capacitor/share";
 
 interface ScheduleSettlementProps {
   scheduleId: string;
+  scheduleTitle?: string;
   scheduleNote?: string;
   customerNameFromSchedule?: string;
   customerPhoneFromSchedule?: string;
@@ -19,7 +20,7 @@ function formatWon(n: number): string {
   return n.toLocaleString("ko") + "원";
 }
 
-export default function ScheduleSettlement({ scheduleId, scheduleNote, customerNameFromSchedule, customerPhoneFromSchedule, memberName = "", memberBranch = "", onCompleted }: ScheduleSettlementProps) {
+export default function ScheduleSettlement({ scheduleId, scheduleTitle = "", scheduleNote, customerNameFromSchedule, customerPhoneFromSchedule, memberName = "", memberBranch = "", onCompleted }: ScheduleSettlementProps) {
   const [s, setS] = useState<Settlement | null>(null);
   const [quote, setQuote] = useState("");
   const [deposit, setDeposit] = useState("");
@@ -129,32 +130,23 @@ export default function ScheduleSettlement({ scheduleId, scheduleNote, customerN
     onCompleted?.();
 
     // 백그라운드: 정산 저장 + 제목 U→A 변경
-    (async () => {
-      try {
-        // 1. 정산 저장
-        saveSettlement(scheduleId, {
-          quote: q, deposit: d, extraCharge: e,
-          paymentMethod, cashReceipt, customerName, customerPhone, note, status: "completed",
-          depositorName, bankName, accountNumber,
-        } as Record<string, unknown>);
+    const timePrefix = scheduleTitle.match(/^\[.+?\]\s*/)?.[0] || "";
+    const oldTitle = scheduleTitle.replace(/^\[.+?\]\s*/, "");
+    let newTitle = oldTitle;
+    if (oldTitle.startsWith("U") || oldTitle.startsWith("u")) {
+      newTitle = "A" + oldTitle.slice(1);
+    } else if (!oldTitle.startsWith("A")) {
+      newTitle = "A" + oldTitle;
+    }
 
-        // 2. 현재 제목 가져와서 U→A 변경
-        const res = await fetch(`/api/schedules/${scheduleId}`);
-        const sched = await res.json();
-        const oldFullTitle = sched?.title || "";
-        const timePrefix = oldFullTitle.match(/^\[.+?\]\s*/)?.[0] || "";
-        const oldTitle = oldFullTitle.replace(/^\[.+?\]\s*/, "");
-
-        let newTitle = oldTitle;
-        if (oldTitle.startsWith("U") || oldTitle.startsWith("u")) {
-          newTitle = "A" + oldTitle.slice(1);
-        } else if (!oldTitle.startsWith("A")) {
-          newTitle = "A" + oldTitle;
-        }
-
-        await apiUpdateSchedule(scheduleId, { status: "completed", title: timePrefix + newTitle } as Partial<import("@/types").Schedule>);
-      } catch { /* 실패해도 모달은 이미 표시됨 */ }
-    })();
+    Promise.all([
+      saveSettlement(scheduleId, {
+        quote: q, deposit: d, extraCharge: e,
+        paymentMethod, cashReceipt, customerName, customerPhone, note, status: "completed",
+        depositorName, bankName, accountNumber,
+      } as Record<string, unknown>),
+      apiUpdateSchedule(scheduleId, { status: "completed", title: timePrefix + newTitle } as Partial<import("@/types").Schedule>),
+    ]).catch(() => {});
   }
 
   function handleSendSMS() {
