@@ -209,7 +209,7 @@ export default function ScheduleDetail({
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
-    <div ref={detailRef} className="fixed inset-0 bg-white z-50 flex flex-col animate-[modalIn_0.15s_ease-out]">
+    <div ref={detailRef} className="fixed inset-0 bg-white z-50 flex flex-col animate-[modalIn_0.15s_ease-out]" style={{ paddingTop: "env(safe-area-inset-top, 0px)", paddingBottom: "env(safe-area-inset-bottom, 0px)" }}>
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Header */}
         <div className="px-4 py-1.5 border-b border-gray-100 flex items-center justify-between">
