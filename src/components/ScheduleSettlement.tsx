@@ -93,7 +93,7 @@ export default function ScheduleSettlement({ scheduleId, scheduleNote, customerN
 
     const lines: string[] = [];
     lines.push("🏠 새집느낌 정산서");
-    lines.push("──────────────────");
+    lines.push("─────────────");
     lines.push(`고객명: ${customerName || "-"}님`);
     lines.push(`연락처: ${customerPhone || "-"}`);
     lines.push(`결제방식: ${pm}`);
@@ -108,7 +108,7 @@ export default function ScheduleSettlement({ scheduleId, scheduleNote, customerN
     lines.push("");
     lines.push(`💰 최종 결제 금액: ${formatWon(total)}`);
     lines.push(cashReceipt ? "※ 부가세 포함" : "※ 부가세 미포함 (공급가액)");
-    lines.push("");
+    lines.push("─────────────");
     lines.push(receiptMsg);
     lines.push("");
     if (accountNumber && bankName) lines.push(`🏦 ${bankName} ${accountNumber}`);
@@ -117,6 +117,7 @@ export default function ScheduleSettlement({ scheduleId, scheduleNote, customerN
     lines.push("감사합니다! 가족분들과 항상 건강하시고 행복한 일들만 가득하세요!!");
     lines.push("");
     lines.push("문제있으시면 관리점 대표인 저에게 편하게 연락 부탁드립니다!! 😊");
+    lines.push("");
     lines.push(`${dateStr} · 새집느낌`);
     return lines.join("\n");
   }
