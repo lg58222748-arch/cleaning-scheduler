@@ -364,7 +364,7 @@ export default function SalesTab({ userName, onCreated }: SalesTabProps) {
       </div>
 
       {/* Scrollable content area */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto pb-6">
       {/* ===== STEP 1 ===== */}
       {step === 1 && (
         <div className="p-3 flex flex-col md:flex-row md:gap-6">
@@ -493,6 +493,7 @@ export default function SalesTab({ userName, onCreated }: SalesTabProps) {
             className="w-full py-2 rounded-lg text-xs font-bold text-white" style={{ background: "#1a6b3c" }}>
             STEP 2 · 파싱으로 이동 →
           </button>
+          <div className="h-8" />
         </div>
         </div>
       )}
@@ -668,6 +669,7 @@ export default function SalesTab({ userName, onCreated }: SalesTabProps) {
             </div>
             </div>
           )}
+          <div className="h-8" />
         </div>
         </div>
       )}
