@@ -145,6 +145,25 @@ export default function Home() {
     }
   }, [currentUser]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // 30초마다 알림 폴링 (반환 알림 실시간 감지)
+  useEffect(() => {
+    if (!currentUser) return;
+    const interval = setInterval(async () => {
+      try {
+        const notif = await fetchNotifications();
+        const allNotifs = notif.notifications as Notification[];
+        const uName = currentUser?.name || "";
+        const uRole = currentUser?.role || "";
+        const myNotifs = (uRole === "ceo" || uRole === "scheduler")
+          ? allNotifs
+          : allNotifs.filter(n => n.message.includes(uName) || n.title.includes(uName));
+        setNotifications(myNotifs);
+        setUnreadCount(myNotifs.filter(n => !n.read).length);
+      } catch { /* 네트워크 오류 무시 */ }
+    }, 30000);
+    return () => clearInterval(interval);
+  }, [currentUser]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // PWA 서비스워커 등록 + 설치 배너
   const [installPrompt, setInstallPrompt] = useState<Event | null>(null);
   const [showInstallBanner, setShowInstallBanner] = useState(false);
