@@ -253,7 +253,7 @@ export default function ScheduleDetail({
                 }
                 setActiveTab(tab);
               }}
-              className={`flex-1 py-1.5 text-sm font-medium text-center transition-colors ${
+              className={`flex-1 py-3 text-sm font-medium text-center transition-colors ${
                 activeTab === tab
                   ? "text-blue-500 border-b-2 border-blue-500"
                   : "text-gray-400"

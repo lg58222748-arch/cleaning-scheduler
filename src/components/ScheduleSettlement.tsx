@@ -67,6 +67,10 @@ export default function ScheduleSettlement({ scheduleId, scheduleTitle = "", sch
       setCustomerName(data.customerName?.trim() || customerNameFromSchedule || "");
       setCustomerPhone(data.customerPhone?.trim() || customerPhoneFromSchedule || "");
       setNote(data.note);
+    } else {
+      // 정산 데이터 없을 때도 고객명/연락처는 채워줌
+      setCustomerName(customerNameFromSchedule || "");
+      setCustomerPhone(customerPhoneFromSchedule || "");
     }
     setLoading(false);
   }, [scheduleId, scheduleNote, customerNameFromSchedule, customerPhoneFromSchedule]);
