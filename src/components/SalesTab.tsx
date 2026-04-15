@@ -94,6 +94,16 @@ export default function SalesTab({ userName, onCreated }: SalesTabProps) {
       text += `10)잔 금 : ${getBalance(s) > 0 ? getBalance(s).toLocaleString() + "원" : ""}\n`;
     });
 
+    if (services.length > 1) {
+      const totalQuote = services.reduce((sum, s) => sum + (parseInt(s.quote) || 0), 0);
+      const totalDeposit = services.reduce((sum, s) => sum + (parseInt(s.deposit) || 0), 0);
+      const totalBalance = totalQuote - totalDeposit;
+      text += `──────────────────\n`;
+      text += `총 견적금액 : ${totalQuote > 0 ? totalQuote.toLocaleString() + "원" : ""}\n`;
+      text += `총 예약금 : ${totalDeposit > 0 ? totalDeposit.toLocaleString() + "원" : ""}\n`;
+      text += `총 잔금 : ${totalBalance > 0 ? totalBalance.toLocaleString() + "원" : ""}\n`;
+    }
+
     if (salesNote) text += `11)상담사 특이사항 : ${salesNote}\n`;
     text += `\n확인 차원에서 1~5번까지\n체크사항 보내주시면\n예약 빠르게 도와 드리겠습니다.\n감사합니다.\n`;
     text += `\n*예약금은 본사 확정 비용, 잔금과 세금 증빙은 당일 관리점에서 작업 마무리 후 처리됩니다.\n`;
@@ -277,6 +287,16 @@ export default function SalesTab({ userName, onCreated }: SalesTabProps) {
       msg += `9)예 약 금 : ${s.deposit ? parseInt(s.deposit).toLocaleString() + "원" : ""}\n`;
       msg += `10)잔 금 : ${getBalance(s) > 0 ? getBalance(s).toLocaleString() + "원" : ""}\n`;
     });
+
+    if (services.length > 1) {
+      const totalQuote = services.reduce((sum, s) => sum + (parseInt(s.quote) || 0), 0);
+      const totalDeposit = services.reduce((sum, s) => sum + (parseInt(s.deposit) || 0), 0);
+      const totalBalance = totalQuote - totalDeposit;
+      msg += `──────────────────\n`;
+      msg += `총 견적금액 : ${totalQuote > 0 ? totalQuote.toLocaleString() + "원" : ""}\n`;
+      msg += `총 예약금 : ${totalDeposit > 0 ? totalDeposit.toLocaleString() + "원" : ""}\n`;
+      msg += `총 잔금 : ${totalBalance > 0 ? totalBalance.toLocaleString() + "원" : ""}\n`;
+    }
 
     if (salesNote) msg += `11)상담사 특이사항 : ${salesNote}\n`;
     msg += `\n*예약금은 본사 확정 비용, 잔금과 세금 증빙은 당일 관리점에서 작업 마무리 후 처리됩니다.\n`;
