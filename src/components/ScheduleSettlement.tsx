@@ -135,7 +135,8 @@ export default function ScheduleSettlement({ scheduleId, scheduleTitle = "", sch
       else if (restoreTitle.startsWith("A")) restoreTitle = "U" + restoreTitle.slice(1);
       apiUpdateSchedule(scheduleId, {
         status: "confirmed",
-        ...(restoreTitle !== scheduleTitle ? { title: restoreTitle, color: "#FDDCCC" } : {}),
+        title: restoreTitle || scheduleTitle,
+        color: "#FDDCCC",
       } as Partial<import("@/types").Schedule>).catch(() => {});
     } else {
       // 작업완료
@@ -156,7 +157,8 @@ export default function ScheduleSettlement({ scheduleId, scheduleTitle = "", sch
 
       apiUpdateSchedule(scheduleId, {
         status: "completed",
-        ...(newTitle !== scheduleTitle ? { title: newTitle, color: "#D1FAE5" } : {}),
+        title: newTitle || scheduleTitle,
+        color: "#C8F7DC",
       } as Partial<import("@/types").Schedule>).catch(() => {});
 
       onCompleted?.();
