@@ -168,7 +168,7 @@ export default function ScheduleSettlement({ scheduleId, scheduleNote, customerN
     const text = getShareText();
     // Capacitor Share 플러그인 → 네이티브 공유 시트 (카카오톡 선택 가능)
     try {
-      await Share.share({ text, dialogTitle: "정산서 보내기" });
+      await Share.share({ text });
       return;
     } catch { /* Capacitor 미지원 환경 */ }
     // fallback: 웹 navigator.share
