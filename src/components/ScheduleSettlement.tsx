@@ -124,37 +124,32 @@ export default function ScheduleSettlement({ scheduleId, scheduleTitle = "", sch
     return lines.join("\n");
   }
 
-  async function handleComplete() {
+  function handleComplete() {
+    // 1. UI 즉시 변경
     if (s) setS({ ...s, status: "completed" as const });
+
+    // 2. 제목 U→A 계산
+    let newTitle = scheduleTitle || "";
+    if (/^\[.+?\]\s*U/.test(newTitle)) newTitle = newTitle.replace(/^(\[.+?\]\s*)U/, "$1A");
+    else if (/^\[.+?\]\s*u/.test(newTitle)) newTitle = newTitle.replace(/^(\[.+?\]\s*)u/, "$1A");
+    else if (newTitle.startsWith("U")) newTitle = "A" + newTitle.slice(1);
+    else if (newTitle.startsWith("u")) newTitle = "A" + newTitle.slice(1);
+    else if (newTitle && !newTitle.startsWith("A") && !newTitle.match(/^\[/)) newTitle = "A" + newTitle;
+
+    // 3. API 백그라운드 (안 기다림)
+    saveSettlement(scheduleId, {
+      quote: q, deposit: d, extraCharge: e,
+      paymentMethod, cashReceipt, customerName, customerPhone, note, status: "completed",
+      depositorName, bankName, accountNumber,
+    } as Record<string, unknown>).catch(() => {});
+
+    apiUpdateSchedule(scheduleId, {
+      status: "completed",
+      ...(newTitle ? { title: newTitle, color: "#D1FAE5" } : {}),
+    } as Partial<import("@/types").Schedule>).catch(() => {});
+
+    // 4. 부모 알림
     onCompleted?.();
-
-    // 정산 저장 + U→A 제목 변경 + 초록색
-    const updateData: Record<string, unknown> = { status: "completed" };
-    if (scheduleTitle) {
-      let newTitle = scheduleTitle;
-      if (/^\[.+?\]\s*U/.test(newTitle)) {
-        newTitle = newTitle.replace(/^(\[.+?\]\s*)U/, "$1A");
-      } else if (/^\[.+?\]\s*u/.test(newTitle)) {
-        newTitle = newTitle.replace(/^(\[.+?\]\s*)u/, "$1A");
-      } else if (newTitle.startsWith("U")) {
-        newTitle = "A" + newTitle.slice(1);
-      } else if (newTitle.startsWith("u")) {
-        newTitle = "A" + newTitle.slice(1);
-      } else if (!newTitle.startsWith("A") && !newTitle.match(/^\[/)) {
-        newTitle = "A" + newTitle;
-      }
-      updateData.title = newTitle;
-      updateData.color = "#D1FAE5";
-    }
-
-    await Promise.all([
-      saveSettlement(scheduleId, {
-        quote: q, deposit: d, extraCharge: e,
-        paymentMethod, cashReceipt, customerName, customerPhone, note, status: "completed",
-        depositorName, bankName, accountNumber,
-      } as Record<string, unknown>),
-      apiUpdateSchedule(scheduleId, updateData as Partial<import("@/types").Schedule>),
-    ]).catch(() => {});
   }
 
   function handleSendSMS() {
