@@ -416,8 +416,17 @@ export default function ScheduleDetail({
             {preloadSettlement && <ScheduleSettlement
               scheduleId={schedule.id}
               scheduleNote={schedule.note}
-              customerNameFromSchedule={schedule.note?.match(/1\)성함\s*[:：]\s*(.+)/)?.[1]?.trim()}
-              customerPhoneFromSchedule={schedule.note?.match(/3\)연락처\s*[:：]\s*(.+)/)?.[1]?.trim()}
+              customerNameFromSchedule={
+                schedule.note?.match(/1\)성함\s*[:：]\s*(.+)/)?.[1]?.trim()
+                || schedule.note?.match(/고객명\s*[:：]\s*(.+)/)?.[1]?.trim()
+                || schedule.title.replace(/^\[.+?\]\s*/, "").match(/^U(.+?)\//)?.[1]
+                || ""
+              }
+              customerPhoneFromSchedule={
+                schedule.note?.match(/3\)연락처\s*[:：]\s*(.+)/)?.[1]?.trim()
+                || schedule.note?.match(/(01[0-9][-.\s]?\d{3,4}[-.\s]?\d{4})/)?.[1]
+                || ""
+              }
               memberName={schedule.memberName}
               memberBranch={memberBranch}
               onCompleted={() => { schedule.status = "completed"; onUpdated?.(); }}
