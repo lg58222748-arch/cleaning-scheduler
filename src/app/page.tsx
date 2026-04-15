@@ -767,6 +767,7 @@ export default function Home() {
             members={members}
             selectedDate={selectedDate}
             onSelectDate={(d) => { setSelectedDate(d); pushHash("day"); setShowDayPopup(true); }}
+            onScheduleClick={(s) => { setDetailSchedule(s); setDetailMode("calendar"); pushHash("detail"); }}
             onMonthChange={(d) => loadData(d)}
           />
         </div>
