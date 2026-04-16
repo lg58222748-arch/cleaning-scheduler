@@ -167,16 +167,26 @@ export default function Home() {
       }).catch(() => {});
     }
 
-    // Realtime 구독 (전체 테이블)
-    const { sbClient } = require("@/lib/supabase-client");
-    const channel = sbClient.channel("all-changes")
-      .on("postgres_changes", { event: "*", schema: "public", table: "schedules" }, () => reloadAll())
-      .on("postgres_changes", { event: "*", schema: "public", table: "notifications" }, () => reloadAll())
-      .on("postgres_changes", { event: "*", schema: "public", table: "members" }, () => { fetchMembers().then(m => setMembers(m)).catch(() => {}); })
-      .on("postgres_changes", { event: "*", schema: "public", table: "users" }, () => { fetchUsers().then(d => { setAllUsers(d.users); setPendingUsers(d.pendingUsers); }).catch(() => {}); })
-      .subscribe();
+    // Realtime 구독 시도
+    let realtimeOk = false;
+    let channel: unknown = null;
+    try {
+      const { sbClient } = require("@/lib/supabase-client");
+      channel = sbClient.channel("all-changes")
+        .on("postgres_changes", { event: "*", schema: "public", table: "schedules" }, () => { realtimeOk = true; reloadAll(); })
+        .on("postgres_changes", { event: "*", schema: "public", table: "notifications" }, () => { realtimeOk = true; reloadAll(); })
+        .on("postgres_changes", { event: "*", schema: "public", table: "members" }, () => { realtimeOk = true; fetchMembers().then(m => setMembers(m)).catch(() => {}); })
+        .on("postgres_changes", { event: "*", schema: "public", table: "users" }, () => { realtimeOk = true; fetchUsers().then(d => { setAllUsers(d.users); setPendingUsers(d.pendingUsers); }).catch(() => {}); })
+        .subscribe((status: string) => { console.log("[Realtime]", status); });
+    } catch (e) { console.error("[Realtime] 연결 실패:", e); }
 
-    return () => { sbClient.removeChannel(channel); };
+    // 폴링 fallback (10초) - Realtime 안 되면 작동
+    const interval = setInterval(() => { if (!realtimeOk) reloadAll(); }, 10000);
+
+    return () => {
+      clearInterval(interval);
+      try { const { sbClient } = require("@/lib/supabase-client"); if (channel) sbClient.removeChannel(channel); } catch {}
+    };
   }, [currentUser, selectedDate]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // PWA 서비스워커 등록 + 설치 배너
