@@ -372,17 +372,21 @@ export default function Home() {
       return false; // 아무것도 안 열려있음
     };
 
-    // 종료 확인 팝업
+    // 종료 확인
     const handleBackPress = () => {
-      const handled = doBack();
-      if (!handled) {
-        // 아무것도 안 열려있음 → 종료 확인
-        if (confirm("앱을 종료하시겠습니까?")) {
-          return false; // 종료 허용
+      // 해시 스택이 있으면 뒤로가기
+      if (hashStackRef.current.length > 0) {
+        const handled = doBack();
+        if (handled) {
+          if (hashStackRef.current.length > 0) hashStackRef.current.pop();
+          return true;
         }
-        return true; // 종료 방지
       }
-      return true;
+      // 모달이 열려있으면 닫기
+      const handled = doBack();
+      if (handled) return true;
+      // 아무것도 안 열려있음 → 종료
+      return false;
     };
 
     // 1. Capacitor 네이티브 뒤로가기 (APK에서 동작)
