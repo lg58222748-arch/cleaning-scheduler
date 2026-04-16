@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { Schedule } from "@/types";
-import { fetchDeletedSchedules, restoreScheduleApi, emptyTrashApi, deleteAllSchedules, fetchSchedules, addUnassignedSchedule, assignScheduleApi } from "@/lib/api";
+import { fetchDeletedSchedules, restoreScheduleApi, emptyTrashApi, deleteAllSchedules, fetchSchedules, addUnassignedSchedule, assignScheduleApi, createSchedule } from "@/lib/api";
 
 type ManageSubTab = "sales-stats" | "field" | "scheduler" | "ceo";
 
@@ -447,21 +447,31 @@ function GoogleCalendarImport({ allUsers, members, onImported }: {
     for (let i = 0; i < toImport.length; i++) {
       const ev = toImport[i];
       try {
-        const created = await addUnassignedSchedule({
-          title: ev.summary,
-          date: ev.date,
-          startTime: "09:00",
-          endTime: "18:00",
-          note: ev.description || "",
-        });
-        if (ev.assignTo && created?.id) {
+        if (ev.assignTo) {
+          // 담당자 선택 → 달력에 직접 등록
           const member = members.find(m => m.id === ev.assignTo);
           const fieldUser = allUsers.find(u => (u.id === ev.assignTo || u.name === ev.assignTo) && u.role === "field");
           const assignId = member?.id || fieldUser?.id || ev.assignTo;
           const assignName = member?.name || fieldUser?.name || ev.assignTo;
-          if (assignId) {
-            await assignScheduleApi(created.id, assignId, assignName);
-          }
+          await createSchedule({
+            title: ev.summary,
+            date: ev.date,
+            startTime: "09:00",
+            endTime: "18:00",
+            location: "",
+            memberId: assignId,
+            memberName: assignName,
+            note: ev.description || "",
+          });
+        } else {
+          // 미배정 → 배정탭
+          await addUnassignedSchedule({
+            title: ev.summary,
+            date: ev.date,
+            startTime: "09:00",
+            endTime: "18:00",
+            note: ev.description || "",
+          });
         }
         count++;
       } catch { /* 개별 실패 무시 */ }
