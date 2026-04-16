@@ -109,22 +109,6 @@ export default function AdminPanel({ onClose, onRefresh }: AdminPanelProps) {
                 </div>
               </div>
 
-              {/* 전체 일정 삭제 (휴지통으로) */}
-              <div className="border border-gray-200 rounded-xl p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className="text-sm font-medium text-gray-800">전체 일정 삭제</div>
-                    <div className="text-xs text-gray-400 mt-0.5">모든 일정을 휴지통으로 이동</div>
-                  </div>
-                  <button
-                    onClick={handleMoveAllToTrash}
-                    className="px-4 py-2 bg-red-50 text-red-500 rounded-lg text-xs font-medium active:bg-red-100"
-                  >
-                    삭제
-                  </button>
-                </div>
-              </div>
-
               {/* 휴지통 바로가기 */}
               <button
                 onClick={() => setTab("trash")}
