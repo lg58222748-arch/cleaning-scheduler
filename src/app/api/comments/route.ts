@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { getCommentsBySchedule, addComment, deleteComment } from "@/lib/store";
+import { getCommentsBySchedule, addComment, deleteComment, addNotification } from "@/lib/store";
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
@@ -23,5 +23,6 @@ export async function POST(req: NextRequest) {
     return Response.json({ error: "Missing fields" }, { status: 400 });
   }
   const comment = await addComment(body.scheduleId, body.authorName, body.content);
+  await addNotification("schedule_updated", "새 댓글", `${body.authorName}님이 댓글을 남겼습니다: ${body.content.slice(0, 30)}${body.content.length > 30 ? "..." : ""}`, body.scheduleId);
   return Response.json(comment, { status: 201 });
 }

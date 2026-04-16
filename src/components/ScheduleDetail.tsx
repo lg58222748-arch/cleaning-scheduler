@@ -58,6 +58,8 @@ export default function ScheduleDetail({
   const [saving, setSaving] = useState(false);
   const [noteChanged, setNoteChanged] = useState(false);
   const [schedColor, setSchedColor] = useState(schedule.color || "#FDDCCC");
+  const [showReturnModal, setShowReturnModal] = useState(false);
+  const [returnReason, setReturnReason] = useState("");
   const [assignMemberId, setAssignMemberId] = useState("");
 
   // 탭 히스토리 (뒤로가기 지원)
@@ -487,12 +489,7 @@ export default function ScheduleDetail({
         <div className="flex gap-2 px-4 py-2">
           {mode === "calendar" && schedule.status !== "unassigned" && onUnassign && (
             <button
-              onClick={() => {
-                const reason = prompt("반환 사유를 입력하세요:");
-                if (reason === null) return;
-                onClose();
-                setTimeout(() => onUnassign(schedule.id, reason || "사유 없음"), 50);
-              }}
+              onClick={() => { setReturnReason(""); setShowReturnModal(true); }}
               className="flex-1 py-2 bg-orange-500 text-white rounded-xl text-xs font-bold active:bg-orange-600"
             >
               반환
@@ -582,6 +579,36 @@ export default function ScheduleDetail({
       </div>
       )}
       </div>
+      {/* 반환 사유 모달 */}
+      {showReturnModal && (
+        <div className="fixed inset-0 bg-black/40 z-[60] flex items-center justify-center px-6" onClick={(e) => { if (e.target === e.currentTarget) setShowReturnModal(false); }}>
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-5 space-y-3 animate-[modalIn_0.15s_ease-out]">
+            <h3 className="text-sm font-bold text-gray-800">반환 사유를 입력하세요</h3>
+            <input
+              autoFocus
+              value={returnReason}
+              onChange={(e) => setReturnReason(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  setShowReturnModal(false);
+                  onClose();
+                  setTimeout(() => onUnassign?.(schedule.id, returnReason.trim() || "사유 없음"), 50);
+                }
+              }}
+              placeholder="반환 사유를 입력하세요"
+              className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-orange-400"
+            />
+            <div className="flex gap-2">
+              <button onClick={() => setShowReturnModal(false)} className="flex-1 py-2.5 bg-gray-100 text-gray-600 rounded-xl text-xs font-bold active:bg-gray-200">취소</button>
+              <button onClick={() => {
+                setShowReturnModal(false);
+                onClose();
+                setTimeout(() => onUnassign?.(schedule.id, returnReason.trim() || "사유 없음"), 50);
+              }} className="flex-1 py-2.5 bg-orange-500 text-white rounded-xl text-xs font-bold active:bg-orange-600">반환</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
