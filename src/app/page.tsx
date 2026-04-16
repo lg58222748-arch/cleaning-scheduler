@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import dynamic from "next/dynamic";
-import { Member, Schedule, SwapRequest, Notification, User, UserRole } from "@/types";
+import { Member, Schedule, SwapRequest, Notification as AppNotification, User, UserRole } from "@/types";
+type Notification = AppNotification;
 import Calendar from "@/components/Calendar";
 import LoginPage from "@/components/LoginPage";
 import ScheduleDetail from "@/components/ScheduleDetail";
@@ -172,6 +173,35 @@ export default function Home() {
       else if (r === "ceo") setActiveTab("members");
     }
   }, [currentUser]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // 푸시 알림 구독 등록
+  useEffect(() => {
+    if (!currentUser) return;
+    async function registerPush() {
+      try {
+        if (!("serviceWorker" in navigator) || !("PushManager" in window)) return;
+        const permission = await Notification.requestPermission();
+        if (permission !== "granted") return;
+        const reg = await navigator.serviceWorker.ready;
+        const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+        if (!vapidKey) return;
+        let sub = await reg.pushManager.getSubscription();
+        if (!sub) {
+          sub = await reg.pushManager.subscribe({
+            userVisibleOnly: true,
+            applicationServerKey: vapidKey,
+          });
+        }
+        // 서버에 구독 정보 저장
+        await fetch("/api/push", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "subscribe", subscription: sub.toJSON(), userId: currentUser.id, userName: currentUser.name }),
+        });
+      } catch { /* 푸시 등록 실패 무시 */ }
+    }
+    registerPush();
+  }, [currentUser]);
 
   // Realtime + 경량 폴링 (알림만 30초, 일정은 Realtime으로)
   useEffect(() => {

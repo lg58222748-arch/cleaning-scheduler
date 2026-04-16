@@ -1,0 +1,64 @@
+import { NextRequest } from "next/server";
+import webpush from "web-push";
+import { supabase } from "@/lib/supabase";
+
+const VAPID_PUBLIC = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || "";
+const VAPID_PRIVATE = process.env.VAPID_PRIVATE_KEY || "";
+
+if (VAPID_PUBLIC && VAPID_PRIVATE) {
+  webpush.setVapidDetails("mailto:lg58222748@gmail.com", VAPID_PUBLIC, VAPID_PRIVATE);
+}
+
+// 구독 등록
+export async function POST(req: NextRequest) {
+  const body = await req.json();
+
+  if (body.action === "subscribe") {
+    const { subscription, userId, userName } = body;
+    if (!subscription?.endpoint) return Response.json({ error: "Invalid subscription" }, { status: 400 });
+
+    // 기존 구독 업데이트 또는 새로 추가
+    const { data: existing } = await supabase.from("push_subscriptions").select("id").eq("endpoint", subscription.endpoint).single();
+    if (existing) {
+      await supabase.from("push_subscriptions").update({
+        user_id: userId, user_name: userName,
+        p256dh: subscription.keys.p256dh, auth: subscription.keys.auth,
+      }).eq("id", existing.id);
+    } else {
+      await supabase.from("push_subscriptions").insert({
+        user_id: userId, user_name: userName,
+        endpoint: subscription.endpoint,
+        p256dh: subscription.keys.p256dh, auth: subscription.keys.auth,
+      });
+    }
+    return Response.json({ success: true });
+  }
+
+  // 푸시 전송
+  if (body.action === "send") {
+    const { title, message, tag } = body;
+    const { data: subs } = await supabase.from("push_subscriptions").select("*");
+    if (!subs || subs.length === 0) return Response.json({ sent: 0 });
+
+    let sent = 0;
+    let failed = 0;
+    for (const sub of subs) {
+      try {
+        await webpush.sendNotification(
+          { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
+          JSON.stringify({ title, body: message, tag: tag || "notification", url: "/" })
+        );
+        sent++;
+      } catch (err: unknown) {
+        failed++;
+        // 410 Gone = 구독 만료 → 삭제
+        if (err && typeof err === "object" && "statusCode" in err && (err as { statusCode: number }).statusCode === 410) {
+          await supabase.from("push_subscriptions").delete().eq("id", sub.id);
+        }
+      }
+    }
+    return Response.json({ sent, failed });
+  }
+
+  return Response.json({ error: "Invalid action" }, { status: 400 });
+}

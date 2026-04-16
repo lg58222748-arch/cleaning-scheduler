@@ -1,12 +1,10 @@
-const CACHE_NAME = 'cleaning-scheduler-v2';
+const CACHE_NAME = 'cleaning-scheduler-v3';
 
 self.addEventListener('install', (event) => {
-  // 이전 캐시 무시하고 즉시 활성화
   self.skipWaiting();
 });
 
 self.addEventListener('activate', (event) => {
-  // 모든 이전 캐시 삭제
   event.waitUntil(
     caches.keys().then((names) => {
       return Promise.all(
@@ -17,6 +15,37 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-  // 캐시 없이 항상 네트워크에서 가져옴
   event.respondWith(fetch(event.request));
+});
+
+// 푸시 알림 수신
+self.addEventListener('push', (event) => {
+  const data = event.data ? event.data.json() : {};
+  const title = data.title || '새집느낌 파트너';
+  const options = {
+    body: data.body || '새로운 알림이 있습니다',
+    icon: '/icons/icon-192.png',
+    badge: '/icons/icon-192.png',
+    vibrate: [200, 100, 200],
+    data: { url: data.url || '/' },
+    tag: data.tag || 'default',
+    renotify: true,
+  };
+  event.waitUntil(self.registration.showNotification(title, options));
+});
+
+// 알림 클릭 시 앱 열기
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const url = event.notification.data?.url || '/';
+  event.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windowClients) => {
+      for (const client of windowClients) {
+        if (client.url.includes('cleaning-scheduler') && 'focus' in client) {
+          return client.focus();
+        }
+      }
+      return clients.openWindow(url);
+    })
+  );
 });

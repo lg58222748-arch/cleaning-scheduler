@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import { getSchedules, getSchedulesByRange, getUnassignedSchedules, searchSchedules, addSchedule, addUnassignedSchedule, assignSchedule, unassignSchedule, addNotification, deleteAllSchedules, softDeleteSchedule, getDeletedSchedules, restoreSchedule, emptyTrash } from "@/lib/store";
+import { sendPushToAll } from "@/lib/push";
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
@@ -55,12 +56,9 @@ export async function POST(req: NextRequest) {
   if (body.action === "assign" && body.scheduleId && body.memberId) {
     const schedule = await assignSchedule(body.scheduleId, body.memberId, body.memberName);
     if (!schedule) return Response.json({ error: "Not found" }, { status: 404 });
-    await addNotification(
-      "schedule_created",
-      "일정 배정",
-      `"${schedule.title}" 일정이 ${schedule.memberName}님에게 배정되었습니다.`,
-      schedule.id
-    );
+    const msg = `"${schedule.title}" 일정이 ${schedule.memberName}님에게 배정되었습니다.`;
+    await addNotification("schedule_created", "일정 배정", msg, schedule.id);
+    sendPushToAll("일정 배정", msg, "assign").catch(() => {});
     return Response.json(schedule);
   }
 
@@ -69,12 +67,9 @@ export async function POST(req: NextRequest) {
     if (!schedule) return Response.json({ error: "Not found" }, { status: 404 });
     const who = body.returnedBy || "";
     const reason = body.reason || "";
-    await addNotification(
-      "schedule_updated",
-      "일정 반환",
-      `${who ? who + "님이 " : ""}"${schedule.title}" 일정을 반환했습니다.${reason ? " 사유: " + reason : ""}`,
-      schedule.id
-    );
+    const msg = `${who ? who + "님이 " : ""}"${schedule.title}" 일정을 반환했습니다.${reason ? " 사유: " + reason : ""}`;
+    await addNotification("schedule_updated", "일정 반환", msg, schedule.id);
+    sendPushToAll("🔔 일정 반환", msg, "return").catch(() => {});
     return Response.json(schedule);
   }
 
