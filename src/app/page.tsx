@@ -145,21 +145,20 @@ export default function Home() {
     }
   }, [currentUser]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // 15초마다 데이터 동기화 (알림 + 일정 + 미배정)
+  // Supabase Realtime - DB 변경 즉시 반영
   useEffect(() => {
     if (!currentUser) return;
-    const interval = setInterval(async () => {
-      try {
-        const d = selectedDate;
-        const start = format(startOfMonth(subMonths(d, 1)), "yyyy-MM-dd");
-        const end = format(endOfMonth(addMonths(d, 1)), "yyyy-MM-dd");
-        const [rangeScheds, unassigned, notif] = await Promise.all([
-          fetchSchedules(start, end),
-          fetchUnassignedSchedules(),
-          fetchNotifications(),
-        ]);
-        setSchedules(rangeScheds);
-        setUnassignedSchedules(unassigned);
+    const { sbClient } = require("@/lib/supabase-client");
+
+    function reloadSchedules() {
+      const d = selectedDate;
+      const start = format(startOfMonth(subMonths(d, 1)), "yyyy-MM-dd");
+      const end = format(endOfMonth(addMonths(d, 1)), "yyyy-MM-dd");
+      fetchSchedules(start, end).then(s => setSchedules(s)).catch(() => {});
+      fetchUnassignedSchedules().then(s => setUnassignedSchedules(s)).catch(() => {});
+    }
+    function reloadNotifications() {
+      fetchNotifications().then(notif => {
         const allNotifs = notif.notifications as Notification[];
         const uName = currentUser?.name || "";
         const uRole = currentUser?.role || "";
@@ -168,9 +167,15 @@ export default function Home() {
           : allNotifs.filter(n => n.message.includes(uName) || n.title.includes(uName));
         setNotifications(myNotifs);
         setUnreadCount(myNotifs.filter(n => !n.read).length);
-      } catch { /* 네트워크 오류 무시 */ }
-    }, 15000);
-    return () => clearInterval(interval);
+      }).catch(() => {});
+    }
+
+    const channel = sbClient.channel("db-changes")
+      .on("postgres_changes", { event: "*", schema: "public", table: "schedules" }, () => reloadSchedules())
+      .on("postgres_changes", { event: "*", schema: "public", table: "notifications" }, () => reloadNotifications())
+      .subscribe();
+
+    return () => { sbClient.removeChannel(channel); };
   }, [currentUser, selectedDate]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // PWA 서비스워커 등록 + 설치 배너
