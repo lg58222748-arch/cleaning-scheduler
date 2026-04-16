@@ -274,14 +274,16 @@ export async function deleteCommentApi(id: string): Promise<void> {
 // Auth
 export async function loginApi(username: string, password: string): Promise<{ error?: string; status?: string } & Partial<import("@/types").User>> {
   try {
-    const res = await safeFetch(`${BASE}/api/auth`, {
+    const res = await fetch(`${BASE}/api/auth`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ action: "login", username, password }),
     });
-    return res.json();
+    const result = await res.json();
+    if (result.error) return { error: result.error, status: result.status };
+    return result;
   } catch {
-    return { error: "네트워크 오류. 인터넷 연결을 확인해주세요." };
+    return { error: "서버 연결에 실패했습니다. 잠시 후 다시 시도해주세요." };
   }
 }
 
@@ -291,14 +293,16 @@ export async function registerApi(data: {
   residentNumber: string; businessLicenseFile: string; branch: string;
 }): Promise<{ error?: string } & Partial<import("@/types").User>> {
   try {
-    const res = await safeFetch(`${BASE}/api/auth`, {
+    const res = await fetch(`${BASE}/api/auth`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ action: "register", ...data }),
     });
-    return res.json();
+    const result = await res.json();
+    if (result.error) return { error: result.error };
+    return result;
   } catch {
-    return { error: "네트워크 오류. 인터넷 연결을 확인해주세요." };
+    return { error: "서버 연결에 실패했습니다. 잠시 후 다시 시도해주세요." };
   }
 }
 
