@@ -648,8 +648,8 @@ export default function Home() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
               </svg>
             </button>
-            {/* Member filter - 관리자만 */}
-            {canManageAdvanced && activeTab === "calendar" && (
+            {/* Member filter - 대표/일정관리자/영업팀 */}
+            {canAssign && activeTab === "calendar" && (
               <button
                 onClick={() => { showMemberFilter ? (setShowMemberFilter(false), consumeHash()) : openModal(setShowMemberFilter); }}
                 className={`p-2 rounded-lg relative ${showMemberFilter || filterActive ? "text-blue-500 bg-blue-50" : "text-gray-400 active:bg-blue-50"}`}
