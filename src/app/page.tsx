@@ -17,6 +17,7 @@ const AssignTab = dynamic(() => import("@/components/AssignTab"), { ssr: false }
 const SearchPanel = dynamic(() => import("@/components/SearchPanel"), { ssr: false });
 const ManageTab = dynamic(() => import("@/components/ManageTab"), { ssr: false });
 const SalesTab = dynamic(() => import("@/components/SalesTab"), { ssr: false });
+import { sbClient } from "@/lib/supabase-client";
 import {
   fetchMembers,
   createMember,
@@ -196,27 +197,20 @@ export default function Home() {
       }).catch(() => {});
     }
 
-    // Realtime 구독
-    let channel: unknown = null;
-    try {
-      const { sbClient } = require("@/lib/supabase-client");
-      channel = sbClient.channel("all-changes")
-        .on("postgres_changes", { event: "*", schema: "public", table: "schedules" }, () => reloadSchedules())
-        .on("postgres_changes", { event: "*", schema: "public", table: "notifications" }, () => reloadNotifications())
-        .on("postgres_changes", { event: "*", schema: "public", table: "members" }, () => { fetchMembers().then(m => setMembers(m)).catch(() => {}); })
-        .on("postgres_changes", { event: "*", schema: "public", table: "users" }, () => { fetchUsers().then(d => { setAllUsers(d.users); setPendingUsers(d.pendingUsers); }).catch(() => {}); })
-        .subscribe();
-    } catch {}
+    // Supabase Realtime 구독 (즉시 반영)
+    const channel = sbClient.channel("all-db-changes")
+      .on("postgres_changes", { event: "*", schema: "public", table: "schedules" }, () => { console.log("[RT] schedules changed"); reloadSchedules(); })
+      .on("postgres_changes", { event: "*", schema: "public", table: "notifications" }, () => { console.log("[RT] notifications changed"); reloadNotifications(); })
+      .on("postgres_changes", { event: "*", schema: "public", table: "members" }, () => { fetchMembers().then(m => setMembers(m)).catch(() => {}); })
+      .on("postgres_changes", { event: "*", schema: "public", table: "users" }, () => { fetchUsers().then(d => { setAllUsers(d.users); setPendingUsers(d.pendingUsers); }).catch(() => {}); })
+      .subscribe((status: string) => { console.log("[RT] status:", status); });
 
-    // 경량 폴링: 알림만 30초마다 (일정은 Realtime에 맡김)
-    const interval = setInterval(() => reloadNotifications(), 30000);
-    // 일정은 60초마다 백그라운드 동기화
-    const schedInterval = setInterval(() => reloadSchedules(), 60000);
+    // 폴링 백업: Realtime 실패 대비 (15초)
+    const interval = setInterval(() => { reloadSchedules(); reloadNotifications(); }, 15000);
 
     return () => {
       clearInterval(interval);
-      clearInterval(schedInterval);
-      try { const { sbClient } = require("@/lib/supabase-client"); if (channel) sbClient.removeChannel(channel); } catch {}
+      sbClient.removeChannel(channel);
     };
   }, [currentUser, selectedDate]); // eslint-disable-line react-hooks/exhaustive-deps
 
