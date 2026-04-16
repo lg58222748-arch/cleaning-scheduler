@@ -137,7 +137,7 @@ export default function ScheduleDetail({
     schedule.note = noteText;
     setNoteChanged(false);
     setSaving(false);
-    apiUpdateSchedule(schedule.id, { note: noteText }).catch(() => {});
+    apiUpdateSchedule(schedule.id, { note: noteText }).then(() => onUpdated?.()).catch(() => {});
   }
 
   async function handleSaveTitle() {
@@ -145,7 +145,7 @@ export default function ScheduleDetail({
     schedule.title = titleText;
     setEditingTitle(false);
     setSaving(false);
-    apiUpdateSchedule(schedule.id, { title: titleText }).catch(() => {});
+    apiUpdateSchedule(schedule.id, { title: titleText }).then(() => onUpdated?.()).catch(() => {});
   }
 
   async function handleTimeSlotChange(slot: string) {
@@ -443,13 +443,8 @@ export default function ScheduleDetail({
         {/* 댓글 */}
         {comments.length > 0 && (
           <div className="px-4 pt-2 max-h-[80px] overflow-y-auto border-b border-gray-100">
-            {comments.length > 2 && !showAllComments && (
-              <button onClick={() => setShowAllComments(true)} className="text-xs text-blue-500 font-medium mb-1 active:text-blue-700">
-                +{comments.length - 2}개 이전 댓글
-              </button>
-            )}
             <div className="space-y-1.5 pb-1.5">
-              {(showAllComments ? comments : comments.slice(-2)).map((c) => (
+              {(showAllComments ? [...comments].reverse() : [...comments].reverse().slice(0, 2)).map((c) => (
                 <div key={c.id} className="flex items-start gap-1.5">
                   <div className="w-5 h-5 bg-gray-200 rounded-full flex items-center justify-center text-xs font-bold text-gray-600 shrink-0 mt-0.5">{c.authorName[0]}</div>
                   <div className="flex-1 min-w-0">
@@ -462,6 +457,11 @@ export default function ScheduleDetail({
                   </button>
                 </div>
               ))}
+              {comments.length > 2 && !showAllComments && (
+                <button onClick={() => setShowAllComments(true)} className="text-xs text-blue-500 font-medium mt-1 active:text-blue-700">
+                  +{comments.length - 2}개 이전 댓글 더보기
+                </button>
+              )}
             </div>
           </div>
         )}
