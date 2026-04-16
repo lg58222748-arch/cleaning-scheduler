@@ -29,10 +29,38 @@ export default function AdminPanel({ onClose, onRefresh }: AdminPanelProps) {
     setLoadingTrash(false);
   }
 
-  function toggleNotifications() {
+  async function toggleNotifications() {
     const next = !notificationsEnabled;
     setNotificationsEnabled(next);
     localStorage.setItem("notificationsEnabled", String(next));
+
+    try {
+      if (!("serviceWorker" in navigator) || !("PushManager" in window)) return;
+      const reg = await navigator.serviceWorker.ready;
+      if (!next) {
+        // OFF: push 구독 해제 + SW에 알림 끄기 전달
+        reg.active?.postMessage({ type: "SET_NOTIFICATIONS_ENABLED", enabled: false });
+        const sub = await reg.pushManager.getSubscription();
+        if (sub) await sub.unsubscribe();
+      } else {
+        // ON: push 재구독 + SW에 알림 켜기 전달
+        reg.active?.postMessage({ type: "SET_NOTIFICATIONS_ENABLED", enabled: true });
+        const vapidKey = "BIFAj9bQTWPRvMdMvDc5RTF4Qyof08lZR2SkI3vHwmhmUZwWbVJt7_SKEczBy_9ul88kmvfmqzr14-TecTwRBwc";
+        let sub = await reg.pushManager.getSubscription();
+        if (!sub) {
+          sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: vapidKey });
+        }
+        const saved = localStorage.getItem("currentUser");
+        const user = saved ? JSON.parse(saved) : null;
+        if (sub && user) {
+          await fetch("/api/push", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ action: "subscribe", subscription: sub.toJSON(), userId: user.id, userName: user.name }),
+          });
+        }
+      }
+    } catch (e) { console.error("[Push] toggle failed:", e); }
   }
 
   async function handleMoveAllToTrash() {

@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { getUsers, getPendingUsers, approveUser, rejectUser, changeUserRole, deleteUser } from "@/lib/store";
+import { getUsers, getPendingUsers, approveUser, rejectUser, changeUserRole, deleteUser, updateUserInfo } from "@/lib/store";
 
 export async function GET() {
   return Response.json({
@@ -32,6 +32,12 @@ export async function POST(req: NextRequest) {
   if (body.action === "changeRole" && body.userId && body.role) {
     const ok = await changeUserRole(body.userId, body.role);
     if (!ok) return Response.json({ error: "역할 변경 실패" }, { status: 500 });
+    return Response.json({ success: true });
+  }
+
+  if (body.action === "updateInfo" && body.userId) {
+    const ok = await updateUserInfo(body.userId, { address: body.address, phone: body.phone, branch: body.branch });
+    if (!ok) return Response.json({ error: "수정 실패" }, { status: 500 });
     return Response.json({ success: true });
   }
 

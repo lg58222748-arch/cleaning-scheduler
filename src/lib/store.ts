@@ -96,12 +96,15 @@ export async function searchSchedules(query: string): Promise<Schedule[]> {
   return (data || []).map(rowToSchedule);
 }
 
-export async function addSchedule(input: Omit<Schedule, "id" | "status">): Promise<Schedule | null> {
-  const { data, error } = await supabase.from("schedules").insert({
-    member_id: input.memberId, member_name: input.memberName, title: input.title, location: input.location || "", date: input.date, start_time: input.startTime, end_time: input.endTime, status: "confirmed", assigned_to: input.assignedTo, assigned_to_name: input.assignedToName, google_event_id: input.googleEventId || null, note: input.note || "", color: input.color || "#FDDCCC",
-  }).select().single();
-  if (error || !data) return null;
-  return rowToSchedule(data);
+export async function addSchedule(input: Omit<Schedule, "id" | "status">): Promise<{ schedule?: Schedule; error?: string }> {
+  const row: Record<string, unknown> = {
+    member_id: input.memberId || "", member_name: input.memberName || "미배정", title: input.title, location: input.location || "", date: input.date, start_time: input.startTime, end_time: input.endTime, status: "confirmed", google_event_id: input.googleEventId || null, note: input.note || "", color: input.color || "#FDDCCC",
+  };
+  if (input.assignedTo) row.assigned_to = input.assignedTo;
+  if (input.assignedToName) row.assigned_to_name = input.assignedToName;
+  const { data, error } = await supabase.from("schedules").insert(row).select().single();
+  if (error || !data) { console.error("[addSchedule] 실패:", error); return { error: error?.message || "insert failed" }; }
+  return { schedule: rowToSchedule(data) };
 }
 
 export async function addUnassignedSchedule(input: Omit<Schedule, "id" | "status" | "memberId" | "memberName">): Promise<Schedule | null> {
@@ -114,7 +117,7 @@ export async function addUnassignedSchedule(input: Omit<Schedule, "id" | "status
   const { data: dup } = await supabase.from("schedules").select("id").eq("title", input.title).eq("date", input.date).limit(1);
   if (dup && dup.length > 0) return null;
   const { data, error } = await supabase.from("schedules").insert({
-    member_id: "", member_name: "미배정", title: input.title, location: input.location || "", date: input.date, start_time: input.startTime, end_time: input.endTime, status: "unassigned", google_event_id: input.googleEventId || null, note: input.note || "",
+    member_id: "", member_name: "미배정", title: input.title, location: input.location || "", date: input.date, start_time: input.startTime, end_time: input.endTime, status: "unassigned", google_event_id: input.googleEventId || null, note: input.note || "", color: input.color || "#FDDCCC",
   }).select().single();
   if (error || !data) return null;
   return rowToSchedule(data);
@@ -370,6 +373,15 @@ export async function rejectUser(id: string): Promise<boolean> {
 
 export async function changeUserRole(id: string, role: string): Promise<boolean> {
   const { error } = await supabase.from("users").update({ role }).eq("id", id);
+  return !error;
+}
+
+export async function updateUserInfo(id: string, data: { address?: string; phone?: string; branch?: string }): Promise<boolean> {
+  const update: Record<string, unknown> = {};
+  if (data.address !== undefined) update.address = data.address;
+  if (data.phone !== undefined) update.phone = data.phone;
+  if (data.branch !== undefined) update.branch = data.branch;
+  const { error } = await supabase.from("users").update(update).eq("id", id);
   return !error;
 }
 

@@ -44,6 +44,7 @@ import {
   rejectUserApi,
   changeUserRoleApi,
   deleteUserApi,
+  updateUserInfoApi,
 } from "@/lib/api";
 import { format, startOfMonth, endOfMonth, addMonths, subMonths } from "date-fns";
 import { ko } from "date-fns/locale";
@@ -88,6 +89,10 @@ export default function Home() {
   const [showAdminPanel, setShowAdminPanel] = useState(false);
   const [allUsers, setAllUsers] = useState<User[]>([]);
   const [pendingUsers, setPendingUsers] = useState<User[]>([]);
+  const [userOrder, setUserOrder] = useState<string[]>(() => {
+    if (typeof window === "undefined") return [];
+    try { const s = localStorage.getItem("userOrder"); return s ? JSON.parse(s) : []; } catch { return []; }
+  });
   const [profileUser, setProfileUser] = useState<User | null>(null);
   const [showDayPopup, setShowDayPopup] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
@@ -180,6 +185,7 @@ export default function Home() {
     async function registerPush() {
       // Web Push (브라우저/PWA/APK 모두)
       try {
+        if (localStorage.getItem("notificationsEnabled") === "false") { console.log("[Push] 알림 OFF 상태 - 등록 스킵"); return; }
         if (!("serviceWorker" in navigator) || !("PushManager" in window)) { console.log("[Push] SW/PushManager 미지원"); return; }
         const permission = await Notification.requestPermission();
         console.log("[Push] 권한:", permission);
@@ -200,6 +206,11 @@ export default function Home() {
       } catch (e) { console.error("[Push] 실패:", e); }
     }
     registerPush();
+    // SW에 알림 ON/OFF 상태 전달
+    navigator.serviceWorker?.ready.then(reg => {
+      const enabled = localStorage.getItem("notificationsEnabled") !== "false";
+      reg.active?.postMessage({ type: "SET_NOTIFICATIONS_ENABLED", enabled });
+    }).catch(() => {});
   }, [currentUser]);
 
   // Realtime + 경량 폴링 (알림만 30초, 일정은 Realtime으로)
@@ -506,18 +517,28 @@ export default function Home() {
       setSchedules((prev) => prev.map((s) => s.id === editingSchedule.id ? { ...s, ...data } : s));
       apiUpdateSchedule(editingSchedule.id, data).catch(() => {});
     } else if (activeTab === "calendar") {
-      // 달력탭에서 생성 → 달력에만 표시 (배정탭 안 감)
+      // 달력탭에서 생성 → 현재 사용자 정보로 설정
       const tempId = "temp-" + Date.now();
+      const linkedMember = members.find(m => m.linkedUsername === currentUser?.username);
       const calData = {
         ...data,
-        memberId: data.memberId || currentUser?.id || "self",
-        memberName: data.memberName || currentUser?.name || "",
+        memberId: linkedMember?.id || data.memberId || "",
+        memberName: linkedMember?.name || currentUser?.name || "미배정",
+        assignedTo: currentUser?.id || "",
+        assignedToName: currentUser?.name || "",
       };
       const tempSchedule: Schedule = { id: tempId, ...calData, status: "confirmed", location: data.location || "" };
       setSchedules((prev) => [...prev, tempSchedule]);
       createSchedule(calData).then(ns => {
         if (ns?.id) setSchedules(prev => prev.map(s => s.id === tempId ? ns : s));
-      }).catch(() => {});
+        else if (ns?.error) {
+          setSchedules(prev => prev.filter(s => s.id !== tempId));
+          alert("일정 저장 실패: " + (ns.detail || ns.error));
+        }
+      }).catch((err) => {
+        setSchedules(prev => prev.filter(s => s.id !== tempId));
+        alert("일정 저장에 실패했습니다: " + (err?.message || "네트워크 오류"));
+      });
     } else {
       // 배정탭에서 생성
       const tempId = "temp-" + Date.now();
@@ -916,11 +937,21 @@ export default function Home() {
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
               <h3 className="text-sm font-bold text-gray-800 mb-3">사용자 ({allUsers.filter(u => u.username !== "admin").length}{canManageAdvanced && pendingUsers.length > 0 ? ` + 대기 ${pendingUsers.length}` : ""})</h3>
               <div className="space-y-2.5">
-                {[...allUsers, ...(canManageAdvanced ? pendingUsers : [])].filter(u => u.username !== "admin").sort((a, b) => {
-                  if (a.username === currentUser.username) return -1;
-                  if (b.username === currentUser.username) return 1;
-                  return 0;
-                }).map((u) => {
+                {(() => {
+                  const list = [...allUsers, ...(canManageAdvanced ? pendingUsers : [])].filter(u => u.username !== "admin");
+                  // userOrder 기준 정렬, 본인은 항상 맨 위
+                  list.sort((a, b) => {
+                    if (a.username === currentUser.username) return -1;
+                    if (b.username === currentUser.username) return 1;
+                    const ai = userOrder.indexOf(a.id);
+                    const bi = userOrder.indexOf(b.id);
+                    if (ai === -1 && bi === -1) return 0;
+                    if (ai === -1) return 1;
+                    if (bi === -1) return 1;
+                    return ai - bi;
+                  });
+                  return list;
+                })().map((u, idx, sortedList) => {
                   const isMe = u.username === currentUser.username;
                   const roleLabels: Record<string, string> = { ceo: "대표", scheduler: "일정관리자", sales: "영업팀", field: "현장팀", pending: "대기" };
                   const roleColors: Record<string, string> = { ceo: "bg-purple-100 text-purple-700", scheduler: "bg-blue-100 text-blue-700", sales: "bg-green-100 text-green-700", field: "bg-orange-100 text-orange-700", pending: "bg-gray-100 text-gray-500" };
@@ -941,9 +972,40 @@ export default function Home() {
                           {u.branch && <div className="text-xs text-gray-400">{u.branch}[관리점]</div>}
                         </div>
                       </div>
-                      {/* 관리 버튼 - 대표만 */}
+                      {/* 순서 이동 + 관리 버튼 - 대표만 */}
                       {canManageAdvanced && !isMe && u.status !== "pending" && (
                         <div className="flex items-center gap-2 mt-2 pt-2 border-t border-gray-100">
+                          {/* 위/아래 이동 */}
+                          <div className="flex flex-col gap-0.5">
+                            <button
+                              disabled={idx <= 1}
+                              onClick={() => {
+                                const ids = sortedList.filter(x => x.username !== currentUser.username).map(x => x.id);
+                                const i = ids.indexOf(u.id);
+                                if (i <= 0) return;
+                                [ids[i - 1], ids[i]] = [ids[i], ids[i - 1]];
+                                setUserOrder(ids);
+                                localStorage.setItem("userOrder", JSON.stringify(ids));
+                              }}
+                              className="p-0.5 rounded active:bg-gray-200 disabled:opacity-20"
+                            >
+                              <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" /></svg>
+                            </button>
+                            <button
+                              disabled={idx >= sortedList.length - 1}
+                              onClick={() => {
+                                const ids = sortedList.filter(x => x.username !== currentUser.username).map(x => x.id);
+                                const i = ids.indexOf(u.id);
+                                if (i < 0 || i >= ids.length - 1) return;
+                                [ids[i], ids[i + 1]] = [ids[i + 1], ids[i]];
+                                setUserOrder(ids);
+                                localStorage.setItem("userOrder", JSON.stringify(ids));
+                              }}
+                              className="p-0.5 rounded active:bg-gray-200 disabled:opacity-20"
+                            >
+                              <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                            </button>
+                          </div>
                           <select
                             value={u.role}
                             onChange={async (e) => {
@@ -1205,7 +1267,10 @@ export default function Home() {
         />
       )}
       {/* 신상정보 팝업 */}
-      {profileUser && (
+      {profileUser && (() => {
+        const pu = profileUser;
+        const canEdit = isAdmin && pu.username !== currentUser.username;
+        return (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center px-6" style={{ paddingTop: "env(safe-area-inset-top, 0px)", paddingBottom: "env(safe-area-inset-bottom, 0px)" }} onClick={(e) => { if (e.target === e.currentTarget) { setProfileUser(null); consumeHash(); } }}>
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm animate-[modalIn_0.15s_ease-out]">
             <div className="px-5 pt-5 pb-3 flex items-center justify-between">
@@ -1216,30 +1281,53 @@ export default function Home() {
             </div>
             <div className="px-5 pb-5 space-y-3">
               <div className="flex items-center gap-3 pb-3 border-b border-gray-100">
-                <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 font-bold text-lg">{profileUser.name[0]}</div>
+                <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 font-bold text-lg">{pu.name[0]}</div>
                 <div>
-                  <div className="text-base font-bold text-gray-800">{profileUser.name}</div>
-                  <div className="text-xs text-gray-500">{profileUser.username}</div>
+                  <div className="text-base font-bold text-gray-800">{pu.name}</div>
+                  <div className="text-xs text-gray-500">{pu.username}</div>
                 </div>
               </div>
               {[
-                ["아이디", profileUser.username],
-                ["비밀번호", profileUser.password],
-                ["연락처", profileUser.phone],
-                ["주소", profileUser.address],
-                ["관리점", profileUser.branch ? `${profileUser.branch}[관리점]` : ""],
-                ["주민등록번호", profileUser.residentNumber],
-                ["사업자등록증", profileUser.businessLicenseFile],
+                ["아이디", pu.username],
+                ["비밀번호", pu.password],
+                ["연락처", pu.phone],
+                ["관리점", pu.branch ? `${pu.branch}[관리점]` : ""],
+                ["주민등록번호", pu.residentNumber],
+                ["사업자등록증", pu.businessLicenseFile],
               ].filter(([, v]) => v).map(([label, value]) => (
                 <div key={label} className="flex items-start gap-2">
                   <span className="text-xs text-gray-500 w-20 shrink-0">{label}</span>
                   <span className="text-sm text-gray-800">{value}</span>
                 </div>
               ))}
+              {/* 주소 — 대표만 수정 가능 */}
+              <div className="flex items-start gap-2">
+                <span className="text-xs text-gray-500 w-20 shrink-0 pt-1.5">주소</span>
+                {canEdit ? (
+                  <div className="flex-1 flex gap-1.5">
+                    <input
+                      defaultValue={pu.address}
+                      onBlur={async (e) => {
+                        const newAddr = e.target.value.trim();
+                        if (newAddr === pu.address) return;
+                        setAllUsers(prev => prev.map(u => u.id === pu.id ? { ...u, address: newAddr } : u));
+                        setProfileUser({ ...pu, address: newAddr });
+                        await updateUserInfoApi(pu.id, { address: newAddr });
+                      }}
+                      onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+                      className="flex-1 text-sm text-gray-800 border border-gray-200 rounded-lg px-2 py-1 outline-none focus:ring-1 focus:ring-blue-400"
+                      placeholder="주소 입력"
+                    />
+                  </div>
+                ) : (
+                  <span className="text-sm text-gray-800">{pu.address || "-"}</span>
+                )}
+              </div>
             </div>
           </div>
         </div>
-      )}
+        );
+      })()}
     </div>
   );
 }

@@ -102,8 +102,8 @@ export async function emptyTrashApi(): Promise<{ deleted: number }> {
   return res.json();
 }
 
-export async function createSchedule(data: Omit<Schedule, "id" | "status">): Promise<Schedule> {
-  const res = await safeFetch(`${BASE}/api/schedules`, {
+export async function createSchedule(data: Omit<Schedule, "id" | "status">): Promise<Schedule & { error?: string; detail?: string }> {
+  const res = await fetch(`${BASE}/api/schedules`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
@@ -346,6 +346,14 @@ export async function changeUserRoleApi(userId: string, role: string): Promise<v
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ action: "changeRole", userId, role }),
+  });
+}
+
+export async function updateUserInfoApi(userId: string, data: { address?: string; phone?: string; branch?: string }): Promise<void> {
+  await safeFetch(`${BASE}/api/users`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ action: "updateInfo", userId, ...data }),
   });
 }
 

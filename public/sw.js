@@ -18,8 +18,17 @@ self.addEventListener('fetch', (event) => {
   event.respondWith(fetch(event.request));
 });
 
+// 알림 ON/OFF 상태 (클라이언트에서 postMessage로 전달)
+let notificationsEnabled = true;
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SET_NOTIFICATIONS_ENABLED') {
+    notificationsEnabled = event.data.enabled;
+  }
+});
+
 // 푸시 알림 수신
 self.addEventListener('push', (event) => {
+  if (!notificationsEnabled) return;
   const data = event.data ? event.data.json() : {};
   const title = data.title || '새집느낌 파트너';
   const options = {

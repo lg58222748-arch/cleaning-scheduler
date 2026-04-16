@@ -79,12 +79,13 @@ export async function POST(req: NextRequest) {
       endTime: body.endTime || "18:00",
       googleEventId: body.googleEventId,
       note: body.note || "",
+      color: body.color,
     });
     if (!schedule) return Response.json({ error: "duplicate or failed" }, { status: 200 });
     return Response.json(schedule, { status: 201 });
   }
 
-  const schedule = await addSchedule({
+  const result = await addSchedule({
     memberId: body.memberId,
     memberName: body.memberName,
     title: body.title,
@@ -97,7 +98,8 @@ export async function POST(req: NextRequest) {
     color: body.color,
   });
 
-  if (!schedule) return Response.json({ error: "저장 실패" }, { status: 500 });
+  if (!result.schedule) return Response.json({ error: "저장 실패", detail: result.error }, { status: 500 });
+  const schedule = result.schedule;
 
   await addNotification(
     "schedule_created",
