@@ -890,7 +890,7 @@ export default function Home() {
                       {u.status === "pending" && canManageAdvanced && (
                         <div className="flex gap-2 mt-2 pt-2 border-t border-gray-100">
                           <button onClick={() => { setPendingUsers(prev => prev.filter(x => x.id !== u.id)); setAllUsers(prev => [...prev, { ...u, status: "approved" as const }]); approveUserApi(u.id).catch(() => {}); }} className="flex-1 py-2 bg-green-500 text-white rounded-lg text-xs font-bold active:bg-green-600">승인</button>
-                          <button onClick={() => { setPendingUsers(prev => prev.filter(x => x.id !== u.id)); rejectUserApi(u.id).catch(() => {}); }} className="flex-1 py-2 bg-red-500 text-white rounded-lg text-xs font-bold active:bg-red-600">거절</button>
+                          <button onClick={() => { setPendingUsers(prev => prev.filter(x => x.id !== u.id)); deleteUserApi(u.id).catch(() => {}); }} className="flex-1 py-2 bg-red-500 text-white rounded-lg text-xs font-bold active:bg-red-600">거절</button>
                         </div>
                       )}
                     </div>
