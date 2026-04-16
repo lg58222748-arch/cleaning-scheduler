@@ -85,7 +85,7 @@ export default function SalesTab({ userName, onCreated }: SalesTabProps) {
     text += `1)성함 :\n2)주소 : (아파트명+동호수)\n3)연락처 :\n4)청소희망날짜:\n  (오전: 7시~9시, 오후: 1시~3시 사이 방문 선택)\n5)고객님 특이사항 :\n\n`;
     text += `──────────────────\n`;
     text += `6)서비스 종류 : ${svcList}\n`;
-    text += `7)평수 : ${pyeong ? pyeong + "평" : ""}\n`;
+    text += `7)평수 : ${pyeong ? pyeong + "평" : ""}${buildType && buildType !== "선택" ? " " + buildType : ""}\n`;
 
     services.forEach((s, i) => {
       text += `► ${s.name}\n`;
@@ -279,7 +279,7 @@ export default function SalesTab({ userName, onCreated }: SalesTabProps) {
     msg += `4)청소희망날짜 : ${schedDateStr}\n`;
     msg += `5)고객님 특이사항 : ${note || parsedNote}\n\n`;
     msg += `──────────────────\n`;
-    msg += `6)서비스 종류 : ${svcList}\n7)평수 : ${(parsedPyeong || pyeong) ? (parsedPyeong || pyeong) + "평" : ""}\n`;
+    msg += `6)서비스 종류 : ${svcList}\n7)평수 : ${(parsedPyeong || pyeong) ? (parsedPyeong || pyeong) + "평" : ""}${buildType && buildType !== "선택" ? " " + buildType : ""}\n`;
 
     services.forEach((s) => {
       msg += `► ${s.name}\n`;
