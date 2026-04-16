@@ -697,9 +697,9 @@ export default function Home() {
                 <button
                   onClick={() => {
                     if (allSelected) {
-                      // 전체 해제 → 필터 비활성
+                      // 전체 해제 → 빈 달력
                       setSelectedMemberIds(new Set());
-                      setFilterActive(false);
+                      setFilterActive(true);
                     } else {
                       // 전체 선택
                       setSelectedMemberIds(new Set(fieldUsers.map(u => u.id)));
