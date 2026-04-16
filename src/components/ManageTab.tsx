@@ -838,12 +838,11 @@ export function BranchMap({ allUsers, isAdmin = false }: { allUsers: { id?: stri
     const N = window.naver.maps;
 
     const map = new N.Map(mapRef.current, {
-      center: new N.LatLng(36.5, 127.0),
-      zoom: 8,
+      center: new N.LatLng(37.5665, 126.9780),
+      zoom: 7,
       zoomControl: true,
       zoomControlOptions: { position: 3 },
       minZoom: 6,
-      maxBounds: new N.LatLngBounds(new N.LatLng(33.0, 124.5), new N.LatLng(39.0, 132.0)),
     });
 
     let minLat = 90, maxLat = -90, minLng = 180, maxLng = -180;
@@ -894,10 +893,7 @@ export function BranchMap({ allUsers, isAdmin = false }: { allUsers: { id?: stri
       }
     });
 
-    if (userList.length > 1) {
-      const bounds = new N.LatLngBounds(new N.LatLng(minLat, minLng), new N.LatLng(maxLat, maxLng));
-      map.fitBounds(bounds, { top: 50, right: 30, bottom: 50, left: 30 });
-    }
+    // 서울 중심 고정 (fitBounds 사용 안 함)
   }, [ready, userList]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // 선택된 유저 원 표시/숨김
