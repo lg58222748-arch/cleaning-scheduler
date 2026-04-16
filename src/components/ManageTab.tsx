@@ -393,47 +393,75 @@ function GoogleCalendarImport({ allUsers, members, onImported }: {
   members: { id: string; name: string; linkedUsername?: string }[];
   onImported: () => void;
 }) {
-  const [calendarId, setCalendarId] = useState(() => typeof window !== "undefined" ? localStorage.getItem("google_calendar_id") || "" : "");
-  const [events, setEvents] = useState<{ id: string; summary: string; date: string; description?: string; selected: boolean; assignTo: string }[]>([]);
+  const [calendarId, setCalendarId] = useState("");
+  const [savedCalendars, setSavedCalendars] = useState<{ id: string; name: string }[]>(() => {
+    if (typeof window === "undefined") return [];
+    try { return JSON.parse(localStorage.getItem("google_calendars") || "[]"); } catch { return []; }
+  });
+  const [events, setEvents] = useState<{ id: string; summary: string; date: string; description?: string; selected: boolean; assignTo: string; calName?: string }[]>([]);
   const [loading, setLoading] = useState(false);
   const [importing, setImporting] = useState(false);
   const [importDone, setImportDone] = useState(false);
   const [importCount, setImportCount] = useState(0);
-  const [importProgress, setImportProgress] = useState(0); // 0~100
+  const [importProgress, setImportProgress] = useState(0);
   const [error, setError] = useState("");
+
+  function saveCalendarId(id: string, name: string) {
+    const updated = savedCalendars.filter(c => c.id !== id);
+    updated.push({ id, name });
+    setSavedCalendars(updated);
+    localStorage.setItem("google_calendars", JSON.stringify(updated));
+  }
+  function removeCalendarId(id: string) {
+    const updated = savedCalendars.filter(c => c.id !== id);
+    setSavedCalendars(updated);
+    localStorage.setItem("google_calendars", JSON.stringify(updated));
+  }
+
+  async function fetchFromCalendar(cid: string) {
+    const url = `${GAS_URL}?action=fetchEvents&calendarId=${encodeURIComponent(cid)}&days=60`;
+    const res = await fetch(url);
+    return res.json();
+  }
 
   async function handleFetchEvents() {
     if (!calendarId.trim()) { setError("캘린더 ID를 입력해주세요"); return; }
     setLoading(true);
     setError("");
     setImportDone(false);
-    localStorage.setItem("google_calendar_id", calendarId.trim());
 
     try {
-      // GAS를 통해 캘린더 이벤트 조회 (OAuth 불필요)
-      const url = `${GAS_URL}?action=fetchEvents&calendarId=${encodeURIComponent(calendarId.trim())}&days=60`;
-      const res = await fetch(url);
-      const data = await res.json();
-
-      if (data.status === "error") {
-        setError(data.message || "캘린더 조회 실패");
-        setLoading(false);
-        return;
-      }
-
+      const data = await fetchFromCalendar(calendarId.trim());
+      if (data.status === "error") { setError(data.message || "캘린더 조회 실패"); setLoading(false); return; }
+      const calName = data.calendarName || calendarId.trim();
+      saveCalendarId(calendarId.trim(), calName);
       const items = (data.items || []).map((ev: { id: string; summary: string; date: string; description?: string }) => ({
-        id: ev.id,
-        summary: ev.summary || "(제목 없음)",
-        date: ev.date || "",
-        description: ev.description || "",
-        selected: true,
-        assignTo: "",
+        id: ev.id, summary: ev.summary || "(제목 없음)", date: ev.date || "", description: ev.description || "", selected: true, assignTo: "", calName,
       }));
       setEvents(items);
       if (items.length === 0) setError("가져올 일정이 없습니다 (향후 60일)");
-    } catch {
-      setError("GAS 연결 실패. 네트워크를 확인하세요.");
+    } catch { setError("GAS 연결 실패. 네트워크를 확인하세요."); }
+    setLoading(false);
+  }
+
+  async function handleFetchAll() {
+    if (savedCalendars.length === 0) { setError("저장된 캘린더가 없습니다. 먼저 캘린더 ID를 추가하세요."); return; }
+    setLoading(true);
+    setError("");
+    setImportDone(false);
+    const allItems: typeof events = [];
+    for (const cal of savedCalendars) {
+      try {
+        const data = await fetchFromCalendar(cal.id);
+        if (data.status === "ok" && data.items) {
+          data.items.forEach((ev: { id: string; summary: string; date: string; description?: string }) => {
+            allItems.push({ id: ev.id + cal.id, summary: ev.summary || "(제목 없음)", date: ev.date || "", description: ev.description || "", selected: true, assignTo: "", calName: cal.name });
+          });
+        }
+      } catch { /* 개별 캘린더 실패 무시 */ }
     }
+    setEvents(allItems);
+    if (allItems.length === 0) setError("가져올 일정이 없습니다");
     setLoading(false);
   }
 
@@ -537,6 +565,28 @@ function GoogleCalendarImport({ allUsers, members, onImported }: {
             </div>
             <p className="text-xs text-gray-400">구글 캘린더 설정 → 캘린더 통합 → 캘린더 ID 복사</p>
           </div>
+
+          {/* 저장된 캘린더 목록 */}
+          {savedCalendars.length > 0 && (
+            <div className="space-y-1">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-gray-500">저장된 캘린더 ({savedCalendars.length})</label>
+                <button onClick={handleFetchAll} disabled={loading} className="px-3 py-1.5 bg-green-500 text-white rounded-lg text-xs font-bold active:bg-green-600 disabled:opacity-50">
+                  {loading ? "로딩..." : "전체 가져오기"}
+                </button>
+              </div>
+              {savedCalendars.map(cal => (
+                <div key={cal.id} className="flex items-center gap-2 bg-white border border-gray-200 rounded-lg px-2 py-1.5">
+                  <button onClick={() => { setCalendarId(cal.id); handleFetchEvents(); }} className="flex-1 text-left text-xs text-gray-700 truncate active:text-blue-500">
+                    📅 {cal.name}
+                  </button>
+                  <button onClick={() => removeCalendarId(cal.id)} className="text-gray-300 active:text-red-500 shrink-0">
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
 
           {error && <div className="p-2 bg-red-50 border border-red-200 rounded-lg text-xs text-red-600">{error}</div>}
 
