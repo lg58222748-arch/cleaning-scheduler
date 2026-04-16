@@ -394,7 +394,7 @@ function GoogleCalendarImport({ allUsers, members, onImported }: {
   onImported: () => void;
 }) {
   const [calendarId, setCalendarId] = useState("");
-  const [savedCalendars, setSavedCalendars] = useState<{ id: string; name: string }[]>(() => {
+  const [savedCalendars, setSavedCalendars] = useState<{ id: string; name: string; assignTo: string }[]>(() => {
     if (typeof window === "undefined") return [];
     try { return JSON.parse(localStorage.getItem("google_calendars") || "[]"); } catch { return []; }
   });
@@ -407,8 +407,14 @@ function GoogleCalendarImport({ allUsers, members, onImported }: {
   const [error, setError] = useState("");
 
   function saveCalendarId(id: string, name: string) {
+    const existing = savedCalendars.find(c => c.id === id);
     const updated = savedCalendars.filter(c => c.id !== id);
-    updated.push({ id, name });
+    updated.push({ id, name, assignTo: existing?.assignTo || "" });
+    setSavedCalendars(updated);
+    localStorage.setItem("google_calendars", JSON.stringify(updated));
+  }
+  function updateCalendarAssign(calId: string, assignTo: string) {
+    const updated = savedCalendars.map(c => c.id === calId ? { ...c, assignTo } : c);
     setSavedCalendars(updated);
     localStorage.setItem("google_calendars", JSON.stringify(updated));
   }
@@ -455,7 +461,7 @@ function GoogleCalendarImport({ allUsers, members, onImported }: {
         const data = await fetchFromCalendar(cal.id);
         if (data.status === "ok" && data.items) {
           data.items.forEach((ev: { id: string; summary: string; date: string; description?: string }) => {
-            allItems.push({ id: ev.id + cal.id, summary: ev.summary || "(제목 없음)", date: ev.date || "", description: ev.description || "", selected: true, assignTo: "", calName: cal.name });
+            allItems.push({ id: ev.id + cal.id, summary: ev.summary || "(제목 없음)", date: ev.date || "", description: ev.description || "", selected: true, assignTo: cal.assignTo || "", calName: cal.name });
           });
         }
       } catch { /* 개별 캘린더 실패 무시 */ }
@@ -576,13 +582,20 @@ function GoogleCalendarImport({ allUsers, members, onImported }: {
                 </button>
               </div>
               {savedCalendars.map(cal => (
-                <div key={cal.id} className="flex items-center gap-2 bg-white border border-gray-200 rounded-lg px-2 py-1.5">
-                  <button onClick={() => { setCalendarId(cal.id); handleFetchEvents(); }} className="flex-1 text-left text-xs text-gray-700 truncate active:text-blue-500">
-                    📅 {cal.name}
-                  </button>
-                  <button onClick={() => removeCalendarId(cal.id)} className="text-gray-300 active:text-red-500 shrink-0">
-                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-                  </button>
+                <div key={cal.id} className="bg-white border border-gray-200 rounded-lg px-2 py-1.5 space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className="flex-1 text-xs text-gray-700 truncate">📅 {cal.name}</span>
+                    <button onClick={() => removeCalendarId(cal.id)} className="text-gray-300 active:text-red-500 shrink-0">
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                    </button>
+                  </div>
+                  <select value={cal.assignTo || ""} onChange={(e) => updateCalendarAssign(cal.id, e.target.value)}
+                    className="w-full px-2 py-1 border border-gray-200 rounded text-xs outline-none bg-gray-50">
+                    <option value="">📋 배정탭으로 보내기</option>
+                    {assignableList.map(a => (
+                      <option key={a.id} value={a.id}>📅 {a.name} 달력으로 이동</option>
+                    ))}
+                  </select>
                 </div>
               ))}
             </div>
