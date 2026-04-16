@@ -910,7 +910,7 @@ export function BranchMap({ allUsers, isAdmin = false }: { allUsers: { id?: stri
   return (
     <div className="flex flex-col h-full">
       {/* 지도 */}
-      <div ref={mapRef} className="flex-1 w-full" style={{ minHeight: 400 }}>
+      <div ref={mapRef} className="w-full" style={{ height: 500 }}>
         {!ready && <div className="flex items-center justify-center h-full text-gray-400 text-sm">지도 로딩 중...</div>}
       </div>
       {/* 선택된 팀원 반경 조절 - 대표만 */}
