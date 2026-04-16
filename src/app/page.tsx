@@ -440,20 +440,19 @@ export default function Home() {
         .catch(() => {});
     }
   }
-  async function handleDeleteSchedule(id: string) {
+  function handleDeleteSchedule(id: string) {
     setSchedules((prev) => prev.filter((s) => s.id !== id));
     setUnassignedSchedules((prev) => prev.filter((s) => s.id !== id));
-    await softDeleteSchedule(id);
+    softDeleteSchedule(id).catch(() => {});
   }
 
-  async function handleUnassignSchedule(id: string, reason: string = "") {
+  function handleUnassignSchedule(id: string, reason: string = "") {
     const target = schedules.find((s) => s.id === id);
     setSchedules((prev) => prev.filter((s) => s.id !== id));
     if (target) {
       setUnassignedSchedules((prev) => [...prev, { ...target, memberId: "", memberName: "미배정", status: "unassigned" as const }]);
-      setReturnAlerts((prev) => [...prev, { id: target.id, title: target.title.replace(/^\[.+?\]\s*/, ""), date: target.date, reason }]);
     }
-    await unassignScheduleApi(id, currentUser?.name || "", reason);
+    unassignScheduleApi(id, currentUser?.name || "", reason).catch(() => {});
   }
   function handleEditSchedule(schedule: Schedule) {
     setEditingSchedule(schedule);
