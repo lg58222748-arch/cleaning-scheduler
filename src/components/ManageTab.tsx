@@ -776,6 +776,7 @@ export function BranchMap({ allUsers, isAdmin = false }: { allUsers: { id?: stri
   const mapInitialized = useRef(false);
   const [ready, setReady] = useState(false);
   const [selectedUser, setSelectedUser] = useState<string | null>(null);
+  const [showCircles, setShowCircles] = useState(true);
   const [userRadii, setUserRadii] = useState<Record<string, number>>(() => {
     if (typeof window === "undefined") return {};
     try { return JSON.parse(localStorage.getItem("map_user_radii") || "{}"); } catch { return {}; }
@@ -896,13 +897,14 @@ export function BranchMap({ allUsers, isAdmin = false }: { allUsers: { id?: stri
     // 서울 중심 고정 (fitBounds 사용 안 함)
   }, [ready, userList]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // 선택된 유저 반경 실시간 반영 (원은 항상 보임)
+  // 반경 실시간 반영 + 보기/끄기
   useEffect(() => {
     for (const [name, circle] of Object.entries(circlesRef.current)) {
-      const c = circle as unknown as { setRadius: (r: number) => void };
+      const c = circle as unknown as { setRadius: (r: number) => void; setVisible: (v: boolean) => void };
       c.setRadius((userRadii[name] || 15) * 1000);
+      c.setVisible(showCircles);
     }
-  }, [userRadii]);
+  }, [userRadii, showCircles]);
 
   const selRadius = selectedUser ? (userRadii[selectedUser] || 15) : 15;
 
@@ -912,6 +914,14 @@ export function BranchMap({ allUsers, isAdmin = false }: { allUsers: { id?: stri
       <div ref={mapRef} style={{ width: "100vw", height: "calc(100dvh - 100px)" }}>
         {!ready && <div className="flex items-center justify-center h-full text-gray-400 text-sm">지도 로딩 중...</div>}
       </div>
+      {/* 활동범위 보기/끄기 */}
+      <button
+        onClick={() => setShowCircles(prev => !prev)}
+        style={{ position: "absolute", top: 12, left: 12, zIndex: 10 }}
+        className={`px-3 py-1.5 rounded-lg text-xs font-bold shadow-md ${showCircles ? "bg-blue-500 text-white" : "bg-white text-gray-500 border border-gray-300"}`}
+      >
+        {showCircles ? "활동범위 끄기" : "활동범위 보기"}
+      </button>
       {/* 선택된 팀원 반경 조절 - 대표만 */}
       {isAdmin && selectedUser && (
         <div style={{ position: "absolute", bottom: 16, left: 16, right: 16, zIndex: 10 }}>
