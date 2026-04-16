@@ -740,7 +740,7 @@ export default function Home() {
                       const next = new Set(prev);
                       if (next.has(uid)) next.delete(uid);
                       else next.add(uid);
-                      setFilterActive(next.size > 0);
+                      setFilterActive(true);
                       return next;
                     });
                   }}
