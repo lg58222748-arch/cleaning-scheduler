@@ -167,28 +167,16 @@ export default function Home() {
       }).catch(() => {});
     }
 
-    // Realtime 시도
-    let realtimeWorking = false;
-    let channel: ReturnType<typeof import("@/lib/supabase-client").sbClient.channel> | null = null;
-    try {
-      const { sbClient } = require("@/lib/supabase-client");
-      channel = sbClient.channel("db-changes")
-        .on("postgres_changes", { event: "*", schema: "public", table: "schedules" }, () => { realtimeWorking = true; reloadAll(); })
-        .on("postgres_changes", { event: "*", schema: "public", table: "notifications" }, () => { realtimeWorking = true; reloadAll(); })
-        .subscribe();
-    } catch { /* Realtime 실패 */ }
+    // Realtime 구독 (전체 테이블)
+    const { sbClient } = require("@/lib/supabase-client");
+    const channel = sbClient.channel("all-changes")
+      .on("postgres_changes", { event: "*", schema: "public", table: "schedules" }, () => reloadAll())
+      .on("postgres_changes", { event: "*", schema: "public", table: "notifications" }, () => reloadAll())
+      .on("postgres_changes", { event: "*", schema: "public", table: "members" }, () => { fetchMembers().then(m => setMembers(m)).catch(() => {}); })
+      .on("postgres_changes", { event: "*", schema: "public", table: "users" }, () => { fetchUsers().then(d => { setAllUsers(d.users); setPendingUsers(d.pendingUsers); }).catch(() => {}); })
+      .subscribe();
 
-    // 폴링 fallback (10초) - Realtime 안 되면 이걸로
-    const interval = setInterval(() => {
-      if (!realtimeWorking) reloadAll();
-    }, 10000);
-
-    return () => {
-      clearInterval(interval);
-      if (channel) {
-        try { const { sbClient } = require("@/lib/supabase-client"); sbClient.removeChannel(channel); } catch {}
-      }
-    };
+    return () => { sbClient.removeChannel(channel); };
   }, [currentUser, selectedDate]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // PWA 서비스워커 등록 + 설치 배너
