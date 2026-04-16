@@ -34,6 +34,21 @@ export async function POST(req: NextRequest) {
     return Response.json({ success: true });
   }
 
+  // FCM 토큰 저장 (Capacitor APK)
+  if (body.action === "subscribe-fcm") {
+    const { token, userId, userName } = body;
+    if (!token) return Response.json({ error: "Invalid token" }, { status: 400 });
+    const { data: existing } = await supabase.from("push_subscriptions").select("id").eq("endpoint", `fcm:${token}`).single();
+    if (existing) {
+      await supabase.from("push_subscriptions").update({ user_id: userId, user_name: userName }).eq("id", existing.id);
+    } else {
+      await supabase.from("push_subscriptions").insert({
+        user_id: userId, user_name: userName, endpoint: `fcm:${token}`, p256dh: "fcm", auth: "fcm",
+      });
+    }
+    return Response.json({ success: true });
+  }
+
   // 푸시 전송
   if (body.action === "send") {
     const { title, message, tag } = body;

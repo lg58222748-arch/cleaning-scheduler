@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "487282207890",
+    "project_id": "saejip-partner",
+    "storage_bucket": "saejip-partner.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:487282207890:android:146d6087805ca985920a4b",
+        "android_client_info": {
+          "package_name": "com.saejipneukkeim.partner"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBYVn7Mx_e9BkYhmOhsF8r0erVtD-UKDJg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
