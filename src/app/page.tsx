@@ -93,6 +93,10 @@ export default function Home() {
     if (typeof window === "undefined") return [];
     try { const s = localStorage.getItem("userOrder"); return s ? JSON.parse(s) : []; } catch { return []; }
   });
+  const [dragUserId, setDragUserId] = useState<string | null>(null);
+  const [dragOverUserId, setDragOverUserId] = useState<string | null>(null);
+  const dragStartY = useRef(0);
+  const dragNodeRef = useRef<HTMLDivElement | null>(null);
   const [profileUser, setProfileUser] = useState<User | null>(null);
   const [showDayPopup, setShowDayPopup] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
@@ -964,8 +968,63 @@ export default function Home() {
                   const roleLabels: Record<string, string> = { ceo: "대표", scheduler: "일정관리자", sales: "영업팀", field: "현장팀", pending: "대기" };
                   const roleColors: Record<string, string> = { ceo: "bg-purple-100 text-purple-700", scheduler: "bg-blue-100 text-blue-700", sales: "bg-green-100 text-green-700", field: "bg-orange-100 text-orange-700", pending: "bg-gray-100 text-gray-500" };
                   return (
-                    <div key={u.id} className={`border rounded-xl p-3 ${isMe ? "border-blue-300 bg-blue-50/30" : u.status === "pending" ? "border-orange-300 bg-orange-50/30" : "border-gray-200"}`}>
+                    <div
+                      key={u.id}
+                      className={`border rounded-xl p-3 transition-all ${isMe ? "border-blue-300 bg-blue-50/30" : u.status === "pending" ? "border-orange-300 bg-orange-50/30" : "border-gray-200"} ${dragOverUserId === u.id && dragUserId !== u.id ? "border-blue-500 border-dashed bg-blue-50/50" : ""} ${dragUserId === u.id ? "opacity-40 scale-95" : ""}`}
+                      onDragOver={(e) => { e.preventDefault(); if (!isMe && canManageAdvanced) setDragOverUserId(u.id); }}
+                      data-userid={u.id}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        if (!dragUserId || dragUserId === u.id || isMe) return;
+                        const ids = sortedList.filter(x => x.username !== currentUser.username).map(x => x.id);
+                        const fromIdx = ids.indexOf(dragUserId);
+                        const toIdx = ids.indexOf(u.id);
+                        if (fromIdx < 0 || toIdx < 0) return;
+                        ids.splice(fromIdx, 1);
+                        ids.splice(toIdx, 0, dragUserId);
+                        setUserOrder(ids);
+                        localStorage.setItem("userOrder", JSON.stringify(ids));
+                        setDragUserId(null);
+                        setDragOverUserId(null);
+                      }}
+                    >
                       <div className="flex items-center gap-2.5">
+                        {/* 드래그 핸들 - 대표만 */}
+                        {canManageAdvanced && !isMe && u.status !== "pending" ? (
+                          <div
+                            draggable
+                            onDragStart={(e) => { setDragUserId(u.id); e.dataTransfer.effectAllowed = "move"; }}
+                            onDragEnd={() => { setDragUserId(null); setDragOverUserId(null); }}
+                            onTouchStart={(e) => { setDragUserId(u.id); dragStartY.current = e.touches[0].clientY; dragNodeRef.current = e.currentTarget.parentElement?.parentElement as HTMLDivElement; }}
+                            onTouchMove={(e) => {
+                              if (!dragUserId) return;
+                              const touch = e.touches[0];
+                              const els = document.elementsFromPoint(touch.clientX, touch.clientY);
+                              for (const el of els) {
+                                const card = (el as HTMLElement).closest("[data-userid]");
+                                if (card) { setDragOverUserId(card.getAttribute("data-userid") || null); break; }
+                              }
+                            }}
+                            onTouchEnd={() => {
+                              if (dragUserId && dragOverUserId && dragUserId !== dragOverUserId) {
+                                const ids = sortedList.filter(x => x.username !== currentUser.username).map(x => x.id);
+                                const fromIdx = ids.indexOf(dragUserId);
+                                const toIdx = ids.indexOf(dragOverUserId);
+                                if (fromIdx >= 0 && toIdx >= 0) {
+                                  ids.splice(fromIdx, 1);
+                                  ids.splice(toIdx, 0, dragUserId);
+                                  setUserOrder(ids);
+                                  localStorage.setItem("userOrder", JSON.stringify(ids));
+                                }
+                              }
+                              setDragUserId(null);
+                              setDragOverUserId(null);
+                            }}
+                            className="w-7 h-9 flex items-center justify-center cursor-grab active:cursor-grabbing shrink-0 touch-none"
+                          >
+                            <svg className="w-4 h-5 text-gray-300" viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="6" r="1.5"/><circle cx="15" cy="6" r="1.5"/><circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="9" cy="18" r="1.5"/><circle cx="15" cy="18" r="1.5"/></svg>
+                          </div>
+                        ) : null}
                         <div className={`w-9 h-9 rounded-full flex items-center justify-center font-bold text-xs shrink-0 ${isMe ? "bg-blue-500 text-white" : u.status === "pending" ? "bg-orange-200 text-orange-700" : "bg-blue-100 text-blue-600"}`}>{u.name[0]}</div>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-1.5 flex-wrap">
@@ -980,40 +1039,9 @@ export default function Home() {
                           {u.branch && <div className="text-xs text-gray-400">{u.branch}[관리점]</div>}
                         </div>
                       </div>
-                      {/* 순서 이동 + 관리 버튼 - 대표만 */}
+                      {/* 관리 버튼 - 대표만 */}
                       {canManageAdvanced && !isMe && u.status !== "pending" && (
                         <div className="flex items-center gap-2 mt-2 pt-2 border-t border-gray-100">
-                          {/* 위/아래 이동 */}
-                          <div className="flex flex-col gap-0.5">
-                            <button
-                              disabled={idx <= 1}
-                              onClick={() => {
-                                const ids = sortedList.filter(x => x.username !== currentUser.username).map(x => x.id);
-                                const i = ids.indexOf(u.id);
-                                if (i <= 0) return;
-                                [ids[i - 1], ids[i]] = [ids[i], ids[i - 1]];
-                                setUserOrder(ids);
-                                localStorage.setItem("userOrder", JSON.stringify(ids));
-                              }}
-                              className="p-0.5 rounded active:bg-gray-200 disabled:opacity-20"
-                            >
-                              <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" /></svg>
-                            </button>
-                            <button
-                              disabled={idx >= sortedList.length - 1}
-                              onClick={() => {
-                                const ids = sortedList.filter(x => x.username !== currentUser.username).map(x => x.id);
-                                const i = ids.indexOf(u.id);
-                                if (i < 0 || i >= ids.length - 1) return;
-                                [ids[i], ids[i + 1]] = [ids[i + 1], ids[i]];
-                                setUserOrder(ids);
-                                localStorage.setItem("userOrder", JSON.stringify(ids));
-                              }}
-                              className="p-0.5 rounded active:bg-gray-200 disabled:opacity-20"
-                            >
-                              <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
-                            </button>
-                          </div>
                           <select
                             value={u.role}
                             onChange={async (e) => {
