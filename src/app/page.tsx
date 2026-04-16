@@ -145,20 +145,22 @@ export default function Home() {
     }
   }, [currentUser]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Supabase Realtime + 폴링 fallback
+  // Realtime + 경량 폴링 (알림만 30초, 일정은 Realtime으로)
   useEffect(() => {
     if (!currentUser) return;
+    const uName = currentUser?.name || "";
+    const uRole = currentUser?.role || "";
 
-    function reloadAll() {
+    function reloadSchedules() {
       const d = selectedDate;
       const start = format(startOfMonth(subMonths(d, 1)), "yyyy-MM-dd");
       const end = format(endOfMonth(addMonths(d, 1)), "yyyy-MM-dd");
       fetchSchedules(start, end).then(s => setSchedules(s)).catch(() => {});
       fetchUnassignedSchedules().then(s => setUnassignedSchedules(s)).catch(() => {});
+    }
+    function reloadNotifications() {
       fetchNotifications().then(notif => {
         const allNotifs = notif.notifications as Notification[];
-        const uName = currentUser?.name || "";
-        const uRole = currentUser?.role || "";
         const myNotifs = (uRole === "ceo" || uRole === "scheduler")
           ? allNotifs
           : allNotifs.filter(n => n.message.includes(uName) || n.title.includes(uName));
@@ -167,24 +169,26 @@ export default function Home() {
       }).catch(() => {});
     }
 
-    // Realtime 구독 시도
-    let realtimeOk = false;
+    // Realtime 구독
     let channel: unknown = null;
     try {
       const { sbClient } = require("@/lib/supabase-client");
       channel = sbClient.channel("all-changes")
-        .on("postgres_changes", { event: "*", schema: "public", table: "schedules" }, () => { realtimeOk = true; reloadAll(); })
-        .on("postgres_changes", { event: "*", schema: "public", table: "notifications" }, () => { realtimeOk = true; reloadAll(); })
-        .on("postgres_changes", { event: "*", schema: "public", table: "members" }, () => { realtimeOk = true; fetchMembers().then(m => setMembers(m)).catch(() => {}); })
-        .on("postgres_changes", { event: "*", schema: "public", table: "users" }, () => { realtimeOk = true; fetchUsers().then(d => { setAllUsers(d.users); setPendingUsers(d.pendingUsers); }).catch(() => {}); })
-        .subscribe((status: string) => { console.log("[Realtime]", status); });
-    } catch (e) { console.error("[Realtime] 연결 실패:", e); }
+        .on("postgres_changes", { event: "*", schema: "public", table: "schedules" }, () => reloadSchedules())
+        .on("postgres_changes", { event: "*", schema: "public", table: "notifications" }, () => reloadNotifications())
+        .on("postgres_changes", { event: "*", schema: "public", table: "members" }, () => { fetchMembers().then(m => setMembers(m)).catch(() => {}); })
+        .on("postgres_changes", { event: "*", schema: "public", table: "users" }, () => { fetchUsers().then(d => { setAllUsers(d.users); setPendingUsers(d.pendingUsers); }).catch(() => {}); })
+        .subscribe();
+    } catch {}
 
-    // 폴링 fallback (10초) - Realtime 안 되면 작동
-    const interval = setInterval(() => { if (!realtimeOk) reloadAll(); }, 10000);
+    // 경량 폴링: 알림만 30초마다 (일정은 Realtime에 맡김)
+    const interval = setInterval(() => reloadNotifications(), 30000);
+    // 일정은 60초마다 백그라운드 동기화
+    const schedInterval = setInterval(() => reloadSchedules(), 60000);
 
     return () => {
       clearInterval(interval);
+      clearInterval(schedInterval);
       try { const { sbClient } = require("@/lib/supabase-client"); if (channel) sbClient.removeChannel(channel); } catch {}
     };
   }, [currentUser, selectedDate]); // eslint-disable-line react-hooks/exhaustive-deps
