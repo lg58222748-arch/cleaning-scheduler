@@ -806,6 +806,8 @@ function BranchMap({ allUsers }: { allUsers: { id?: string; name: string; role?:
       zoom: 8,
       zoomControl: true,
       zoomControlOptions: { position: 3 /* RIGHT_CENTER */ },
+      minZoom: 6,
+      maxBounds: new N.LatLngBounds(new N.LatLng(33.0, 124.5), new N.LatLng(39.0, 132.0)),
     });
     mapInstance.current = map;
 
