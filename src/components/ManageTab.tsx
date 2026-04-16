@@ -835,17 +835,17 @@ export function BranchMap({ allUsers }: { allUsers: { id?: string; name: string;
           anchor: { x: 40, y: 15 },
         },
       });
-      // 각 사용자 이름 마커 (살짝 분산)
+      // 각 사용자 이름 마커 (분산 배치, 안 겹치게)
       g.users.forEach((uname, ui) => {
-        const angle = (2 * Math.PI * ui) / Math.max(g.users.length, 1);
-        const spread = 0.012 + (ui % 2) * 0.005;
-        const uPos = new N.LatLng(g.coord!.lat + Math.cos(angle) * spread, g.coord!.lng + Math.sin(angle) * spread * 1.2);
+        const angle = (2 * Math.PI * ui) / Math.max(g.users.length, 1) - Math.PI / 2;
+        const spread = 0.018 + (ui % 3) * 0.008;
+        const uPos = new N.LatLng(g.coord!.lat + Math.cos(angle) * spread, g.coord!.lng + Math.sin(angle) * spread * 1.3);
         new N.Marker({
           position: uPos,
           map,
           icon: {
-            content: `<div style="background:#fff;color:${color};padding:3px 8px;border-radius:12px;font-size:10px;font-weight:600;white-space:nowrap;box-shadow:0 1px 4px rgba(0,0,0,0.15);border:1.5px solid ${color}">${uname}</div>`,
-            anchor: { x: 20, y: 10 },
+            content: `<div style="background:#fff;color:${color};padding:2px 6px;border-radius:8px;font-size:9px;font-weight:600;white-space:nowrap;box-shadow:0 1px 3px rgba(0,0,0,0.12);border:1px solid ${color}">${uname}</div>`,
+            anchor: { x: 15, y: 8 },
           },
         });
       });

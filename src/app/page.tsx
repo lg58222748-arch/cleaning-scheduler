@@ -50,7 +50,7 @@ import {
 import { format, startOfMonth, endOfMonth, addMonths, subMonths } from "date-fns";
 import { ko } from "date-fns/locale";
 
-type TabMode = "calendar" | "manage" | "assign" | "members" | "sales";
+type TabMode = "calendar" | "manage" | "assign" | "members" | "sales" | "area";
 
 export default function Home() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -953,23 +953,13 @@ export default function Home() {
           </div>
         )}
 
+        {/* 활동범위 탭 */}
+        <div className="h-full overflow-y-auto pb-20" style={{ display: activeTab === "area" ? "block" : "none" }}>
+          <BranchMapSection allUsers={allUsers.filter(u => u.role === "field" || u.role === "scheduler").map(u => ({ id: u.id, name: u.name, role: u.role, address: u.address, branch: u.branch }))} />
+        </div>
+
         {/* 사용자 탭 */}
-        <div className="h-full flex flex-col" style={{ display: activeTab === "members" ? "flex" : "none" }}>
-          {/* 서브탭: 사용자 / 활동범위 */}
-          <div className="flex border-b border-gray-200 px-2 pt-1 shrink-0">
-            <button onClick={() => setMembersSubTab("users")} className={`flex-1 py-2.5 text-xs font-bold text-center ${membersSubTab === "users" ? "text-blue-500 border-b-2 border-blue-500" : "text-gray-400"}`}>사용자</button>
-            <button onClick={() => setMembersSubTab("map")} className={`flex-1 py-2.5 text-xs font-bold text-center ${membersSubTab === "map" ? "text-blue-500 border-b-2 border-blue-500" : "text-gray-400"}`}>활동범위</button>
-          </div>
-
-          {/* 활동범위 지도 - 현장팀/일정관리자만 */}
-          {membersSubTab === "map" && (
-            <div className="flex-1 overflow-y-auto pb-20">
-              <BranchMapSection allUsers={allUsers.filter(u => u.role === "field" || u.role === "scheduler").map(u => ({ id: u.id, name: u.name, role: u.role, address: u.address, branch: u.branch }))} />
-            </div>
-          )}
-
-          {/* 사용자 목록 */}
-          <div className="flex-1 overflow-y-auto" style={{ display: membersSubTab === "users" ? "block" : "none" }}>
+        <div className="h-full overflow-y-auto" style={{ display: activeTab === "members" ? "block" : "none" }}>
           <div className="p-3 space-y-3 pb-20">
             {/* 전체 사용자 */}
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
@@ -1108,7 +1098,6 @@ export default function Home() {
             </div>
           </div>
         </div>
-        </div>
 
         {/* Sales tab */}
         {canSales && (
@@ -1168,14 +1157,28 @@ export default function Home() {
           {/* 사용자 */}
           <button
             onClick={() => switchTab("members")}
-            className={`flex flex-col items-center justify-center gap-0.5 w-16 h-full ${
+            className={`flex flex-col items-center justify-center gap-0.5 w-14 h-full ${
               activeTab === "members" ? "text-blue-500" : "text-gray-400"
             }`}
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={activeTab === "members" ? 2.5 : 1.5} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
             </svg>
-            <span className="text-xs font-medium">사용자</span>
+            <span className="text-[10px] font-medium">사용자</span>
+          </button>
+
+          {/* 활동범위 */}
+          <button
+            onClick={() => switchTab("area")}
+            className={`flex flex-col items-center justify-center gap-0.5 w-14 h-full ${
+              activeTab === "area" ? "text-blue-500" : "text-gray-400"
+            }`}
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={activeTab === "area" ? 2.5 : 1.5} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={activeTab === "area" ? 2.5 : 1.5} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+            <span className="text-[10px] font-medium">활동범위</span>
           </button>
 
           {/* 관리 */}
