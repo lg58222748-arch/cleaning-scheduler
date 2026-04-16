@@ -141,6 +141,11 @@ export default function Home() {
         setUnreadCount(myNotifs.filter(n => !n.read).length);
         setAllUsers(usersData.users);
         setPendingUsers(usersData.pendingUsers);
+        // 캐시 저장
+        try {
+          localStorage.setItem("cached_members", JSON.stringify(m));
+          localStorage.setItem("cached_users", JSON.stringify(usersData));
+        } catch {}
       } else {
         const rangeScheds = await fetchSchedules(start, end);
         setSchedules(rangeScheds);
@@ -162,7 +167,11 @@ export default function Home() {
       // 캐시에서 먼저 로드 (즉시 표시)
       try {
         const cached = localStorage.getItem("cached_schedules");
-        if (cached) { const data = JSON.parse(cached); setSchedules(data); }
+        if (cached) setSchedules(JSON.parse(cached));
+        const cachedMembers = localStorage.getItem("cached_members");
+        if (cachedMembers) setMembers(JSON.parse(cachedMembers));
+        const cachedUsers = localStorage.getItem("cached_users");
+        if (cachedUsers) { const d = JSON.parse(cachedUsers); setAllUsers(d.users || []); setPendingUsers(d.pendingUsers || []); }
       } catch {}
       // 백그라운드로 최신 데이터 로드
       loadData(undefined, true).then(() => {
