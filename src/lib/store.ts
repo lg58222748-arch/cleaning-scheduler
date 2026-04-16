@@ -241,6 +241,11 @@ export async function getUnreadCount(): Promise<number> {
 
 export async function addNotification(type: NotificationType, title: string, message: string, scheduleId?: string): Promise<Notification> {
   const { data } = await supabase.from("notifications").insert({ type, title, message, schedule_id: scheduleId, read: false }).select().single();
+  // 푸시 알림 전송
+  try {
+    const { sendPushToAll } = await import("./push");
+    sendPushToAll(title, message, type).catch(() => {});
+  } catch { /* push 모듈 로드 실패 무시 */ }
   return rowToNotification(data!);
 }
 
