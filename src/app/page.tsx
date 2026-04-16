@@ -914,7 +914,7 @@ export default function Home() {
             isAdmin={canManageAdvanced}
             userRole={role}
             userName={currentUser.name}
-            allUsers={allUsers.map(u => ({ id: u.id, name: u.name, username: u.username, role: u.role }))}
+            allUsers={allUsers.map(u => ({ id: u.id, name: u.name, username: u.username, role: u.role, address: u.address, branch: u.branch }))}
             members={members.map(m => ({ id: m.id, name: m.name, linkedUsername: m.linkedUsername }))}
             onRefresh={() => loadData(undefined, true)}
           />

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { Schedule } from "@/types";
 import { fetchDeletedSchedules, restoreScheduleApi, emptyTrashApi, deleteAllSchedules, fetchSchedules, addUnassignedSchedule, assignScheduleApi, createSchedule } from "@/lib/api";
 
@@ -10,7 +10,7 @@ interface ManageTabProps {
   isAdmin: boolean;
   userRole: string;
   userName?: string;
-  allUsers?: { id?: string; name: string; username?: string; role?: string }[];
+  allUsers?: { id?: string; name: string; username?: string; role?: string; address?: string; branch?: string }[];
   members?: { id: string; name: string; linkedUsername?: string }[];
   onRefresh: () => void;
 }
@@ -108,7 +108,7 @@ export default function ManageTab({ isAdmin, userRole, userName = "", allUsers =
 /* ════════════ 대표 전용 섹션 ════════════ */
 function CeoSection({ onRefresh, allUsers, members }: {
   onRefresh: () => void;
-  allUsers: { id?: string; name: string; username?: string; role?: string }[];
+  allUsers: { id?: string; name: string; username?: string; role?: string; address?: string; branch?: string }[];
   members: { id: string; name: string; linkedUsername?: string }[];
 }) {
   const [trashItems, setTrashItems] = useState<Schedule[]>([]);
@@ -116,6 +116,7 @@ function CeoSection({ onRefresh, allUsers, members }: {
   const [showTrash, setShowTrash] = useState(false);
   const [totalCount, setTotalCount] = useState(0);
   const [showGoogleImport, setShowGoogleImport] = useState(false);
+  const [showMap, setShowMap] = useState(false);
 
   useEffect(() => { loadCounts(); }, []);
 
@@ -165,6 +166,23 @@ function CeoSection({ onRefresh, allUsers, members }: {
       <div className="px-4 py-3">
         <p className="text-xs text-gray-400">전체 일정 {totalCount}건</p>
       </div>
+
+      {/* 활동 지역 지도 */}
+      <button
+        onClick={() => setShowMap(!showMap)}
+        className="w-full px-4 py-3.5 flex items-center gap-3 active:bg-gray-50"
+      >
+        <div className="w-9 h-9 bg-green-50 rounded-xl flex items-center justify-center">
+          <svg className="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+        </div>
+        <div className="flex-1 text-left">
+          <div className="text-sm font-medium text-gray-800">활동 지역 지도</div>
+          <div className="text-xs text-gray-400">관리점별 현장팀 활동 가능 지역</div>
+        </div>
+        <svg className={`w-4 h-4 text-gray-400 transition-transform ${showMap ? "rotate-90" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+      </button>
+
+      {showMap && <BranchMap allUsers={allUsers} />}
 
       {/* 구글 캘린더 가져오기 */}
       <button
@@ -257,7 +275,7 @@ function CeoSection({ onRefresh, allUsers, members }: {
 function SalesStatsSection({ userName, userRole, allUsers }: {
   userName: string;
   userRole: string;
-  allUsers: { id?: string; name: string; username?: string; role?: string }[];
+  allUsers: { id?: string; name: string; username?: string; role?: string; address?: string; branch?: string }[];
 }) {
   const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [loading, setLoading] = useState(true);
@@ -389,7 +407,7 @@ function SalesStatsSection({ userName, userRole, allUsers }: {
 const GAS_URL = "https://script.google.com/macros/s/AKfycbzBMfzBsdC5YKHDPUhHVZuPLKqb2MTYKT_zTGoNVl_h8jhGTsAiqnkxBgtO414TzWdVEw/exec";
 
 function GoogleCalendarImport({ allUsers, members, onImported }: {
-  allUsers: { id?: string; name: string; username?: string; role?: string }[];
+  allUsers: { id?: string; name: string; username?: string; role?: string; address?: string; branch?: string }[];
   members: { id: string; name: string; linkedUsername?: string }[];
   onImported: () => void;
 }) {
@@ -696,6 +714,171 @@ function GoogleCalendarImport({ allUsers, members, onImported }: {
 
           {error && <div className="p-2 bg-red-50 border border-red-200 rounded-lg text-xs text-red-600">{error}</div>}
         </>
+      )}
+    </div>
+  );
+}
+
+
+/* ════════════ 활동 지역 지도 ════════════ */
+declare global {
+  interface Window {
+    naver: {
+      maps: {
+        Map: new (el: HTMLElement, opts: Record<string, unknown>) => NaverMap;
+        LatLng: new (lat: number, lng: number) => NaverLatLng;
+        Marker: new (opts: Record<string, unknown>) => unknown;
+        Circle: new (opts: Record<string, unknown>) => unknown;
+        Event: { addListener: (instance: unknown, eventName: string, handler: () => void) => void };
+        LatLngBounds: new (sw: NaverLatLng, ne: NaverLatLng) => NaverBounds;
+      };
+    };
+  }
+}
+interface NaverLatLng { lat: () => number; lng: () => number }
+interface NaverBounds { extend: (latlng: NaverLatLng) => void }
+interface NaverMap { fitBounds: (bounds: NaverBounds, padding?: Record<string, number>) => void; setCenter: (latlng: NaverLatLng) => void; setZoom: (z: number) => void }
+
+// 주요 관리점 기본 좌표 (주소 geocoding 실패 시 사용)
+const BRANCH_COORDS: Record<string, { lat: number; lng: number }> = {
+  "천안": { lat: 36.8151, lng: 127.1139 },
+  "인천": { lat: 37.4563, lng: 126.7052 },
+  "서울": { lat: 37.5665, lng: 126.9780 },
+  "수원": { lat: 37.2636, lng: 127.0286 },
+  "성남": { lat: 37.4200, lng: 127.1267 },
+  "평택": { lat: 36.9920, lng: 127.0889 },
+  "화성": { lat: 37.1994, lng: 126.8313 },
+  "부천": { lat: 37.5034, lng: 126.7660 },
+  "의정부": { lat: 37.7381, lng: 127.0337 },
+  "춘천": { lat: 37.8813, lng: 127.7298 },
+  "대전": { lat: 36.3504, lng: 127.3845 },
+  "세종": { lat: 36.4800, lng: 127.2590 },
+  "청주": { lat: 36.6424, lng: 127.4890 },
+  "아산": { lat: 36.7898, lng: 127.0018 },
+  "용인": { lat: 37.2411, lng: 127.1776 },
+  "광주": { lat: 37.4095, lng: 127.2553 },
+  "안양": { lat: 37.3943, lng: 126.9568 },
+  "시흥": { lat: 37.3800, lng: 126.8030 },
+  "김포": { lat: 37.6153, lng: 126.7156 },
+  "파주": { lat: 37.7600, lng: 126.7800 },
+  "고양": { lat: 37.6584, lng: 126.8320 },
+  "일산": { lat: 37.6660, lng: 126.7695 },
+};
+
+const BRANCH_COLORS = ["#3B82F6", "#EF4444", "#10B981", "#F59E0B", "#8B5CF6", "#EC4899", "#06B6D4", "#F97316", "#14B8A6", "#6366F1"];
+
+function BranchMap({ allUsers }: { allUsers: { id?: string; name: string; role?: string; address?: string; branch?: string }[] }) {
+  const mapRef = useRef<HTMLDivElement>(null);
+  const mapInstance = useRef<NaverMap | null>(null);
+  const [ready, setReady] = useState(false);
+  const [radius, setRadius] = useState(15); // km
+
+  // 관리점별 사용자 그룹핑
+  const branchGroups = useMemo(() => {
+    const groups: Record<string, { name: string; users: string[]; coord: { lat: number; lng: number } | null }> = {};
+    for (const u of allUsers) {
+      if (!u.branch) continue;
+      const bname = u.branch.replace(/\[관리점\]/, "").trim();
+      if (!bname) continue;
+      if (!groups[bname]) {
+        // 좌표 매칭
+        const coord = BRANCH_COORDS[bname] || null;
+        groups[bname] = { name: bname, users: [], coord };
+      }
+      groups[bname].users.push(u.name);
+    }
+    return Object.values(groups).filter(g => g.coord);
+  }, [allUsers]);
+
+  useEffect(() => {
+    const check = setInterval(() => {
+      if (window.naver?.maps) { setReady(true); clearInterval(check); }
+    }, 200);
+    return () => clearInterval(check);
+  }, []);
+
+  useEffect(() => {
+    if (!ready || !mapRef.current || branchGroups.length === 0) return;
+    const N = window.naver.maps;
+
+    const map = new N.Map(mapRef.current, {
+      center: new N.LatLng(36.8, 127.1),
+      zoom: 8,
+      zoomControl: true,
+      zoomControlOptions: { position: 3 /* RIGHT_CENTER */ },
+    });
+    mapInstance.current = map;
+
+    const bounds = new N.LatLngBounds(
+      new N.LatLng(90, 180),
+      new N.LatLng(-90, -180)
+    );
+
+    branchGroups.forEach((g, i) => {
+      if (!g.coord) return;
+      const pos = new N.LatLng(g.coord.lat, g.coord.lng);
+      bounds.extend(pos);
+      const color = BRANCH_COLORS[i % BRANCH_COLORS.length];
+
+      new N.Marker({
+        position: pos,
+        map,
+        icon: {
+          content: `<div style="background:${color};color:#fff;padding:4px 10px;border-radius:20px;font-size:11px;font-weight:700;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,0.2);border:2px solid #fff">${g.name} (${g.users.length})</div>`,
+          anchor: { x: 30, y: 15 },
+        },
+      });
+
+      new N.Circle({
+        map,
+        center: pos,
+        radius: radius * 1000,
+        strokeColor: color,
+        strokeWeight: 2,
+        strokeOpacity: 0.6,
+        fillColor: color,
+        fillOpacity: 0.08,
+      });
+    });
+
+    if (branchGroups.length > 1) {
+      map.fitBounds(bounds, { top: 40, right: 40, bottom: 40, left: 40 });
+    } else if (branchGroups.length === 1) {
+      const g = branchGroups[0];
+      if (g.coord) {
+        map.setCenter(new N.LatLng(g.coord.lat, g.coord.lng));
+        map.setZoom(11);
+      }
+    }
+  }, [ready, branchGroups, radius]);
+
+  return (
+    <div className="bg-gray-50 px-4 py-3 space-y-3">
+      {/* 반경 조절 */}
+      <div className="flex items-center gap-3">
+        <span className="text-xs font-bold text-gray-500">활동 반경</span>
+        <input type="range" min={5} max={50} step={5} value={radius} onChange={(e) => setRadius(Number(e.target.value))} className="flex-1 accent-blue-500" />
+        <span className="text-xs font-bold text-blue-600 w-10 text-right">{radius}km</span>
+      </div>
+      {/* 지도 */}
+      <div ref={mapRef} className="w-full rounded-xl overflow-hidden border border-gray-200" style={{ height: 360 }}>
+        {!ready && <div className="flex items-center justify-center h-full text-gray-400 text-sm">지도 로딩 중...</div>}
+      </div>
+      {/* 범례 */}
+      <div className="flex flex-wrap gap-2">
+        {branchGroups.map((g, i) => (
+          <div key={g.name} className="flex items-center gap-1.5 bg-white border border-gray-200 rounded-full px-2.5 py-1">
+            <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: BRANCH_COLORS[i % BRANCH_COLORS.length] }} />
+            <span className="text-xs font-medium text-gray-700">{g.name}</span>
+            <span className="text-[10px] text-gray-400">{g.users.join(", ")}</span>
+          </div>
+        ))}
+      </div>
+      {branchGroups.length === 0 && (
+        <div className="py-6 text-center text-gray-400 text-sm">
+          관리점이 설정된 사용자가 없습니다.<br/>
+          <span className="text-xs">사용자 탭에서 관리점을 입력하세요</span>
+        </div>
       )}
     </div>
   );

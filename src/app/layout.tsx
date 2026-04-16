@@ -40,6 +40,13 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ko" className={`${geistSans.variable} h-full`}>
+      <head>
+        <script
+          type="text/javascript"
+          src={`https://oapi.map.naver.com/openapi/v3/maps.js?ncpClientId=${process.env.NEXT_PUBLIC_NAVER_MAP_CLIENT_ID}`}
+          defer
+        />
+      </head>
       <body className="min-h-full font-sans antialiased" style={{ overscrollBehavior: "none" }}>{children}</body>
     </html>
   );
