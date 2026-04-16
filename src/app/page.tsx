@@ -673,20 +673,12 @@ export default function Home() {
         <div className="bg-white border-b border-gray-200 px-4 py-3 z-30 max-h-[50vh] overflow-y-auto">
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs font-bold text-gray-700">팀원 필터</span>
-            <div className="flex gap-2">
-              <button
-                onClick={() => { setSelectedMemberIds(new Set()); setFilterActive(false); }}
-                className="text-xs text-blue-500 font-medium"
-              >
-                초기화
-              </button>
-              <button
-                onClick={() => { setShowMemberFilter(false); consumeHash(); }}
-                className="text-xs text-gray-400"
-              >
-                닫기
-              </button>
-            </div>
+            <button
+              onClick={() => { setShowMemberFilter(false); consumeHash(); }}
+              className="px-3 py-1.5 bg-blue-500 text-white rounded-lg text-xs font-bold active:bg-blue-600"
+            >
+              닫기
+            </button>
           </div>
           <div className="space-y-1">
             {/* 전체 토글 버튼 (개별 클릭처럼 동작) */}
