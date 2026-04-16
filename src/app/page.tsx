@@ -1035,7 +1035,7 @@ export default function Home() {
                 <span className="text-sm text-gray-500">{format(selectedDate, "EEEE", { locale: ko })}</span>
               </div>
               <button
-                onClick={() => { setShowDayPopup(false); consumeHash(); setEditingSchedule(null); openModal(setShowScheduleForm); }}
+                onClick={() => { setShowDayPopup(false); setEditingSchedule(null); setTimeout(() => openModal(setShowScheduleForm), 100); }}
                 className="w-9 h-9 bg-gray-100 rounded-full flex items-center justify-center active:bg-blue-100"
               >
                 <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
