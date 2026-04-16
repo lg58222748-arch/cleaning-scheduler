@@ -529,14 +529,22 @@ export default function Home() {
       };
       const tempSchedule: Schedule = { id: tempId, ...calData, status: "confirmed", location: data.location || "" };
       setSchedules((prev) => [...prev, tempSchedule]);
+      // 저장 후 바로 상세화면 열기
+      setDetailMode("calendar");
+      setDetailSchedule(tempSchedule);
+      pushHash("d");
       createSchedule(calData).then(ns => {
-        if (ns?.id) setSchedules(prev => prev.map(s => s.id === tempId ? ns : s));
-        else if (ns?.error) {
+        if (ns?.id) {
+          setSchedules(prev => prev.map(s => s.id === tempId ? ns : s));
+          setDetailSchedule(ns);
+        } else if (ns?.error) {
           setSchedules(prev => prev.filter(s => s.id !== tempId));
+          setDetailSchedule(null);
           alert("일정 저장 실패: " + (ns.detail || ns.error));
         }
       }).catch((err) => {
         setSchedules(prev => prev.filter(s => s.id !== tempId));
+        setDetailSchedule(null);
         alert("일정 저장에 실패했습니다: " + (err?.message || "네트워크 오류"));
       });
     } else {
