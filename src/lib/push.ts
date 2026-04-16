@@ -13,14 +13,17 @@ function init() {
 
 export async function sendPushToAll(title: string, message: string, tag?: string) {
   init();
-  if (!VAPID_PUBLIC || !VAPID_PRIVATE) return;
+  if (!VAPID_PUBLIC || !VAPID_PRIVATE) { console.log("[SendPush] VAPID 키 없음"); return; }
 
   const { data: subs } = await supabase.from("push_subscriptions").select("*");
+  console.log("[SendPush] 구독자:", subs?.length || 0);
   if (!subs || subs.length === 0) return;
 
   const payload = JSON.stringify({ title, body: message, tag: tag || "notification", url: "/" });
 
   for (const sub of subs) {
+    // FCM 토큰은 Web Push로 전송 불가 (skip)
+    if (sub.endpoint?.startsWith("fcm:")) continue;
     try {
       await webpush.sendNotification(
         { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },

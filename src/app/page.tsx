@@ -205,22 +205,25 @@ export default function Home() {
 
       // 2. Web Push (브라우저/PWA)
       try {
-        if (!("serviceWorker" in navigator) || !("PushManager" in window)) return;
+        if (!("serviceWorker" in navigator) || !("PushManager" in window)) { console.log("[Push] SW/PushManager 미지원"); return; }
         const permission = await Notification.requestPermission();
+        console.log("[Push] 권한:", permission);
         if (permission !== "granted") return;
         const reg = await navigator.serviceWorker.ready;
         const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
-        if (!vapidKey) return;
+        if (!vapidKey) { console.log("[Push] VAPID 키 없음"); return; }
         let sub = await reg.pushManager.getSubscription();
         if (!sub) {
           sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: vapidKey });
         }
-        await fetch("/api/push", {
+        console.log("[Push] 구독 완료:", sub.endpoint.slice(0, 50));
+        const res = await fetch("/api/push", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ action: "subscribe", subscription: sub.toJSON(), userId: currentUser?.id, userName: currentUser?.name }),
         });
-      } catch { /* Web Push 실패 무시 */ }
+        console.log("[Push] 서버 저장:", await res.json());
+      } catch (e) { console.error("[Push] Web Push 실패:", e); }
     }
     registerPush();
   }, [currentUser]);
@@ -451,7 +454,12 @@ export default function Home() {
       const h = window.location.hash;
       if (!h || h === "#") {
         const prevent = handleBackPress();
-        if (prevent) history.pushState(null, "", "#home");
+        if (prevent) {
+          history.pushState(null, "", "#home");
+        } else {
+          // 앱 종료
+          try { import("@capacitor/app").then(({ App }) => App.exitApp()).catch(() => {}); } catch {}
+        }
         return;
       }
       const current = h.slice(1);
