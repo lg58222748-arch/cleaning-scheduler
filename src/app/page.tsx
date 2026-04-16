@@ -90,8 +90,14 @@ export default function Home() {
   const [showDayPopup, setShowDayPopup] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
   const [showMemberFilter, setShowMemberFilter] = useState(false);
-  const [selectedMemberIds, setSelectedMemberIds] = useState<Set<string>>(new Set());
-  const [filterActive, setFilterActive] = useState(false); // 필터 사용 여부
+  const [selectedMemberIds, setSelectedMemberIds] = useState<Set<string>>(() => {
+    if (typeof window === "undefined") return new Set<string>();
+    try { const saved = localStorage.getItem("filter_members"); return saved ? new Set(JSON.parse(saved)) : new Set<string>(); } catch { return new Set<string>(); }
+  });
+  const [filterActive, setFilterActive] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return localStorage.getItem("filter_active") === "true";
+  });
   const [returnAlerts, setReturnAlerts] = useState<{ id: string; title: string; date: string; reason: string }[]>([]);
 
   const loadData = useCallback(async (monthDate?: Date, fullRefresh = false) => {
@@ -133,9 +139,30 @@ export default function Home() {
     }
   }, [selectedDate]);
 
+  // 필터 상태 자동 저장
+  useEffect(() => {
+    localStorage.setItem("filter_members", JSON.stringify([...selectedMemberIds]));
+    localStorage.setItem("filter_active", String(filterActive));
+  }, [selectedMemberIds, filterActive]);
+
+  // 초기 로딩: 캐시 먼저 → 백그라운드 업데이트
   useEffect(() => {
     if (currentUser) {
-      loadData(undefined, true);
+      // 캐시에서 먼저 로드 (즉시 표시)
+      try {
+        const cached = localStorage.getItem("cached_schedules");
+        if (cached) { const data = JSON.parse(cached); setSchedules(data); }
+      } catch {}
+      // 백그라운드로 최신 데이터 로드
+      loadData(undefined, true).then(() => {
+        // 로드 완료 후 캐시 저장
+        const d = selectedDate;
+        const start = format(startOfMonth(subMonths(d, 1)), "yyyy-MM-dd");
+        const end = format(endOfMonth(addMonths(d, 1)), "yyyy-MM-dd");
+        fetchSchedules(start, end).then(s => {
+          try { localStorage.setItem("cached_schedules", JSON.stringify(s)); } catch {}
+        }).catch(() => {});
+      });
       // 역할별 기본 탭
       const r = currentUser.role;
       if (r === "sales") setActiveTab("sales");
