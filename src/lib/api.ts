@@ -298,11 +298,17 @@ export async function registerApi(data: {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ action: "register", ...data }),
     });
-    const result = await res.json();
-    if (result.error) return { error: result.error };
-    return result;
+    try {
+      const result = await res.json();
+      if (result.error) return { error: result.error };
+      return result;
+    } catch {
+      if (res.status === 500) return { error: "회원가입 처리 중 오류가 발생했습니다. 다시 시도해주세요." };
+      if (res.status === 400) return { error: "입력 정보를 확인해주세요." };
+      return { error: `오류가 발생했습니다. (${res.status})` };
+    }
   } catch {
-    return { error: "서버 연결에 실패했습니다. 잠시 후 다시 시도해주세요." };
+    return { error: "서버 연결에 실패했습니다. 인터넷 연결을 확인해주세요." };
   }
 }
 

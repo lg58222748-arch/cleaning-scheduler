@@ -23,21 +23,26 @@ export async function POST(req: NextRequest) {
   }
 
   if (body.action === "register") {
-    const existing = await getUserByUsername(body.username);
-    if (existing) {
-      return Response.json({ error: "이미 사용 중인 아이디입니다." }, { status: 400 });
+    try {
+      const existing = await getUserByUsername(body.username);
+      if (existing) {
+        return Response.json({ error: "이미 사용 중인 아이디입니다." }, { status: 400 });
+      }
+      const user = await registerUser({
+        username: body.username,
+        password: body.password,
+        name: body.name,
+        phone: body.phone,
+        address: body.address,
+        residentNumber: body.residentNumber,
+        businessLicenseFile: body.businessLicenseFile || "",
+        branch: body.branch || "",
+      });
+      return Response.json(user, { status: 201 });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "알 수 없는 오류";
+      return Response.json({ error: "회원가입 실패: " + msg }, { status: 500 });
     }
-    const user = await registerUser({
-      username: body.username,
-      password: body.password,
-      name: body.name,
-      phone: body.phone,
-      address: body.address,
-      residentNumber: body.residentNumber,
-      businessLicenseFile: body.businessLicenseFile || "",
-      branch: body.branch || "",
-    });
-    return Response.json(user, { status: 201 });
   }
 
   return Response.json({ error: "Invalid action" }, { status: 400 });
