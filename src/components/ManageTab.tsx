@@ -65,6 +65,9 @@ export default function ManageTab({ isAdmin, userRole, userName = "", allUsers =
         </div>
       )}
 
+      {/* 활동 지역 지도 - 모든 사용자 공통 */}
+      <MapToggle allUsers={allUsers} />
+
       {/* 대표 탭 */}
       {activeSubTab === "ceo" && (
         <CeoSection onRefresh={onRefresh} allUsers={allUsers} members={members} />
@@ -116,7 +119,6 @@ function CeoSection({ onRefresh, allUsers, members }: {
   const [showTrash, setShowTrash] = useState(false);
   const [totalCount, setTotalCount] = useState(0);
   const [showGoogleImport, setShowGoogleImport] = useState(false);
-  const [showMap, setShowMap] = useState(false);
 
   useEffect(() => { loadCounts(); }, []);
 
@@ -166,23 +168,6 @@ function CeoSection({ onRefresh, allUsers, members }: {
       <div className="px-4 py-3">
         <p className="text-xs text-gray-400">전체 일정 {totalCount}건</p>
       </div>
-
-      {/* 활동 지역 지도 */}
-      <button
-        onClick={() => setShowMap(!showMap)}
-        className="w-full px-4 py-3.5 flex items-center gap-3 active:bg-gray-50"
-      >
-        <div className="w-9 h-9 bg-green-50 rounded-xl flex items-center justify-center">
-          <svg className="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
-        </div>
-        <div className="flex-1 text-left">
-          <div className="text-sm font-medium text-gray-800">활동 지역 지도</div>
-          <div className="text-xs text-gray-400">관리점별 현장팀 활동 가능 지역</div>
-        </div>
-        <svg className={`w-4 h-4 text-gray-400 transition-transform ${showMap ? "rotate-90" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
-      </button>
-
-      {showMap && <BranchMap allUsers={allUsers} />}
 
       {/* 구글 캘린더 가져오기 */}
       <button
@@ -766,6 +751,28 @@ const BRANCH_COORDS: Record<string, { lat: number; lng: number }> = {
 };
 
 const BRANCH_COLORS = ["#3B82F6", "#EF4444", "#10B981", "#F59E0B", "#8B5CF6", "#EC4899", "#06B6D4", "#F97316", "#14B8A6", "#6366F1"];
+
+function MapToggle({ allUsers }: { allUsers: { id?: string; name: string; role?: string; address?: string; branch?: string }[] }) {
+  const [showMap, setShowMap] = useState(false);
+  return (
+    <div className="divide-y divide-gray-100">
+      <button
+        onClick={() => setShowMap(!showMap)}
+        className="w-full px-4 py-3.5 flex items-center gap-3 active:bg-gray-50"
+      >
+        <div className="w-9 h-9 bg-green-50 rounded-xl flex items-center justify-center">
+          <svg className="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+        </div>
+        <div className="flex-1 text-left">
+          <div className="text-sm font-medium text-gray-800">활동 지역 지도</div>
+          <div className="text-xs text-gray-400">관리점별 현장팀 활동 가능 지역</div>
+        </div>
+        <svg className={`w-4 h-4 text-gray-400 transition-transform ${showMap ? "rotate-90" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+      </button>
+      {showMap && <BranchMap allUsers={allUsers} />}
+    </div>
+  );
+}
 
 function BranchMap({ allUsers }: { allUsers: { id?: string; name: string; role?: string; address?: string; branch?: string }[] }) {
   const mapRef = useRef<HTMLDivElement>(null);
