@@ -530,14 +530,14 @@ export default function Home() {
 
   // Derived - schedules는 이미 배정된 것만 (DB레벨 분리)
   const myLinkedMember = members.find((m) => m.linkedUsername === currentUser.username);
-  const baseCalendarSchedules = canManageAdvanced
-    ? schedules
-    : schedules.filter((s) =>
+  const baseCalendarSchedules = (role === "field")
+    ? schedules.filter((s) =>
         s.memberName === currentUser.name ||
         s.assignedToName === currentUser.name ||
         s.assignedTo === currentUser.id ||
         (myLinkedMember && s.memberId === myLinkedMember.id)
-      );
+      )
+    : schedules;
   // 팀원 필터 적용 (현장팀 User ID 기준, 이름으로도 매칭)
   const calendarSchedules = (() => {
     if (!filterActive) return baseCalendarSchedules;
