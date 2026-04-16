@@ -1,4 +1,4 @@
-const CACHE_NAME = 'cleaning-scheduler-v3';
+const CACHE_NAME = 'cleaning-scheduler-v4';
 
 self.addEventListener('install', (event) => {
   self.skipWaiting();
@@ -26,10 +26,10 @@ self.addEventListener('push', (event) => {
     body: data.body || '새로운 알림이 있습니다',
     icon: '/icons/icon-192.png',
     badge: '/icons/icon-192.png',
-    vibrate: [200, 100, 200],
-    data: { url: data.url || '/' },
+    data: { url: 'https://cleaning-scheduler-chi.vercel.app' },
     tag: data.tag || 'default',
     renotify: true,
+    silent: false,
   };
   event.waitUntil(self.registration.showNotification(title, options));
 });
@@ -37,7 +37,7 @@ self.addEventListener('push', (event) => {
 // 알림 클릭 시 앱 열기
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
-  const url = event.notification.data?.url || '/';
+  const url = 'https://cleaning-scheduler-chi.vercel.app';
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windowClients) => {
       for (const client of windowClients) {

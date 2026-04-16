@@ -217,7 +217,7 @@ export default function AssignTab({ members, schedules, onAssigned, onDeleted, o
                         );
                       })}
                       {dayScheds.length > 2 && (
-                        <div className="absolute bottom-0 right-0 text-[8px] text-gray-400 font-medium">+{dayScheds.length - 2}</div>
+                        <div className="absolute bottom-0 right-0 text-[10px] md:text-[12px] text-blue-600 font-bold bg-blue-100 px-1.5 py-0.5 rounded-full leading-none border border-blue-300">+{dayScheds.length - 2}</div>
                       )}
                     </div>
                   </button>
