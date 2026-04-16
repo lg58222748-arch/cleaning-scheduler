@@ -908,9 +908,9 @@ export function BranchMap({ allUsers, isAdmin = false }: { allUsers: { id?: stri
   const selRadius = selectedUser ? (userRadii[selectedUser] || 15) : 15;
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col" style={{ height: "calc(100dvh - 110px)" }}>
       {/* 지도 */}
-      <div ref={mapRef} className="w-full" style={{ height: 500 }}>
+      <div ref={mapRef} className="w-full flex-1">
         {!ready && <div className="flex items-center justify-center h-full text-gray-400 text-sm">지도 로딩 중...</div>}
       </div>
       {/* 선택된 팀원 반경 조절 - 대표만 */}
