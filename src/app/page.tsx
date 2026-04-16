@@ -889,8 +889,8 @@ export default function Home() {
                       {/* 승인 대기 - 대표만 승인/거절 */}
                       {u.status === "pending" && canManageAdvanced && (
                         <div className="flex gap-2 mt-2 pt-2 border-t border-gray-100">
-                          <button onClick={async () => { await approveUserApi(u.id); loadData(undefined, true); }} className="flex-1 py-2 bg-green-500 text-white rounded-lg text-xs font-bold active:bg-green-600">승인</button>
-                          <button onClick={async () => { await rejectUserApi(u.id); loadData(undefined, true); }} className="flex-1 py-2 bg-red-500 text-white rounded-lg text-xs font-bold active:bg-red-600">거절</button>
+                          <button onClick={() => { setPendingUsers(prev => prev.filter(x => x.id !== u.id)); setAllUsers(prev => [...prev, { ...u, status: "approved" as const }]); approveUserApi(u.id).catch(() => {}); }} className="flex-1 py-2 bg-green-500 text-white rounded-lg text-xs font-bold active:bg-green-600">승인</button>
+                          <button onClick={() => { setPendingUsers(prev => prev.filter(x => x.id !== u.id)); rejectUserApi(u.id).catch(() => {}); }} className="flex-1 py-2 bg-red-500 text-white rounded-lg text-xs font-bold active:bg-red-600">거절</button>
                         </div>
                       )}
                     </div>
@@ -1035,7 +1035,7 @@ export default function Home() {
                 <span className="text-sm text-gray-500">{format(selectedDate, "EEEE", { locale: ko })}</span>
               </div>
               <button
-                onClick={() => { setShowDayPopup(false); setEditingSchedule(null); setTimeout(() => openModal(setShowScheduleForm), 100); }}
+                onClick={() => { setShowDayPopup(false); consumeHash(); setEditingSchedule(null); setTimeout(() => openModal(setShowScheduleForm), 150); }}
                 className="w-9 h-9 bg-gray-100 rounded-full flex items-center justify-center active:bg-blue-100"
               >
                 <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
