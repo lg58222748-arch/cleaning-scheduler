@@ -1089,7 +1089,7 @@ export default function Home() {
           memberBranch={allUsers.find(u => u.name === (detailSchedule?.memberName))?.branch || ""}
           onEdit={(s) => { setDetailSchedule(null); consumeHash(); handleEditSchedule(s); }}
           onDelete={(id) => { handleDeleteSchedule(id); setDetailSchedule(null); consumeHash(); }}
-          onUnassign={(id, reason) => { handleUnassignSchedule(id, reason); setDetailSchedule(null); consumeHash(); }}
+          onUnassign={(id, reason) => { setDetailSchedule(null); consumeHash(); handleUnassignSchedule(id, reason); }}
           onAssign={(scheduleId, memberId, memberName) => {
             const target = unassignedSchedules.find((s) => s.id === scheduleId);
             if (target) {
