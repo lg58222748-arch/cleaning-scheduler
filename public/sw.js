@@ -24,8 +24,8 @@ self.addEventListener('push', (event) => {
   const title = data.title || '새집느낌 파트너';
   const options = {
     body: data.body || '새로운 알림이 있습니다',
-    icon: '/icons/icon-192.png',
-    badge: '/icons/icon-192.png',
+    icon: '/icons/logo-push.jpg',
+    badge: '/icons/logo-push.jpg',
     data: { url: 'https://cleaning-scheduler-chi.vercel.app' },
     tag: data.tag || 'default',
     renotify: true,
