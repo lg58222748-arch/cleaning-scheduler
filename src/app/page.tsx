@@ -174,44 +174,18 @@ export default function Home() {
     }
   }, [currentUser]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // 푸시 알림 등록 (Capacitor FCM + Web Push 둘 다 시도)
+  // 푸시 알림 등록
   useEffect(() => {
     if (!currentUser) return;
     async function registerPush() {
-      // 1. Capacitor Push (APK)
-      try {
-        const { PushNotifications } = await import("@capacitor/push-notifications");
-        const perm = await PushNotifications.requestPermissions();
-        if (perm.receive === "granted") {
-          await PushNotifications.register();
-          PushNotifications.addListener("registration", (token) => {
-            // FCM 토큰을 서버에 저장
-            fetch("/api/push", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ action: "subscribe-fcm", token: token.value, userId: currentUser?.id, userName: currentUser?.name }),
-            }).catch(() => {});
-          });
-          PushNotifications.addListener("pushNotificationReceived", (notification) => {
-            console.log("[Push] 수신:", notification);
-          });
-          PushNotifications.addListener("pushNotificationActionPerformed", () => {
-            // 알림 클릭 시 앱 열기
-            window.focus();
-          });
-          return; // Capacitor 성공하면 Web Push 안 함
-        }
-      } catch { /* Capacitor 없으면 Web Push로 */ }
-
-      // 2. Web Push (브라우저/PWA)
+      // Web Push (브라우저/PWA/APK 모두)
       try {
         if (!("serviceWorker" in navigator) || !("PushManager" in window)) { console.log("[Push] SW/PushManager 미지원"); return; }
         const permission = await Notification.requestPermission();
         console.log("[Push] 권한:", permission);
         if (permission !== "granted") return;
         const reg = await navigator.serviceWorker.ready;
-        const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || "BIFAj9bQTWPRvMdMvDc5RTF4Qyof08lZR2SkI3vHwmhmUZwWbVJt7_SKEczBy_9ul88kmvfmqzr14-TecTwRBwc";
-        if (!vapidKey) { console.log("[Push] VAPID 키 없음"); return; }
+        const vapidKey = "BIFAj9bQTWPRvMdMvDc5RTF4Qyof08lZR2SkI3vHwmhmUZwWbVJt7_SKEczBy_9ul88kmvfmqzr14-TecTwRBwc";
         let sub = await reg.pushManager.getSubscription();
         if (!sub) {
           sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: vapidKey });
@@ -223,7 +197,7 @@ export default function Home() {
           body: JSON.stringify({ action: "subscribe", subscription: sub.toJSON(), userId: currentUser?.id, userName: currentUser?.name }),
         });
         console.log("[Push] 서버 저장:", await res.json());
-      } catch (e) { console.error("[Push] Web Push 실패:", e); }
+      } catch (e) { console.error("[Push] 실패:", e); }
     }
     registerPush();
   }, [currentUser]);
