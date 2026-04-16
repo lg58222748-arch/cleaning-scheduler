@@ -913,7 +913,12 @@ export function BranchMap({ allUsers, isAdmin = false }: { allUsers: { id?: stri
       <div ref={mapRef} className="w-full flex-1">
         {!ready && <div className="flex items-center justify-center h-full text-gray-400 text-sm">지도 로딩 중...</div>}
       </div>
-      {/* 선택된 팀원 반경 조절 - 대표만 */}
+      {/* 선택된 팀원 반경 조절 - 대표만 슬라이더, 다른 사용자는 이름만 */}
+      {selectedUser && !isAdmin && (
+        <div className="px-4 py-2.5 bg-white border-t border-gray-200">
+          <span className="text-xs font-bold text-gray-700">{selectedUser} · 활동반경 {userRadii[selectedUser] || 15}km</span>
+        </div>
+      )}
       {isAdmin && selectedUser && (
         <div className="px-4 py-3 bg-white border-t border-gray-200">
           <div className="flex items-center gap-2">

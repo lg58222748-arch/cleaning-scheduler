@@ -57,17 +57,24 @@ export default function Home() {
   const [appReady, setAppReady] = useState(false);
   const [showSplash, setShowSplash] = useState(true);
 
-  // 클라이언트에서만 localStorage 복원
+  // 클라이언트에서만 localStorage 복원 + 캐시 즉시 로드
   useEffect(() => {
+    let hasCachedData = false;
     try {
       const saved = localStorage.getItem("currentUser");
       if (saved) setCurrentUser(JSON.parse(saved));
+      const cm = localStorage.getItem("cached_members");
+      if (cm) { setMembers(JSON.parse(cm)); hasCachedData = true; }
+      const cs = localStorage.getItem("cached_schedules");
+      if (cs) { setSchedules(JSON.parse(cs)); hasCachedData = true; }
+      const cu = localStorage.getItem("cached_users");
+      if (cu) { const d = JSON.parse(cu); setAllUsers(d.users || []); setPendingUsers(d.pendingUsers || []); hasCachedData = true; }
     } catch {}
-    // 스플래시 후 앱 표시
+    // 캐시 있으면 즉시 표시, 없으면 짧은 스플래시
     const t = setTimeout(() => {
       setShowSplash(false);
       setAppReady(true);
-    }, 500);
+    }, hasCachedData ? 100 : 500);
     return () => clearTimeout(t);
   }, []);
   const [members, setMembers] = useState<Member[]>([]);
@@ -163,19 +170,9 @@ export default function Home() {
     localStorage.setItem("filter_active", String(filterActive));
   }, [selectedMemberIds, filterActive]);
 
-  // 초기 로딩: 캐시 먼저 → 백그라운드 업데이트
+  // 초기 로딩: 백그라운드로 최신 데이터 갱신 (캐시는 이미 위에서 복원됨)
   useEffect(() => {
     if (currentUser) {
-      // 캐시에서 먼저 로드 (즉시 표시)
-      try {
-        const cached = localStorage.getItem("cached_schedules");
-        if (cached) setSchedules(JSON.parse(cached));
-        const cachedMembers = localStorage.getItem("cached_members");
-        if (cachedMembers) setMembers(JSON.parse(cachedMembers));
-        const cachedUsers = localStorage.getItem("cached_users");
-        if (cachedUsers) { const d = JSON.parse(cachedUsers); setAllUsers(d.users || []); setPendingUsers(d.pendingUsers || []); }
-      } catch {}
-      // 백그라운드로 최신 데이터 로드
       loadData(undefined, true).then(() => {
         // 로드 완료 후 캐시 저장
         const d = selectedDate;
