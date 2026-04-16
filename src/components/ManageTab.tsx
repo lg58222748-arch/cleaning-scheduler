@@ -771,11 +771,26 @@ function MapToggle({ allUsers }: { allUsers: { id?: string; name: string; role?:
   );
 }
 
-export function BranchMap({ allUsers }: { allUsers: { id?: string; name: string; role?: string; address?: string; branch?: string }[] }) {
+export function BranchMap({ allUsers, isAdmin = false }: { allUsers: { id?: string; name: string; role?: string; address?: string; branch?: string }[]; isAdmin?: boolean }) {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstance = useRef<NaverMap | null>(null);
   const [ready, setReady] = useState(false);
-  const [radius, setRadius] = useState(15); // km
+  const [branchRadii, setBranchRadii] = useState<Record<string, number>>(() => {
+    if (typeof window === "undefined") return {};
+    try { return JSON.parse(localStorage.getItem("map_branch_radii") || "{}"); } catch { return {}; }
+  });
+  const [customPositions, setCustomPositions] = useState<Record<string, { lat: number; lng: number }>>(() => {
+    if (typeof window === "undefined") return {};
+    try { return JSON.parse(localStorage.getItem("map_custom_positions") || "{}"); } catch { return {}; }
+  });
+
+  function saveCustomPosition(name: string, lat: number, lng: number) {
+    setCustomPositions(prev => {
+      const next = { ...prev, [name]: { lat, lng } };
+      localStorage.setItem("map_custom_positions", JSON.stringify(next));
+      return next;
+    });
+  }
 
   // 관리점별 사용자 그룹핑
   const branchGroups = useMemo(() => {
@@ -785,7 +800,6 @@ export function BranchMap({ allUsers }: { allUsers: { id?: string; name: string;
       const bname = u.branch.replace(/\[관리점\]/, "").trim();
       if (!bname) continue;
       if (!groups[bname]) {
-        // 좌표 매칭
         const coord = BRANCH_COORDS[bname] || null;
         groups[bname] = { name: bname, users: [], coord };
       }
@@ -835,25 +849,38 @@ export function BranchMap({ allUsers }: { allUsers: { id?: string; name: string;
           anchor: { x: 40, y: 15 },
         },
       });
-      // 각 사용자 이름 마커 (분산 배치, 안 겹치게)
+      // 각 사용자 이름 마커 (분산 배치, 대표는 드래그 가능)
       g.users.forEach((uname, ui) => {
-        const angle = (2 * Math.PI * ui) / Math.max(g.users.length, 1) - Math.PI / 2;
-        const spread = 0.018 + (ui % 3) * 0.008;
-        const uPos = new N.LatLng(g.coord!.lat + Math.cos(angle) * spread, g.coord!.lng + Math.sin(angle) * spread * 1.3);
-        new N.Marker({
+        const custom = customPositions[uname];
+        let uPos;
+        if (custom) {
+          uPos = new N.LatLng(custom.lat, custom.lng);
+        } else {
+          const angle = (2 * Math.PI * ui) / Math.max(g.users.length, 1) - Math.PI / 2;
+          const spread = 0.018 + (ui % 3) * 0.008;
+          uPos = new N.LatLng(g.coord!.lat + Math.cos(angle) * spread, g.coord!.lng + Math.sin(angle) * spread * 1.3);
+        }
+        const marker = new N.Marker({
           position: uPos,
           map,
+          draggable: isAdmin,
           icon: {
-            content: `<div style="background:#fff;color:${color};padding:2px 6px;border-radius:8px;font-size:9px;font-weight:600;white-space:nowrap;box-shadow:0 1px 3px rgba(0,0,0,0.12);border:1px solid ${color}">${uname}</div>`,
+            content: `<div style="background:#fff;color:${color};padding:2px 6px;border-radius:8px;font-size:9px;font-weight:600;white-space:nowrap;box-shadow:0 1px 3px rgba(0,0,0,0.12);border:1px solid ${color};${isAdmin ? "cursor:grab" : ""}">${uname}</div>`,
             anchor: { x: 15, y: 8 },
           },
         });
+        if (isAdmin) {
+          N.Event.addListener(marker, "dragend", () => {
+            const pos = (marker as unknown as { getPosition: () => NaverLatLng }).getPosition();
+            saveCustomPosition(uname, pos.lat(), pos.lng());
+          });
+        }
       });
 
       new N.Circle({
         map,
         center: pos,
-        radius: radius * 1000,
+        radius: (branchRadii[g.name] || 15) * 1000,
         strokeColor: color,
         strokeWeight: 2,
         strokeOpacity: 0.6,
@@ -872,18 +899,30 @@ export function BranchMap({ allUsers }: { allUsers: { id?: string; name: string;
         map.setZoom(11);
       }
     }
-  }, [ready, branchGroups, radius]);
+  }, [ready, branchGroups, branchRadii, customPositions, isAdmin]);
 
   return (
     <div className="bg-gray-50 px-4 py-3 space-y-3">
-      {/* 반경 조절 */}
-      <div className="flex items-center gap-3">
-        <span className="text-xs font-bold text-gray-500">활동 반경</span>
-        <input type="range" min={5} max={50} step={5} value={radius} onChange={(e) => setRadius(Number(e.target.value))} className="flex-1 accent-blue-500" />
-        <span className="text-xs font-bold text-blue-600 w-10 text-right">{radius}km</span>
+      {/* 관리점별 반경 조절 */}
+      <div className="space-y-2">
+        {branchGroups.map((g, i) => {
+          const r = branchRadii[g.name] || 15;
+          return (
+            <div key={g.name} className="flex items-center gap-2">
+              <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: BRANCH_COLORS[i % BRANCH_COLORS.length] }} />
+              <span className="text-xs font-medium text-gray-600 w-12 shrink-0">{g.name}</span>
+              <input type="range" min={5} max={50} step={5} value={r} onChange={(e) => {
+                const next = { ...branchRadii, [g.name]: Number(e.target.value) };
+                setBranchRadii(next);
+                localStorage.setItem("map_branch_radii", JSON.stringify(next));
+              }} className="flex-1 accent-blue-500" />
+              <span className="text-xs font-bold text-blue-600 w-10 text-right">{r}km</span>
+            </div>
+          );
+        })}
       </div>
       {/* 지도 */}
-      <div ref={mapRef} className="w-full rounded-xl overflow-hidden border border-gray-200" style={{ height: 360 }}>
+      <div ref={mapRef} className="w-full rounded-xl overflow-hidden border border-gray-200" style={{ height: "calc(100dvh - 220px)", minHeight: 400 }}>
         {!ready && <div className="flex items-center justify-center h-full text-gray-400 text-sm">지도 로딩 중...</div>}
       </div>
       {/* 범례 */}
