@@ -98,7 +98,7 @@ export async function searchSchedules(query: string): Promise<Schedule[]> {
 
 export async function addSchedule(input: Omit<Schedule, "id" | "status">): Promise<{ schedule?: Schedule; error?: string }> {
   const row: Record<string, unknown> = {
-    member_id: input.memberId || "", member_name: input.memberName || "미배정", title: input.title, location: input.location || "", date: input.date, start_time: input.startTime, end_time: input.endTime, status: "confirmed", google_event_id: input.googleEventId || null, note: input.note || "", color: input.color || "#FDDCCC",
+    member_id: input.memberId || "", member_name: input.memberName || "미배정", title: input.title, location: input.location || "", date: input.date, start_time: input.startTime, end_time: input.endTime, status: "confirmed", google_event_id: input.googleEventId || null, note: input.note || "",
   };
   if (input.assignedTo) row.assigned_to = input.assignedTo;
   if (input.assignedToName) row.assigned_to_name = input.assignedToName;
@@ -117,7 +117,7 @@ export async function addUnassignedSchedule(input: Omit<Schedule, "id" | "status
   const { data: dup } = await supabase.from("schedules").select("id").eq("title", input.title).eq("date", input.date).limit(1);
   if (dup && dup.length > 0) return null;
   const { data, error } = await supabase.from("schedules").insert({
-    member_id: "", member_name: "미배정", title: input.title, location: input.location || "", date: input.date, start_time: input.startTime, end_time: input.endTime, status: "unassigned", google_event_id: input.googleEventId || null, note: input.note || "", color: input.color || "#FDDCCC",
+    member_id: "", member_name: "미배정", title: input.title, location: input.location || "", date: input.date, start_time: input.startTime, end_time: input.endTime, status: "unassigned", google_event_id: input.googleEventId || null, note: input.note || "",
   }).select().single();
   if (error || !data) return null;
   return rowToSchedule(data);
