@@ -951,7 +951,7 @@ export default function Home() {
         )}
 
         {/* 활동범위 탭 */}
-        <div className="h-full overflow-hidden" style={{ display: activeTab === "area" ? "block" : "none" }}>
+        <div className="h-full overflow-hidden relative" style={{ display: activeTab === "area" ? "block" : "none" }}>
           <BranchMapSection allUsers={allUsers.filter(u => u.role === "field" || u.role === "scheduler").map(u => ({ id: u.id, name: u.name, role: u.role, address: u.address, branch: u.branch }))} isAdmin={canManageAdvanced} />
         </div>
 

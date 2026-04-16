@@ -908,32 +908,33 @@ export function BranchMap({ allUsers, isAdmin = false }: { allUsers: { id?: stri
   const selRadius = selectedUser ? (userRadii[selectedUser] || 15) : 15;
 
   return (
-    <div className="flex flex-col" style={{ height: "calc(100dvh - 110px)" }}>
+    <div style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0 }}>
       {/* 지도 */}
-      <div ref={mapRef} className="w-full flex-1">
+      <div ref={mapRef} style={{ width: "100%", height: "100%" }}>
         {!ready && <div className="flex items-center justify-center h-full text-gray-400 text-sm">지도 로딩 중...</div>}
       </div>
-      {/* 선택된 팀원 반경 조절 - 대표만 슬라이더, 다른 사용자는 이름만 */}
-      {selectedUser && !isAdmin && (
-        <div className="px-4 py-2.5 bg-white border-t border-gray-200">
-          <span className="text-xs font-bold text-gray-700">{selectedUser} · 활동반경 {userRadii[selectedUser] || 15}km</span>
-        </div>
-      )}
-      {isAdmin && selectedUser && (
-        <div className="px-4 py-3 bg-white border-t border-gray-200">
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-bold text-gray-700">{selectedUser}</span>
-            <input type="range" min={5} max={50} step={5} value={selRadius} onChange={(e) => {
-              const next = { ...userRadii, [selectedUser]: Number(e.target.value) };
-              setUserRadii(next);
-              localStorage.setItem("map_user_radii", JSON.stringify(next));
-            }} className="flex-1 accent-blue-500" />
-            <span className="text-xs font-bold text-blue-600 w-12 text-right">{selRadius}km</span>
+      {/* 선택된 팀원 반경 - 지도 위 오버레이 */}
+      {selectedUser && (
+        <div style={{ position: "absolute", bottom: 16, left: 16, right: 16, zIndex: 10 }}>
+          <div className="bg-white/95 backdrop-blur rounded-xl shadow-lg px-4 py-2.5">
+            {isAdmin ? (
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-gray-700">{selectedUser}</span>
+                <input type="range" min={5} max={50} step={5} value={selRadius} onChange={(e) => {
+                  const next = { ...userRadii, [selectedUser]: Number(e.target.value) };
+                  setUserRadii(next);
+                  localStorage.setItem("map_user_radii", JSON.stringify(next));
+                }} className="flex-1 accent-blue-500" />
+                <span className="text-xs font-bold text-blue-600 w-12 text-right">{selRadius}km</span>
+              </div>
+            ) : (
+              <span className="text-xs font-bold text-gray-700">{selectedUser} · 활동반경 {userRadii[selectedUser] || 15}km</span>
+            )}
           </div>
         </div>
       )}
       {userList.length === 0 && (
-        <div className="py-8 text-center text-gray-400 text-sm">
+        <div style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%,-50%)" }} className="text-gray-400 text-sm text-center">
           관리점이 설정된 현장팀이 없습니다
         </div>
       )}
