@@ -65,9 +65,6 @@ export default function ManageTab({ isAdmin, userRole, userName = "", allUsers =
         </div>
       )}
 
-      {/* 활동 지역 지도 - 모든 사용자 공통 */}
-      <MapToggle allUsers={allUsers} />
-
       {/* 대표 탭 */}
       {activeSubTab === "ceo" && (
         <CeoSection onRefresh={onRefresh} allUsers={allUsers} members={members} />
@@ -774,7 +771,7 @@ function MapToggle({ allUsers }: { allUsers: { id?: string; name: string; role?:
   );
 }
 
-function BranchMap({ allUsers }: { allUsers: { id?: string; name: string; role?: string; address?: string; branch?: string }[] }) {
+export function BranchMap({ allUsers }: { allUsers: { id?: string; name: string; role?: string; address?: string; branch?: string }[] }) {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstance = useRef<NaverMap | null>(null);
   const [ready, setReady] = useState(false);
@@ -829,13 +826,28 @@ function BranchMap({ allUsers }: { allUsers: { id?: string; name: string; role?:
       if (g.coord.lng > maxLng) maxLng = g.coord.lng;
       const color = BRANCH_COLORS[i % BRANCH_COLORS.length];
 
+      // 관리점 마커
       new N.Marker({
         position: pos,
         map,
         icon: {
-          content: `<div style="background:${color};color:#fff;padding:4px 10px;border-radius:20px;font-size:11px;font-weight:700;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,0.2);border:2px solid #fff">${g.name} (${g.users.length})</div>`,
-          anchor: { x: 30, y: 15 },
+          content: `<div style="background:${color};color:#fff;padding:5px 12px;border-radius:20px;font-size:12px;font-weight:700;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,0.25);border:2px solid #fff">${g.name} (${g.users.length})</div>`,
+          anchor: { x: 40, y: 15 },
         },
+      });
+      // 각 사용자 이름 마커 (살짝 분산)
+      g.users.forEach((uname, ui) => {
+        const angle = (2 * Math.PI * ui) / Math.max(g.users.length, 1);
+        const spread = 0.012 + (ui % 2) * 0.005;
+        const uPos = new N.LatLng(g.coord!.lat + Math.cos(angle) * spread, g.coord!.lng + Math.sin(angle) * spread * 1.2);
+        new N.Marker({
+          position: uPos,
+          map,
+          icon: {
+            content: `<div style="background:#fff;color:${color};padding:3px 8px;border-radius:12px;font-size:10px;font-weight:600;white-space:nowrap;box-shadow:0 1px 4px rgba(0,0,0,0.15);border:1.5px solid ${color}">${uname}</div>`,
+            anchor: { x: 20, y: 10 },
+          },
+        });
       });
 
       new N.Circle({

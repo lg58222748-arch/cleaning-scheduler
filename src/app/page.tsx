@@ -18,6 +18,7 @@ const AssignTab = dynamic(() => import("@/components/AssignTab"), { ssr: false }
 const SearchPanel = dynamic(() => import("@/components/SearchPanel"), { ssr: false });
 const ManageTab = dynamic(() => import("@/components/ManageTab"), { ssr: false });
 const SalesTab = dynamic(() => import("@/components/SalesTab"), { ssr: false });
+const BranchMapSection = dynamic(() => import("@/components/ManageTab").then(m => ({ default: m.BranchMap })), { ssr: false });
 import { sbClient } from "@/lib/supabase-client";
 import {
   fetchMembers,
@@ -94,6 +95,7 @@ export default function Home() {
     try { const s = localStorage.getItem("userOrder"); return s ? JSON.parse(s) : []; } catch { return []; }
   });
   const [dragUserId, setDragUserId] = useState<string | null>(null);
+  const [membersSubTab, setMembersSubTab] = useState<"users" | "map">("users");
   const [dragOverUserId, setDragOverUserId] = useState<string | null>(null);
   const dragStartY = useRef(0);
   const dragNodeRef = useRef<HTMLDivElement | null>(null);
@@ -952,7 +954,22 @@ export default function Home() {
         )}
 
         {/* 사용자 탭 */}
-        <div className="h-full overflow-y-auto" style={{ display: activeTab === "members" ? "block" : "none" }}>
+        <div className="h-full flex flex-col" style={{ display: activeTab === "members" ? "flex" : "none" }}>
+          {/* 서브탭: 사용자 / 활동범위 */}
+          <div className="flex border-b border-gray-200 px-2 pt-1 shrink-0">
+            <button onClick={() => setMembersSubTab("users")} className={`flex-1 py-2.5 text-xs font-bold text-center ${membersSubTab === "users" ? "text-blue-500 border-b-2 border-blue-500" : "text-gray-400"}`}>사용자</button>
+            <button onClick={() => setMembersSubTab("map")} className={`flex-1 py-2.5 text-xs font-bold text-center ${membersSubTab === "map" ? "text-blue-500 border-b-2 border-blue-500" : "text-gray-400"}`}>활동범위</button>
+          </div>
+
+          {/* 활동범위 지도 - 현장팀/일정관리자만 */}
+          {membersSubTab === "map" && (
+            <div className="flex-1 overflow-y-auto pb-20">
+              <BranchMapSection allUsers={allUsers.filter(u => u.role === "field" || u.role === "scheduler").map(u => ({ id: u.id, name: u.name, role: u.role, address: u.address, branch: u.branch }))} />
+            </div>
+          )}
+
+          {/* 사용자 목록 */}
+          <div className="flex-1 overflow-y-auto" style={{ display: membersSubTab === "users" ? "block" : "none" }}>
           <div className="p-3 space-y-3 pb-20">
             {/* 전체 사용자 */}
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
@@ -1090,6 +1107,7 @@ export default function Home() {
               </div>
             </div>
           </div>
+        </div>
         </div>
 
         {/* Sales tab */}
