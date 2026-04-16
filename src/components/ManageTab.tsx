@@ -601,88 +601,62 @@ function GoogleCalendarImport({ allUsers, members, onImported }: {
             </div>
           )}
 
-          {error && <div className="p-2 bg-red-50 border border-red-200 rounded-lg text-xs text-red-600">{error}</div>}
+          {/* 이동 시작 버튼 */}
+          {savedCalendars.length > 0 && !importing && (
+            <button
+              onClick={async () => {
+                const calsWithAssign = savedCalendars.filter(c => c.assignTo);
+                if (calsWithAssign.length === 0) { setError("담당자를 선택해주세요"); return; }
+                setImporting(true); setImportProgress(0); setError("");
+                let count = 0;
+                let total = 0;
+                for (const cal of calsWithAssign) {
+                  try {
+                    const data = await fetchFromCalendar(cal.id);
+                    if (data.status === "ok" && data.items) total += data.items.length;
+                  } catch {}
+                }
+                let done = 0;
+                for (const cal of calsWithAssign) {
+                  try {
+                    const data = await fetchFromCalendar(cal.id);
+                    if (data.status === "ok" && data.items) {
+                      for (const ev of data.items) {
+                        try {
+                          const created = await addUnassignedSchedule({ title: ev.summary || "(제목 없음)", date: ev.date || "", startTime: "09:00", endTime: "18:00", note: ev.description || "" });
+                          if (created?.id) await assignScheduleApi(created.id, cal.assignTo, savedCalendars.find(c => c.id === cal.id)?.name || "");
+                          count++;
+                        } catch {}
+                        done++;
+                        setImportProgress(total > 0 ? Math.round((done / total) * 100) : 0);
+                      }
+                    }
+                  } catch {}
+                }
+                setImporting(false); setImportCount(count); setImportDone(true); onImported();
+              }}
+              disabled={savedCalendars.filter(c => c.assignTo).length === 0}
+              className="w-full py-3 rounded-xl text-sm font-bold text-white active:opacity-90 disabled:opacity-40"
+              style={{ background: "linear-gradient(135deg, #00c473, #00a35e)" }}
+            >
+              이동 시작
+            </button>
+          )}
 
-          {/* 이벤트 목록 */}
-          {events.length > 0 && (
+          {/* 진행률 */}
+          {importing && (
             <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-gray-600">{events.filter(e => e.selected).length}/{events.length}건 선택</span>
-                <div className="flex gap-2">
-                  <button onClick={() => toggleAll(true)} className="text-xs text-blue-500 font-medium">전체선택</button>
-                  <button onClick={() => toggleAll(false)} className="text-xs text-gray-400 font-medium">전체해제</button>
-                </div>
+              <div className="flex items-center justify-between text-xs">
+                <span className="font-bold text-blue-600">이동 중...</span>
+                <span className="font-bold text-blue-700">{importProgress}%</span>
               </div>
-
-              {/* 일괄 배정 */}
-              <div className="bg-white border border-gray-200 rounded-xl p-2.5">
-                <label className="text-xs font-bold text-gray-500 mb-1 block">선택된 일정 일괄 배정</label>
-                <select
-                  onChange={(e) => setAllAssign(e.target.value)}
-                  className="w-full px-2 py-2 border border-gray-200 rounded-lg text-xs outline-none bg-white"
-                  defaultValue=""
-                >
-                  <option value="">배정탭으로 보내기 (미배정)</option>
-                  {assignableList.map(a => (
-                    <option key={a.id} value={a.id}>📅 {a.name} 달력으로 이동</option>
-                  ))}
-                </select>
-              </div>
-
-              {/* 가져오기 버튼 + 진행률 */}
-              {importing ? (
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="font-bold text-blue-600">가져오는 중...</span>
-                    <span className="font-bold text-blue-700">{importProgress}%</span>
-                  </div>
-                  <div className="h-3 bg-gray-200 rounded-full overflow-hidden">
-                    <div className="h-full bg-blue-500 rounded-full transition-all duration-300" style={{ width: `${importProgress}%` }} />
-                  </div>
-                </div>
-              ) : (
-                <button
-                  onClick={handleImport}
-                  disabled={events.filter(e => e.selected).length === 0}
-                  className="w-full py-3 bg-blue-500 text-white rounded-xl text-sm font-bold active:bg-blue-600 disabled:opacity-50"
-                >
-                  {events.filter(e => e.selected).length}건 가져오기
-                </button>
-              )}
-
-              {/* 일정 목록 */}
-              <div className="space-y-1.5">
-                {events.map((ev, idx) => (
-                  <div key={ev.id} className={`border rounded-xl p-2.5 ${ev.selected ? "border-blue-300 bg-blue-50/50" : "border-gray-200 bg-white"}`}>
-                    <div className="flex items-start gap-2">
-                      <input
-                        type="checkbox"
-                        checked={ev.selected}
-                        onChange={(e) => setEvents(prev => prev.map((x, i) => i === idx ? { ...x, selected: e.target.checked } : x))}
-                        className="mt-0.5 w-4 h-4 rounded border-gray-300 text-blue-500 shrink-0"
-                      />
-                      <div className="flex-1 min-w-0">
-                        <div className="text-sm font-medium text-gray-800 truncate">{ev.summary}</div>
-                        <div className="text-xs text-gray-400">{ev.date}</div>
-                      </div>
-                    </div>
-                    {ev.selected && (
-                      <select
-                        value={ev.assignTo}
-                        onChange={(e) => setEvents(prev => prev.map((x, i) => i === idx ? { ...x, assignTo: e.target.value } : x))}
-                        className="mt-2 w-full px-2 py-1.5 border border-gray-200 rounded-lg text-xs outline-none bg-white"
-                      >
-                        <option value="">📋 배정탭으로 보내기</option>
-                        {assignableList.map(a => (
-                          <option key={a.id} value={a.id}>📅 {a.name} 달력으로 이동</option>
-                        ))}
-                      </select>
-                    )}
-                  </div>
-                ))}
+              <div className="h-3 bg-gray-200 rounded-full overflow-hidden">
+                <div className="h-full bg-green-500 rounded-full transition-all duration-300" style={{ width: `${importProgress}%` }} />
               </div>
             </div>
           )}
+
+          {error && <div className="p-2 bg-red-50 border border-red-200 rounded-lg text-xs text-red-600">{error}</div>}
         </>
       )}
     </div>
