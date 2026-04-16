@@ -305,7 +305,7 @@ export async function getUser(id: string): Promise<User | undefined> {
 
 export async function getUserByUsername(username: string): Promise<User | undefined> {
   const lower = username.toLowerCase();
-  const { data } = await supabase.from("users").select("*").ilike("username", lower).single();
+  const { data } = await supabase.from("users").select("*").ilike("username", lower).in("status", ["approved", "pending"]).single();
   return data ? rowToUser(data) : undefined;
 }
 
