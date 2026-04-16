@@ -145,12 +145,21 @@ export default function Home() {
     }
   }, [currentUser]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // 30초마다 알림 폴링 (반환 알림 실시간 감지)
+  // 15초마다 데이터 동기화 (알림 + 일정 + 미배정)
   useEffect(() => {
     if (!currentUser) return;
     const interval = setInterval(async () => {
       try {
-        const notif = await fetchNotifications();
+        const d = selectedDate;
+        const start = format(startOfMonth(subMonths(d, 1)), "yyyy-MM-dd");
+        const end = format(endOfMonth(addMonths(d, 1)), "yyyy-MM-dd");
+        const [rangeScheds, unassigned, notif] = await Promise.all([
+          fetchSchedules(start, end),
+          fetchUnassignedSchedules(),
+          fetchNotifications(),
+        ]);
+        setSchedules(rangeScheds);
+        setUnassignedSchedules(unassigned);
         const allNotifs = notif.notifications as Notification[];
         const uName = currentUser?.name || "";
         const uRole = currentUser?.role || "";
@@ -160,9 +169,9 @@ export default function Home() {
         setNotifications(myNotifs);
         setUnreadCount(myNotifs.filter(n => !n.read).length);
       } catch { /* 네트워크 오류 무시 */ }
-    }, 30000);
+    }, 15000);
     return () => clearInterval(interval);
-  }, [currentUser]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [currentUser, selectedDate]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // PWA 서비스워커 등록 + 설치 배너
   const [installPrompt, setInstallPrompt] = useState<Event | null>(null);
