@@ -210,7 +210,7 @@ export default function Home() {
         console.log("[Push] 권한:", permission);
         if (permission !== "granted") return;
         const reg = await navigator.serviceWorker.ready;
-        const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+        const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || "BIFAj9bQTWPRvMdMvDc5RTF4Qyof08lZR2SkI3vHwmhmUZwWbVJt7_SKEczBy_9ul88kmvfmqzr14-TecTwRBwc";
         if (!vapidKey) { console.log("[Push] VAPID 키 없음"); return; }
         let sub = await reg.pushManager.getSubscription();
         if (!sub) {
