@@ -145,19 +145,16 @@ export default function Home() {
     }
   }, [currentUser]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Supabase Realtime - DB 변경 즉시 반영
+  // Supabase Realtime + 폴링 fallback
   useEffect(() => {
     if (!currentUser) return;
-    const { sbClient } = require("@/lib/supabase-client");
 
-    function reloadSchedules() {
+    function reloadAll() {
       const d = selectedDate;
       const start = format(startOfMonth(subMonths(d, 1)), "yyyy-MM-dd");
       const end = format(endOfMonth(addMonths(d, 1)), "yyyy-MM-dd");
       fetchSchedules(start, end).then(s => setSchedules(s)).catch(() => {});
       fetchUnassignedSchedules().then(s => setUnassignedSchedules(s)).catch(() => {});
-    }
-    function reloadNotifications() {
       fetchNotifications().then(notif => {
         const allNotifs = notif.notifications as Notification[];
         const uName = currentUser?.name || "";
@@ -170,12 +167,28 @@ export default function Home() {
       }).catch(() => {});
     }
 
-    const channel = sbClient.channel("db-changes")
-      .on("postgres_changes", { event: "*", schema: "public", table: "schedules" }, () => reloadSchedules())
-      .on("postgres_changes", { event: "*", schema: "public", table: "notifications" }, () => reloadNotifications())
-      .subscribe();
+    // Realtime 시도
+    let realtimeWorking = false;
+    let channel: ReturnType<typeof import("@/lib/supabase-client").sbClient.channel> | null = null;
+    try {
+      const { sbClient } = require("@/lib/supabase-client");
+      channel = sbClient.channel("db-changes")
+        .on("postgres_changes", { event: "*", schema: "public", table: "schedules" }, () => { realtimeWorking = true; reloadAll(); })
+        .on("postgres_changes", { event: "*", schema: "public", table: "notifications" }, () => { realtimeWorking = true; reloadAll(); })
+        .subscribe();
+    } catch { /* Realtime 실패 */ }
 
-    return () => { sbClient.removeChannel(channel); };
+    // 폴링 fallback (10초) - Realtime 안 되면 이걸로
+    const interval = setInterval(() => {
+      if (!realtimeWorking) reloadAll();
+    }, 10000);
+
+    return () => {
+      clearInterval(interval);
+      if (channel) {
+        try { const { sbClient } = require("@/lib/supabase-client"); sbClient.removeChannel(channel); } catch {}
+      }
+    };
   }, [currentUser, selectedDate]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // PWA 서비스워커 등록 + 설치 배너

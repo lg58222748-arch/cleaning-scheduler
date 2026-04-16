@@ -488,9 +488,10 @@ export default function ScheduleDetail({
           {mode === "calendar" && schedule.status !== "unassigned" && onUnassign && (
             <button
               onClick={() => {
-                if (!confirm("이 일정을 반환하시겠습니까?")) return;
+                const reason = prompt("반환 사유를 입력하세요:");
+                if (reason === null) return;
                 onClose();
-                setTimeout(() => onUnassign(schedule.id, "반환"), 50);
+                setTimeout(() => onUnassign(schedule.id, reason || "사유 없음"), 50);
               }}
               className="flex-1 py-2 bg-orange-500 text-white rounded-xl text-xs font-bold active:bg-orange-600"
             >
