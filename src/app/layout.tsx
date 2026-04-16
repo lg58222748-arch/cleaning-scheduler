@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Geist } from "next/font/google";
+import Script from "next/script";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -40,14 +41,13 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ko" className={`${geistSans.variable} h-full`}>
-      <head>
-        <script
-          type="text/javascript"
+      <body className="min-h-full font-sans antialiased" style={{ overscrollBehavior: "none" }}>
+        {children}
+        <Script
           src={`https://oapi.map.naver.com/openapi/v3/maps.js?ncpKeyId=${process.env.NEXT_PUBLIC_NAVER_MAP_CLIENT_ID}`}
-          defer
+          strategy="lazyOnload"
         />
-      </head>
-      <body className="min-h-full font-sans antialiased" style={{ overscrollBehavior: "none" }}>{children}</body>
+      </body>
     </html>
   );
 }
