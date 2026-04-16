@@ -773,16 +773,18 @@ function MapToggle({ allUsers }: { allUsers: { id?: string; name: string; role?:
 
 export function BranchMap({ allUsers, isAdmin = false }: { allUsers: { id?: string; name: string; role?: string; address?: string; branch?: string }[]; isAdmin?: boolean }) {
   const mapRef = useRef<HTMLDivElement>(null);
-  const mapInstance = useRef<NaverMap | null>(null);
+  const mapInitialized = useRef(false);
   const [ready, setReady] = useState(false);
-  const [branchRadii, setBranchRadii] = useState<Record<string, number>>(() => {
+  const [selectedUser, setSelectedUser] = useState<string | null>(null);
+  const [userRadii, setUserRadii] = useState<Record<string, number>>(() => {
     if (typeof window === "undefined") return {};
-    try { return JSON.parse(localStorage.getItem("map_branch_radii") || "{}"); } catch { return {}; }
+    try { return JSON.parse(localStorage.getItem("map_user_radii") || "{}"); } catch { return {}; }
   });
   const [customPositions, setCustomPositions] = useState<Record<string, { lat: number; lng: number }>>(() => {
     if (typeof window === "undefined") return {};
     try { return JSON.parse(localStorage.getItem("map_custom_positions") || "{}"); } catch { return {}; }
   });
+  const circlesRef = useRef<Record<string, unknown>>({});
 
   function saveCustomPosition(name: string, lat: number, lng: number) {
     setCustomPositions(prev => {
@@ -792,21 +794,35 @@ export function BranchMap({ allUsers, isAdmin = false }: { allUsers: { id?: stri
     });
   }
 
-  // 관리점별 사용자 그룹핑
-  const branchGroups = useMemo(() => {
-    const groups: Record<string, { name: string; users: string[]; coord: { lat: number; lng: number } | null }> = {};
+  // 팀원 목록 (관리점 기준 분산 좌표)
+  const userList = useMemo(() => {
+    const branchUsers: Record<string, string[]> = {};
     for (const u of allUsers) {
       if (!u.branch) continue;
       const bname = u.branch.replace(/\[관리점\]/, "").trim();
-      if (!bname) continue;
-      if (!groups[bname]) {
-        const coord = BRANCH_COORDS[bname] || null;
-        groups[bname] = { name: bname, users: [], coord };
-      }
-      groups[bname].users.push(u.name);
+      if (!bname || !BRANCH_COORDS[bname]) continue;
+      if (!branchUsers[bname]) branchUsers[bname] = [];
+      branchUsers[bname].push(u.name);
     }
-    return Object.values(groups).filter(g => g.coord);
-  }, [allUsers]);
+    const result: { name: string; branch: string; lat: number; lng: number; color: string }[] = [];
+    const branches = Object.keys(branchUsers);
+    branches.forEach((bname, bi) => {
+      const coord = BRANCH_COORDS[bname];
+      const users = branchUsers[bname];
+      const color = BRANCH_COLORS[bi % BRANCH_COLORS.length];
+      users.forEach((uname, ui) => {
+        const custom = customPositions[uname];
+        if (custom) {
+          result.push({ name: uname, branch: bname, lat: custom.lat, lng: custom.lng, color });
+        } else {
+          const angle = (2 * Math.PI * ui) / Math.max(users.length, 1) - Math.PI / 2;
+          const spread = 0.025 + (ui % 3) * 0.01;
+          result.push({ name: uname, branch: bname, lat: coord.lat + Math.cos(angle) * spread, lng: coord.lng + Math.sin(angle) * spread * 1.3, color });
+        }
+      });
+    });
+    return result;
+  }, [allUsers, customPositions]);
 
   useEffect(() => {
     const check = setInterval(() => {
@@ -816,129 +832,108 @@ export function BranchMap({ allUsers, isAdmin = false }: { allUsers: { id?: stri
   }, []);
 
   useEffect(() => {
-    if (!ready || !mapRef.current || branchGroups.length === 0) return;
+    if (!ready || !mapRef.current || userList.length === 0) return;
+    if (mapInitialized.current) return; // 한 번만 생성
+    mapInitialized.current = true;
     const N = window.naver.maps;
 
     const map = new N.Map(mapRef.current, {
-      center: new N.LatLng(36.8, 127.1),
+      center: new N.LatLng(36.5, 127.0),
       zoom: 8,
       zoomControl: true,
-      zoomControlOptions: { position: 3 /* RIGHT_CENTER */ },
+      zoomControlOptions: { position: 3 },
       minZoom: 6,
       maxBounds: new N.LatLngBounds(new N.LatLng(33.0, 124.5), new N.LatLng(39.0, 132.0)),
     });
-    mapInstance.current = map;
 
     let minLat = 90, maxLat = -90, minLng = 180, maxLng = -180;
 
-    branchGroups.forEach((g, i) => {
-      if (!g.coord) return;
-      const pos = new N.LatLng(g.coord.lat, g.coord.lng);
-      if (g.coord.lat < minLat) minLat = g.coord.lat;
-      if (g.coord.lat > maxLat) maxLat = g.coord.lat;
-      if (g.coord.lng < minLng) minLng = g.coord.lng;
-      if (g.coord.lng > maxLng) maxLng = g.coord.lng;
-      const color = BRANCH_COLORS[i % BRANCH_COLORS.length];
+    userList.forEach((u) => {
+      if (u.lat < minLat) minLat = u.lat;
+      if (u.lat > maxLat) maxLat = u.lat;
+      if (u.lng < minLng) minLng = u.lng;
+      if (u.lng > maxLng) maxLng = u.lng;
 
-      // 관리점 마커
-      new N.Marker({
+      const pos = new N.LatLng(u.lat, u.lng);
+      const marker = new N.Marker({
         position: pos,
         map,
+        draggable: isAdmin,
         icon: {
-          content: `<div style="background:${color};color:#fff;padding:5px 12px;border-radius:20px;font-size:12px;font-weight:700;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,0.25);border:2px solid #fff">${g.name} (${g.users.length})</div>`,
-          anchor: { x: 40, y: 15 },
+          content: `<div class="map-pin" data-name="${u.name}" style="background:#fff;color:${u.color};padding:3px 8px;border-radius:10px;font-size:10px;font-weight:700;white-space:nowrap;box-shadow:0 1px 4px rgba(0,0,0,0.15);border:1.5px solid ${u.color};${isAdmin ? "cursor:grab;" : "cursor:pointer;"}user-select:none">${u.name}</div>`,
+          anchor: { x: 20, y: 10 },
         },
       });
-      // 각 사용자 이름 마커 (분산 배치, 대표는 드래그 가능)
-      g.users.forEach((uname, ui) => {
-        const custom = customPositions[uname];
-        let uPos;
-        if (custom) {
-          uPos = new N.LatLng(custom.lat, custom.lng);
-        } else {
-          const angle = (2 * Math.PI * ui) / Math.max(g.users.length, 1) - Math.PI / 2;
-          const spread = 0.018 + (ui % 3) * 0.008;
-          uPos = new N.LatLng(g.coord!.lat + Math.cos(angle) * spread, g.coord!.lng + Math.sin(angle) * spread * 1.3);
-        }
-        const marker = new N.Marker({
-          position: uPos,
-          map,
-          draggable: isAdmin,
-          icon: {
-            content: `<div style="background:#fff;color:${color};padding:2px 6px;border-radius:8px;font-size:9px;font-weight:600;white-space:nowrap;box-shadow:0 1px 3px rgba(0,0,0,0.12);border:1px solid ${color};${isAdmin ? "cursor:grab" : ""}">${uname}</div>`,
-            anchor: { x: 15, y: 8 },
-          },
-        });
-        if (isAdmin) {
-          N.Event.addListener(marker, "dragend", () => {
-            const pos = (marker as unknown as { getPosition: () => NaverLatLng }).getPosition();
-            saveCustomPosition(uname, pos.lat(), pos.lng());
-          });
-        }
+
+      // 클릭 → 활동반경 원 표시/숨김
+      N.Event.addListener(marker, "click", () => {
+        setSelectedUser(prev => prev === u.name ? null : u.name);
       });
 
-      new N.Circle({
+      // 활동반경 원 (숨김 상태로 생성)
+      const circle = new N.Circle({
         map,
         center: pos,
-        radius: (branchRadii[g.name] || 15) * 1000,
-        strokeColor: color,
+        radius: (userRadii[u.name] || 15) * 1000,
+        strokeColor: u.color,
         strokeWeight: 2,
-        strokeOpacity: 0.6,
-        fillColor: color,
+        strokeOpacity: 0.5,
+        fillColor: u.color,
         fillOpacity: 0.08,
+        visible: false,
       });
+      circlesRef.current[u.name] = circle;
+
+      if (isAdmin) {
+        N.Event.addListener(marker, "dragend", () => {
+          const p = (marker as unknown as { getPosition: () => NaverLatLng }).getPosition();
+          saveCustomPosition(u.name, p.lat(), p.lng());
+          // 원도 이동
+          (circle as unknown as { setCenter: (c: NaverLatLng) => void }).setCenter(p);
+        });
+      }
     });
 
-    if (branchGroups.length > 1) {
+    if (userList.length > 1) {
       const bounds = new N.LatLngBounds(new N.LatLng(minLat, minLng), new N.LatLng(maxLat, maxLng));
-      map.fitBounds(bounds, { top: 40, right: 40, bottom: 40, left: 40 });
-    } else if (branchGroups.length === 1) {
-      const g = branchGroups[0];
-      if (g.coord) {
-        map.setCenter(new N.LatLng(g.coord.lat, g.coord.lng));
-        map.setZoom(11);
-      }
+      map.fitBounds(bounds, { top: 50, right: 30, bottom: 50, left: 30 });
     }
-  }, [ready, branchGroups, branchRadii, customPositions, isAdmin]);
+  }, [ready, userList]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // 선택된 유저 원 표시/숨김
+  useEffect(() => {
+    for (const [name, circle] of Object.entries(circlesRef.current)) {
+      const c = circle as unknown as { setVisible: (v: boolean) => void; setRadius: (r: number) => void };
+      c.setVisible(name === selectedUser);
+      if (name === selectedUser) c.setRadius((userRadii[name] || 15) * 1000);
+    }
+  }, [selectedUser, userRadii]);
+
+  const selRadius = selectedUser ? (userRadii[selectedUser] || 15) : 15;
 
   return (
-    <div className="bg-gray-50 px-4 py-3 space-y-3">
-      {/* 관리점별 반경 조절 */}
-      <div className="space-y-2">
-        {branchGroups.map((g, i) => {
-          const r = branchRadii[g.name] || 15;
-          return (
-            <div key={g.name} className="flex items-center gap-2">
-              <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: BRANCH_COLORS[i % BRANCH_COLORS.length] }} />
-              <span className="text-xs font-medium text-gray-600 w-12 shrink-0">{g.name}</span>
-              <input type="range" min={5} max={50} step={5} value={r} onChange={(e) => {
-                const next = { ...branchRadii, [g.name]: Number(e.target.value) };
-                setBranchRadii(next);
-                localStorage.setItem("map_branch_radii", JSON.stringify(next));
-              }} className="flex-1 accent-blue-500" />
-              <span className="text-xs font-bold text-blue-600 w-10 text-right">{r}km</span>
-            </div>
-          );
-        })}
-      </div>
+    <div className="flex flex-col h-full">
       {/* 지도 */}
-      <div ref={mapRef} className="w-full rounded-xl overflow-hidden border border-gray-200" style={{ height: "calc(100dvh - 220px)", minHeight: 400 }}>
+      <div ref={mapRef} className="flex-1 w-full" style={{ minHeight: 400 }}>
         {!ready && <div className="flex items-center justify-center h-full text-gray-400 text-sm">지도 로딩 중...</div>}
       </div>
-      {/* 범례 */}
-      <div className="flex flex-wrap gap-2">
-        {branchGroups.map((g, i) => (
-          <div key={g.name} className="flex items-center gap-1.5 bg-white border border-gray-200 rounded-full px-2.5 py-1">
-            <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: BRANCH_COLORS[i % BRANCH_COLORS.length] }} />
-            <span className="text-xs font-medium text-gray-700">{g.name}</span>
-            <span className="text-[10px] text-gray-400">{g.users.join(", ")}</span>
+      {/* 선택된 팀원 반경 조절 - 대표만 */}
+      {isAdmin && selectedUser && (
+        <div className="px-4 py-3 bg-white border-t border-gray-200">
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-bold text-gray-700">{selectedUser}</span>
+            <input type="range" min={5} max={50} step={5} value={selRadius} onChange={(e) => {
+              const next = { ...userRadii, [selectedUser]: Number(e.target.value) };
+              setUserRadii(next);
+              localStorage.setItem("map_user_radii", JSON.stringify(next));
+            }} className="flex-1 accent-blue-500" />
+            <span className="text-xs font-bold text-blue-600 w-12 text-right">{selRadius}km</span>
           </div>
-        ))}
-      </div>
-      {branchGroups.length === 0 && (
-        <div className="py-6 text-center text-gray-400 text-sm">
-          관리점이 설정된 사용자가 없습니다.<br/>
-          <span className="text-xs">사용자 탭에서 관리점을 입력하세요</span>
+        </div>
+      )}
+      {userList.length === 0 && (
+        <div className="py-8 text-center text-gray-400 text-sm">
+          관리점이 설정된 현장팀이 없습니다
         </div>
       )}
     </div>
