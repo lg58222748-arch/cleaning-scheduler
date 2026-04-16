@@ -408,31 +408,42 @@ export default function Home() {
   }
 
   // Schedules — 낙관적 업데이트
-  async function handleSaveSchedule(data: Omit<Schedule, "id" | "status">) {
+  function handleSaveSchedule(data: Omit<Schedule, "id" | "status">) {
     setShowScheduleForm(false);
     setEditingSchedule(null);
     consumeHash();
+
     if (editingSchedule) {
+      // 수정: UI 즉시 반영
       setSchedules((prev) => prev.map((s) => s.id === editingSchedule.id ? { ...s, ...data } : s));
-      await apiUpdateSchedule(editingSchedule.id, data);
-    } else if (activeTab === "calendar" && data.memberId) {
-      // 달력탭 + 팀원 선택 → 달력에 바로 등록
-      try {
-        const newSchedule = await createSchedule(data);
-        if (newSchedule?.id) setSchedules((prev) => [...prev, newSchedule]);
-      } catch {
-        // fallback: 배정탭으로
-        const ns = await addUnassignedSchedule({ title: data.title, date: data.date, startTime: data.startTime, endTime: data.endTime, note: data.note || "", color: data.color });
-        if (ns?.id) setUnassignedSchedules((prev) => [...prev, ns]);
+      apiUpdateSchedule(editingSchedule.id, data).catch(() => {});
+    } else if (activeTab === "calendar") {
+      // 달력탭에서 생성 → 달력에 바로 표시
+      const tempId = "temp-" + Date.now();
+      const tempSchedule: Schedule = {
+        id: tempId, ...data, status: data.memberId ? "confirmed" : "confirmed",
+        memberId: data.memberId || currentUser?.name || "", memberName: data.memberName || currentUser?.name || "",
+      };
+      setSchedules((prev) => [...prev, tempSchedule]);
+      // API 백그라운드
+      if (data.memberId) {
+        createSchedule(data).then(ns => {
+          if (ns?.id) setSchedules(prev => prev.map(s => s.id === tempId ? ns : s));
+        }).catch(() => {});
+      } else {
+        addUnassignedSchedule({ title: data.title, date: data.date, startTime: data.startTime, endTime: data.endTime, note: data.note || "", color: data.color })
+          .then(ns => { if (ns?.id) setSchedules(prev => prev.map(s => s.id === tempId ? { ...ns, status: "confirmed" as const } : s)); })
+          .catch(() => {});
       }
     } else {
-      // 배정탭 또는 팀원 미선택 → 배정탭(미배정)으로
-      const newSchedule = await addUnassignedSchedule({
-        title: data.title, date: data.date, startTime: data.startTime, endTime: data.endTime, note: data.note || "", color: data.color,
-      });
-      if (newSchedule?.id) setUnassignedSchedules((prev) => [...prev, newSchedule]);
+      // 배정탭에서 생성
+      const tempId = "temp-" + Date.now();
+      const temp: Schedule = { id: tempId, memberId: "", memberName: "미배정", title: data.title, location: "", date: data.date, startTime: data.startTime || "09:00", endTime: data.endTime || "18:00", status: "unassigned", note: data.note || "" };
+      setUnassignedSchedules((prev) => [...prev, temp]);
+      addUnassignedSchedule({ title: data.title, date: data.date, startTime: data.startTime, endTime: data.endTime, note: data.note || "", color: data.color })
+        .then(ns => { if (ns?.id) setUnassignedSchedules(prev => prev.map(s => s.id === tempId ? ns : s)); })
+        .catch(() => {});
     }
-    loadData(undefined, true);
   }
   async function handleDeleteSchedule(id: string) {
     setSchedules((prev) => prev.filter((s) => s.id !== id));
