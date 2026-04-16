@@ -453,18 +453,19 @@ function GoogleCalendarImport({ allUsers, members, onImported }: {
           const fieldUser = allUsers.find(u => (u.id === ev.assignTo || u.name === ev.assignTo) && u.role === "field");
           const assignId = member?.id || fieldUser?.id || ev.assignTo;
           const assignName = member?.name || fieldUser?.name || ev.assignTo;
-          await createSchedule({
+          // 먼저 미배정으로 등록 후 배정 (createSchedule이 실패할 수 있어서)
+          const created = await addUnassignedSchedule({
             title: ev.summary,
             date: ev.date,
             startTime: "09:00",
             endTime: "18:00",
-            location: "",
-            memberId: assignId,
-            memberName: assignName,
             note: ev.description || "",
           });
+          if (created?.id) {
+            await assignScheduleApi(created.id, assignId, assignName);
+          }
         } else {
-          // 미배정 → 배정탭
+          // 미선택 → 배정탭
           await addUnassignedSchedule({
             title: ev.summary,
             date: ev.date,
@@ -560,7 +561,7 @@ function GoogleCalendarImport({ allUsers, members, onImported }: {
                 >
                   <option value="">배정탭으로 보내기 (미배정)</option>
                   {assignableList.map(a => (
-                    <option key={a.id} value={a.id}>📅 {a.name} 달력에 직접 배정</option>
+                    <option key={a.id} value={a.id}>📅 {a.name} 달력으로 이동</option>
                   ))}
                 </select>
               </div>
@@ -610,7 +611,7 @@ function GoogleCalendarImport({ allUsers, members, onImported }: {
                       >
                         <option value="">📋 배정탭으로 보내기</option>
                         {assignableList.map(a => (
-                          <option key={a.id} value={a.id}>📅 {a.name} 달력에 직접 배정</option>
+                          <option key={a.id} value={a.id}>📅 {a.name} 달력으로 이동</option>
                         ))}
                       </select>
                     )}
