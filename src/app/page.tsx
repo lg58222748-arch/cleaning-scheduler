@@ -622,9 +622,9 @@ export default function Home() {
         (myLinkedMember && s.memberId === myLinkedMember.id)
       )
     : schedules;
-  // 팀원 필터 적용 (현장팀 User ID 기준, 이름으로도 매칭)
+  // 팀원 필터 적용 (현장팀은 이미 자기 일정만 보이므로 필터 무시)
   const calendarSchedules = (() => {
-    if (!filterActive) return baseCalendarSchedules;
+    if (!filterActive || role === "field") return baseCalendarSchedules;
     if (selectedMemberIds.size === 0) return [];
     const filterNames = new Set<string>();
     allUsers.filter(u => u.role === "field").forEach(u => {
