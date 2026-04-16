@@ -418,23 +418,18 @@ export default function Home() {
       setSchedules((prev) => prev.map((s) => s.id === editingSchedule.id ? { ...s, ...data } : s));
       apiUpdateSchedule(editingSchedule.id, data).catch(() => {});
     } else if (activeTab === "calendar") {
-      // 달력탭에서 생성 → 달력에 바로 표시
+      // 달력탭에서 생성 → 달력에만 표시 (배정탭 안 감)
       const tempId = "temp-" + Date.now();
-      const tempSchedule: Schedule = {
-        id: tempId, ...data, status: data.memberId ? "confirmed" : "confirmed",
-        memberId: data.memberId || currentUser?.name || "", memberName: data.memberName || currentUser?.name || "",
+      const calData = {
+        ...data,
+        memberId: data.memberId || currentUser?.id || "self",
+        memberName: data.memberName || currentUser?.name || "",
       };
+      const tempSchedule: Schedule = { id: tempId, ...calData, status: "confirmed", location: data.location || "" };
       setSchedules((prev) => [...prev, tempSchedule]);
-      // API 백그라운드
-      if (data.memberId) {
-        createSchedule(data).then(ns => {
-          if (ns?.id) setSchedules(prev => prev.map(s => s.id === tempId ? ns : s));
-        }).catch(() => {});
-      } else {
-        addUnassignedSchedule({ title: data.title, date: data.date, startTime: data.startTime, endTime: data.endTime, note: data.note || "", color: data.color })
-          .then(ns => { if (ns?.id) setSchedules(prev => prev.map(s => s.id === tempId ? { ...ns, status: "confirmed" as const } : s)); })
-          .catch(() => {});
-      }
+      createSchedule(calData).then(ns => {
+        if (ns?.id) setSchedules(prev => prev.map(s => s.id === tempId ? ns : s));
+      }).catch(() => {});
     } else {
       // 배정탭에서 생성
       const tempId = "temp-" + Date.now();
