@@ -62,11 +62,11 @@ export default function Home() {
       const saved = localStorage.getItem("currentUser");
       if (saved) setCurrentUser(JSON.parse(saved));
     } catch {}
-    // 스플래시 1초 후 앱 표시
+    // 스플래시 후 앱 표시
     const t = setTimeout(() => {
       setShowSplash(false);
       setAppReady(true);
-    }, 1500);
+    }, 500);
     return () => clearTimeout(t);
   }, []);
   const [members, setMembers] = useState<Member[]>([]);

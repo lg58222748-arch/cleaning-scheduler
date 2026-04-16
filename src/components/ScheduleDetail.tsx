@@ -230,7 +230,7 @@ export default function ScheduleDetail({
               className="text-sm font-bold text-gray-800 flex-1 text-center cursor-pointer active:text-blue-600 break-all leading-tight"
               onClick={() => { setTitleText(schedule.title); setEditingTitle(true); }}
             >
-              {timeSlot ? `[${timeSlot}] ` : ""}{schedule.title.replace(/^\[.+?\]\s*/, "")}
+              {timeSlot ? `[${timeSlot}] ` : ""}{titleText.replace(/^\[.+?\]\s*/, "")}
             </h3>
           )}
           <button onClick={() => { onDelete(schedule.id); onClose(); }} className="p-1.5 active:bg-red-50 rounded-lg">
