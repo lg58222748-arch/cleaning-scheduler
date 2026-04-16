@@ -259,7 +259,7 @@ export default memo(function Calendar({
                       );
                     })}
                     {daySchedules.length > 2 && (
-                      <div className="absolute bottom-0 right-0 text-[8px] md:text-[10px] text-gray-400 font-medium">+{daySchedules.length - 2}</div>
+                      <div className="absolute bottom-0 right-0 text-[9px] md:text-[11px] text-blue-600 font-bold bg-blue-50 px-1 rounded">+{daySchedules.length - 2}</div>
                     )}
                   </div>
                 </button>

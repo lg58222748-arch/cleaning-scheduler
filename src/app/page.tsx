@@ -516,7 +516,8 @@ export default function Home() {
       );
   // 팀원 필터 적용 (현장팀 User ID 기준, 이름으로도 매칭)
   const calendarSchedules = (() => {
-    if (!filterActive || selectedMemberIds.size === 0) return baseCalendarSchedules;
+    if (!filterActive) return baseCalendarSchedules;
+    if (selectedMemberIds.size === 0) return [];
     const filterNames = new Set<string>();
     allUsers.filter(u => u.role === "field").forEach(u => {
       if (selectedMemberIds.has(u.id)) filterNames.add(u.name);
