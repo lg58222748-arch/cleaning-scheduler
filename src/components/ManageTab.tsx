@@ -864,12 +864,12 @@ export function BranchMap({ allUsers, isAdmin = false }: { allUsers: { id?: stri
         },
       });
 
-      // 클릭 → 활동반경 원 표시/숨김
+      // 클릭 → 대표만 반경 조절 선택
       N.Event.addListener(marker, "click", () => {
-        setSelectedUser(prev => prev === u.name ? null : u.name);
+        if (isAdmin) setSelectedUser(prev => prev === u.name ? null : u.name);
       });
 
-      // 활동반경 원 (숨김 상태로 생성)
+      // 활동반경 원 (항상 표시)
       const circle = new N.Circle({
         map,
         center: pos,
@@ -879,7 +879,7 @@ export function BranchMap({ allUsers, isAdmin = false }: { allUsers: { id?: stri
         strokeOpacity: 0.5,
         fillColor: u.color,
         fillOpacity: 0.08,
-        visible: false,
+        visible: true,
       });
       circlesRef.current[u.name] = circle;
 
@@ -896,14 +896,13 @@ export function BranchMap({ allUsers, isAdmin = false }: { allUsers: { id?: stri
     // 서울 중심 고정 (fitBounds 사용 안 함)
   }, [ready, userList]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // 선택된 유저 원 표시/숨김
+  // 선택된 유저 반경 실시간 반영 (원은 항상 보임)
   useEffect(() => {
     for (const [name, circle] of Object.entries(circlesRef.current)) {
-      const c = circle as unknown as { setVisible: (v: boolean) => void; setRadius: (r: number) => void };
-      c.setVisible(name === selectedUser);
-      if (name === selectedUser) c.setRadius((userRadii[name] || 15) * 1000);
+      const c = circle as unknown as { setRadius: (r: number) => void };
+      c.setRadius((userRadii[name] || 15) * 1000);
     }
-  }, [selectedUser, userRadii]);
+  }, [userRadii]);
 
   const selRadius = selectedUser ? (userRadii[selectedUser] || 15) : 15;
 
@@ -913,23 +912,19 @@ export function BranchMap({ allUsers, isAdmin = false }: { allUsers: { id?: stri
       <div ref={mapRef} style={{ width: "100vw", height: "calc(100dvh - 100px)" }}>
         {!ready && <div className="flex items-center justify-center h-full text-gray-400 text-sm">지도 로딩 중...</div>}
       </div>
-      {/* 선택된 팀원 반경 - 지도 위 오버레이 */}
-      {selectedUser && (
+      {/* 선택된 팀원 반경 조절 - 대표만 */}
+      {isAdmin && selectedUser && (
         <div style={{ position: "absolute", bottom: 16, left: 16, right: 16, zIndex: 10 }}>
           <div className="bg-white/95 backdrop-blur rounded-xl shadow-lg px-4 py-2.5">
-            {isAdmin ? (
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-bold text-gray-700">{selectedUser}</span>
-                <input type="range" min={5} max={50} step={5} value={selRadius} onChange={(e) => {
-                  const next = { ...userRadii, [selectedUser]: Number(e.target.value) };
-                  setUserRadii(next);
-                  localStorage.setItem("map_user_radii", JSON.stringify(next));
-                }} className="flex-1 accent-blue-500" />
-                <span className="text-xs font-bold text-blue-600 w-12 text-right">{selRadius}km</span>
-              </div>
-            ) : (
-              <span className="text-xs font-bold text-gray-700">{selectedUser} · 활동반경 {userRadii[selectedUser] || 15}km</span>
-            )}
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold text-gray-700">{selectedUser}</span>
+              <input type="range" min={5} max={50} step={5} value={selRadius} onChange={(e) => {
+                const next = { ...userRadii, [selectedUser]: Number(e.target.value) };
+                setUserRadii(next);
+                localStorage.setItem("map_user_radii", JSON.stringify(next));
+              }} className="flex-1 accent-blue-500" />
+              <span className="text-xs font-bold text-blue-600 w-12 text-right">{selRadius}km</span>
+            </div>
           </div>
         </div>
       )}
