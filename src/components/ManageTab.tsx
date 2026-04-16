@@ -809,15 +809,15 @@ function BranchMap({ allUsers }: { allUsers: { id?: string; name: string; role?:
     });
     mapInstance.current = map;
 
-    const bounds = new N.LatLngBounds(
-      new N.LatLng(90, 180),
-      new N.LatLng(-90, -180)
-    );
+    let minLat = 90, maxLat = -90, minLng = 180, maxLng = -180;
 
     branchGroups.forEach((g, i) => {
       if (!g.coord) return;
       const pos = new N.LatLng(g.coord.lat, g.coord.lng);
-      bounds.extend(pos);
+      if (g.coord.lat < minLat) minLat = g.coord.lat;
+      if (g.coord.lat > maxLat) maxLat = g.coord.lat;
+      if (g.coord.lng < minLng) minLng = g.coord.lng;
+      if (g.coord.lng > maxLng) maxLng = g.coord.lng;
       const color = BRANCH_COLORS[i % BRANCH_COLORS.length];
 
       new N.Marker({
@@ -842,6 +842,7 @@ function BranchMap({ allUsers }: { allUsers: { id?: string; name: string; role?:
     });
 
     if (branchGroups.length > 1) {
+      const bounds = new N.LatLngBounds(new N.LatLng(minLat, minLng), new N.LatLng(maxLat, maxLng));
       map.fitBounds(bounds, { top: 40, right: 40, bottom: 40, left: 40 });
     } else if (branchGroups.length === 1) {
       const g = branchGroups[0];
