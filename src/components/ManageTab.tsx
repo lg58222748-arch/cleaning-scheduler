@@ -399,6 +399,7 @@ function GoogleCalendarImport({ allUsers, members, onImported }: {
     try { return JSON.parse(localStorage.getItem("google_calendars") || "[]"); } catch { return []; }
   });
   const [events, setEvents] = useState<{ id: string; summary: string; date: string; description?: string; selected: boolean; assignTo: string; calName?: string }[]>([]);
+  const [checkedCals, setCheckedCals] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
   const [importing, setImporting] = useState(false);
   const [importDone, setImportDone] = useState(false);
@@ -576,14 +577,49 @@ function GoogleCalendarImport({ allUsers, members, onImported }: {
           {savedCalendars.length > 0 && (
             <div className="space-y-1">
               <div className="flex items-center justify-between">
-                <label className="text-xs font-bold text-gray-500">저장된 캘린더 ({savedCalendars.length})</label>
-                <button onClick={handleFetchAll} disabled={loading} className="px-3 py-1.5 bg-green-500 text-white rounded-lg text-xs font-bold active:bg-green-600 disabled:opacity-50">
-                  {loading ? "로딩..." : "전체 가져오기"}
-                </button>
+                <div className="flex items-center gap-2">
+                  <label className="text-xs font-bold text-gray-500">저장된 캘린더 ({savedCalendars.length})</label>
+                  <button onClick={() => setCheckedCals(prev => prev.size === savedCalendars.length ? new Set() : new Set(savedCalendars.map(c => c.id)))} className="text-[10px] text-blue-500 font-medium">
+                    {checkedCals.size === savedCalendars.length ? "전체해제" : "전체선택"}
+                  </button>
+                </div>
+                <div className="flex gap-1.5">
+                  {checkedCals.size > 0 && (
+                    <button onClick={() => {
+                      const selected = savedCalendars.filter(c => checkedCals.has(c.id));
+                      if (selected.length === 0) return;
+                      setLoading(true); setError(""); setImportDone(false);
+                      (async () => {
+                        const allItems: typeof events = [];
+                        for (const cal of selected) {
+                          try {
+                            const data = await fetchFromCalendar(cal.id);
+                            if (data.status === "ok" && data.items) {
+                              data.items.forEach((ev: { id: string; summary: string; date: string; description?: string }) => {
+                                allItems.push({ id: ev.id + cal.id, summary: ev.summary || "(제목 없음)", date: ev.date || "", description: ev.description || "", selected: true, assignTo: cal.assignTo || "", calName: cal.name });
+                              });
+                            }
+                          } catch {}
+                        }
+                        setEvents(allItems);
+                        if (allItems.length === 0) setError("가져올 일정이 없습니다");
+                        setLoading(false);
+                      })();
+                    }} disabled={loading} className="px-3 py-1.5 bg-blue-500 text-white rounded-lg text-xs font-bold active:bg-blue-600 disabled:opacity-50">
+                      {loading ? "로딩..." : `선택 가져오기 (${checkedCals.size})`}
+                    </button>
+                  )}
+                  <button onClick={handleFetchAll} disabled={loading} className="px-3 py-1.5 bg-green-500 text-white rounded-lg text-xs font-bold active:bg-green-600 disabled:opacity-50">
+                    {loading ? "로딩..." : "전체 가져오기"}
+                  </button>
+                </div>
               </div>
-              {savedCalendars.map(cal => (
-                <div key={cal.id} className="bg-white border border-gray-200 rounded-lg px-2 py-1.5 space-y-1">
+              {savedCalendars.map(cal => {
+                const isChecked = checkedCals.has(cal.id);
+                return (
+                <div key={cal.id} className={`bg-white border rounded-lg px-2 py-1.5 space-y-1 ${isChecked ? "border-blue-400 bg-blue-50/30" : "border-gray-200"}`}>
                   <div className="flex items-center gap-2">
+                    <input type="checkbox" checked={isChecked} onChange={() => setCheckedCals(prev => { const n = new Set(prev); n.has(cal.id) ? n.delete(cal.id) : n.add(cal.id); return n; })} className="w-4 h-4 accent-blue-500 shrink-0" />
                     <span className="flex-1 text-xs text-gray-700 truncate">📅 {cal.name}</span>
                     <button onClick={() => removeCalendarId(cal.id)} className="text-gray-300 active:text-red-500 shrink-0">
                       <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
@@ -597,7 +633,8 @@ function GoogleCalendarImport({ allUsers, members, onImported }: {
                     ))}
                   </select>
                 </div>
-              ))}
+                );
+              })}
             </div>
           )}
 
@@ -605,7 +642,8 @@ function GoogleCalendarImport({ allUsers, members, onImported }: {
           {savedCalendars.length > 0 && !importing && (
             <button
               onClick={async () => {
-                const calsWithAssign = savedCalendars.filter(c => c.assignTo);
+                const targetCals = checkedCals.size > 0 ? savedCalendars.filter(c => checkedCals.has(c.id)) : savedCalendars;
+                const calsWithAssign = targetCals.filter(c => c.assignTo);
                 if (calsWithAssign.length === 0) { setError("담당자를 선택해주세요"); return; }
                 setImporting(true); setImportProgress(0); setError("");
                 let count = 0;
@@ -635,11 +673,11 @@ function GoogleCalendarImport({ allUsers, members, onImported }: {
                 }
                 setImporting(false); setImportCount(count); setImportDone(true); onImported();
               }}
-              disabled={savedCalendars.filter(c => c.assignTo).length === 0}
+              disabled={(() => { const t = checkedCals.size > 0 ? savedCalendars.filter(c => checkedCals.has(c.id)) : savedCalendars; return t.filter(c => c.assignTo).length === 0; })()}
               className="w-full py-3 rounded-xl text-sm font-bold text-white active:opacity-90 disabled:opacity-40"
               style={{ background: "linear-gradient(135deg, #00c473, #00a35e)" }}
             >
-              이동 시작
+              {checkedCals.size > 0 ? `선택 ${checkedCals.size}개 이동 시작` : "이동 시작"}
             </button>
           )}
 
