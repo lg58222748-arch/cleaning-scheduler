@@ -254,7 +254,7 @@ export default function Home() {
     function startPolling() {
       if (pollInterval) return;
       console.log("[RT] 폴링 시작 (Realtime 실패)");
-      pollInterval = setInterval(() => { reloadSchedules(); reloadNotifications(); }, 30000);
+      pollInterval = setInterval(() => { reloadSchedules(); reloadNotifications(); }, 10000);
     }
     function stopPolling() {
       if (pollInterval) { console.log("[RT] 폴링 중지 (Realtime 복구)"); clearInterval(pollInterval); pollInterval = null; }
