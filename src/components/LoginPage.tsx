@@ -103,6 +103,11 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
                 <input
                   value={username} onChange={(e) => setUsername(e.target.value)}
                   placeholder="아이디를 입력하세요"
+                  autoComplete="off"
+                  autoCorrect="off"
+                  autoCapitalize="off"
+                  spellCheck={false}
+                  name="login-id-field"
                   className={inputClass}
                 />
               </div>
@@ -113,6 +118,8 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
                   value={password} onChange={(e) => setPassword(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && handleLogin()}
                   placeholder="비밀번호를 입력하세요"
+                  autoComplete="new-password"
+                  name="login-pw-field"
                   className={inputClass}
                 />
               </div>
@@ -130,6 +137,8 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
                 <input
                   value={regUsername} onChange={(e) => setRegUsername(e.target.value)}
                   placeholder="로그인에 사용할 아이디"
+                  autoComplete="off"
+                  name="reg-id-field"
                   className={inputClass}
                 />
               </div>
@@ -140,6 +149,8 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
                     type="password"
                     value={regPassword} onChange={(e) => setRegPassword(e.target.value)}
                     placeholder="4자 이상"
+                    autoComplete="new-password"
+                    name="reg-pw-field"
                     className={inputClass}
                   />
                 </div>
@@ -149,6 +160,8 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
                     type="password"
                     value={regPasswordConfirm} onChange={(e) => setRegPasswordConfirm(e.target.value)}
                     placeholder="다시 입력"
+                    autoComplete="new-password"
+                    name="reg-pw-confirm-field"
                     className={inputClass}
                   />
                 </div>
