@@ -249,19 +249,34 @@ export default function Home() {
       }).catch(() => {});
     }
 
+    // 폴링 인터벌 (Realtime 실패 시에만 활성화)
+    let pollInterval: ReturnType<typeof setInterval> | null = null;
+    function startPolling() {
+      if (pollInterval) return;
+      console.log("[RT] 폴링 시작 (Realtime 실패)");
+      pollInterval = setInterval(() => { reloadSchedules(); reloadNotifications(); }, 30000);
+    }
+    function stopPolling() {
+      if (pollInterval) { console.log("[RT] 폴링 중지 (Realtime 복구)"); clearInterval(pollInterval); pollInterval = null; }
+    }
+
     // Supabase Realtime 구독 (즉시 반영)
     const channel = sbClient.channel("all-db-changes")
       .on("postgres_changes", { event: "*", schema: "public", table: "schedules" }, () => { console.log("[RT] schedules changed"); reloadSchedules(); })
       .on("postgres_changes", { event: "*", schema: "public", table: "notifications" }, () => { console.log("[RT] notifications changed"); reloadNotifications(); })
       .on("postgres_changes", { event: "*", schema: "public", table: "members" }, () => { fetchMembers().then(m => setMembers(m)).catch(() => {}); })
       .on("postgres_changes", { event: "*", schema: "public", table: "users" }, () => { fetchUsers().then(d => { setAllUsers(d.users); setPendingUsers(d.pendingUsers); }).catch(() => {}); })
-      .subscribe((status: string) => { console.log("[RT] status:", status); });
-
-    // 폴링 백업: Realtime 실패 대비 (15초)
-    const interval = setInterval(() => { reloadSchedules(); reloadNotifications(); }, 15000);
+      .subscribe((status: string) => {
+        console.log("[RT] status:", status);
+        if (status === "SUBSCRIBED") {
+          stopPolling(); // Realtime 정상 → 폴링 중지
+        } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
+          startPolling(); // Realtime 실패 → 폴링 백업 가동
+        }
+      });
 
     return () => {
-      clearInterval(interval);
+      stopPolling();
       sbClient.removeChannel(channel);
     };
   }, [currentUser, selectedDate]); // eslint-disable-line react-hooks/exhaustive-deps
