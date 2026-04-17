@@ -77,15 +77,7 @@ export default function ManageTab({ isAdmin, userRole, userName = "", allUsers =
 
       {/* 현장팀 탭 */}
       {activeSubTab === "field" && (
-        <div className="px-4 py-12 text-center text-gray-400 text-sm">
-          <div className="w-12 h-12 mx-auto mb-3 bg-gray-100 rounded-full flex items-center justify-center">
-            <svg className="w-6 h-6 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-            </svg>
-          </div>
-          <p className="font-medium text-gray-500">현장팀 관리</p>
-          <p className="text-xs text-gray-400 mt-1">추후 업데이트 예정</p>
-        </div>
+        <FieldStatsSection allUsers={allUsers} />
       )}
 
       {/* 일정관리자 탭 */}
@@ -248,6 +240,180 @@ function CeoSection({ onRefresh, allUsers, members }: {
           <div className="text-xs text-gray-400">모든 일정을 영구 삭제합니다</div>
         </div>
       </button>
+    </div>
+  );
+}
+
+
+/* ════════════ 현장팀 통계 섹션 ════════════ */
+function FieldStatsSection({ allUsers }: {
+  allUsers: { id?: string; name: string; username?: string; role?: string; address?: string; branch?: string }[];
+}) {
+  const [schedules, setSchedules] = useState<Schedule[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchSchedules().then(s => { setSchedules(s); setLoading(false); }).catch(() => setLoading(false));
+  }, []);
+
+  const now = new Date();
+  const curMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+
+  // 이번달 일정만
+  const monthScheds = useMemo(() => schedules.filter(s => s.date.startsWith(curMonth) && s.status !== "unassigned"), [schedules, curMonth]);
+
+  // AS 판정: 제목에 "AS", "A/S", "재방문" 포함
+  const isAS = (title: string) => /AS|A\/S|재방문/i.test(title);
+
+  // 팀원별 통계 (현장팀 기준)
+  const memberStats = useMemo(() => {
+    const stats: Record<string, { name: string; total: number; as: number; completed: number; branch: string }> = {};
+    const fieldUsers = allUsers.filter(u => u.role === "field");
+    for (const u of fieldUsers) {
+      const branch = (u.branch || "").replace(/\[관리점\]/, "").trim() || "미지정";
+      stats[u.name] = { name: u.name, total: 0, as: 0, completed: 0, branch };
+    }
+    for (const s of monthScheds) {
+      const name = s.memberName;
+      if (!stats[name]) continue;
+      stats[name].total++;
+      if (isAS(s.title)) stats[name].as++;
+      if (s.status === "completed") stats[name].completed++;
+    }
+    return Object.values(stats).filter(s => s.total > 0).sort((a, b) => b.total - a.total);
+  }, [monthScheds, allUsers]);
+
+  // 우수팀 TOP 3 (AS 발생률 낮고 + 작업 많은 순)
+  const topTeam = useMemo(() => {
+    return [...memberStats]
+      .filter(s => s.total >= 1)
+      .sort((a, b) => {
+        const rateA = a.as / a.total;
+        const rateB = b.as / b.total;
+        if (rateA !== rateB) return rateA - rateB;
+        return b.total - a.total;
+      })
+      .slice(0, 3);
+  }, [memberStats]);
+
+  // 관리점별 AS 집계
+  const branchStats = useMemo(() => {
+    const map: Record<string, { name: string; total: number; as: number }> = {};
+    for (const m of memberStats) {
+      if (!map[m.branch]) map[m.branch] = { name: m.branch, total: 0, as: 0 };
+      map[m.branch].total += m.total;
+      map[m.branch].as += m.as;
+    }
+    return Object.values(map).sort((a, b) => b.total - a.total);
+  }, [memberStats]);
+
+  if (loading) return <div className="py-8 text-center text-gray-400 text-sm">로딩 중...</div>;
+
+  return (
+    <div className="px-4 py-4 space-y-5">
+      {/* 이번달 헤더 */}
+      <div className="text-center">
+        <div className="text-xs text-gray-400">{curMonth.replace("-", "년 ")}월</div>
+        <div className="text-lg font-extrabold text-gray-800">현장팀 실적</div>
+      </div>
+
+      {/* 우수팀 TOP 3 */}
+      <div>
+        <div className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">🏆 이번달 우수팀</div>
+        {topTeam.length === 0 ? (
+          <div className="py-6 text-center text-gray-400 text-sm bg-gray-50 rounded-xl">아직 집계된 실적이 없습니다</div>
+        ) : (
+          <div className="space-y-2">
+            {topTeam.map((m, i) => {
+              const medals = ["🥇", "🥈", "🥉"];
+              const bgs = ["bg-gradient-to-r from-yellow-50 to-amber-50 border-yellow-300", "bg-gradient-to-r from-gray-50 to-slate-50 border-gray-300", "bg-gradient-to-r from-orange-50 to-red-50 border-orange-300"];
+              const asRate = m.total > 0 ? Math.round((m.as / m.total) * 100) : 0;
+              return (
+                <div key={m.name} className={`border rounded-xl p-3 ${bgs[i]}`}>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xl">{medals[i]}</span>
+                      <div>
+                        <div className="text-sm font-bold text-gray-800">{m.name}</div>
+                        <div className="text-[10px] text-gray-500">{m.branch}[관리점]</div>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-base font-extrabold text-gray-800">{m.total}건</div>
+                      <div className="text-[10px] text-gray-500">AS {asRate}% ({m.as}건)</div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* 관리점별 AS 발생률 */}
+      <div>
+        <div className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">📍 관리점별 AS 발생률</div>
+        {branchStats.length === 0 ? (
+          <div className="py-6 text-center text-gray-400 text-sm bg-gray-50 rounded-xl">데이터 없음</div>
+        ) : (
+          <div className="space-y-2">
+            {branchStats.map(b => {
+              const rate = b.total > 0 ? (b.as / b.total) * 100 : 0;
+              const rateStr = rate.toFixed(1);
+              const rateColor = rate < 5 ? "bg-green-500" : rate < 10 ? "bg-yellow-500" : rate < 20 ? "bg-orange-500" : "bg-red-500";
+              const rateText = rate < 5 ? "text-green-600" : rate < 10 ? "text-yellow-600" : rate < 20 ? "text-orange-600" : "text-red-600";
+              return (
+                <div key={b.name} className="border border-gray-200 rounded-xl p-3">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-sm font-bold text-gray-800">{b.name}</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-gray-500">{b.total}건</span>
+                      <span className={`text-xs font-bold ${rateText}`}>AS {rateStr}%</span>
+                    </div>
+                  </div>
+                  <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                    <div className={`h-full ${rateColor} rounded-full transition-all`} style={{ width: `${Math.min(rate, 100)}%` }} />
+                  </div>
+                  <div className="text-[10px] text-gray-400 mt-1">
+                    전체 {b.total}건 중 AS {b.as}건
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* 팀원별 상세 */}
+      <div>
+        <div className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">👥 팀원별 현황</div>
+        {memberStats.length === 0 ? (
+          <div className="py-6 text-center text-gray-400 text-sm bg-gray-50 rounded-xl">데이터 없음</div>
+        ) : (
+          <div className="space-y-1.5">
+            {memberStats.map(m => {
+              const rate = m.total > 0 ? (m.as / m.total) * 100 : 0;
+              return (
+                <div key={m.name} className="flex items-center justify-between border border-gray-200 rounded-lg px-3 py-2">
+                  <div className="flex items-center gap-2 flex-1 min-w-0">
+                    <span className="text-sm font-medium text-gray-800 truncate">{m.name}</span>
+                    <span className="text-[10px] text-gray-400">{m.branch}</span>
+                  </div>
+                  <div className="flex items-center gap-3 text-xs shrink-0">
+                    <span className="text-blue-600 font-medium">{m.total}건</span>
+                    {m.as > 0 && <span className="text-red-500">AS {m.as}</span>}
+                    <span className="text-gray-400">{rate.toFixed(0)}%</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      <div className="p-2 bg-blue-50 rounded-lg text-[10px] text-blue-600 text-center">
+        ℹ️ AS 판정: 제목에 &quot;AS&quot;, &quot;A/S&quot;, &quot;재방문&quot; 포함 시
+      </div>
     </div>
   );
 }
