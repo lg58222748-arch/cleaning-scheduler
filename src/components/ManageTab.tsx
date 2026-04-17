@@ -12,10 +12,11 @@ interface ManageTabProps {
   userName?: string;
   allUsers?: { id?: string; name: string; username?: string; role?: string; address?: string; branch?: string }[];
   members?: { id: string; name: string; linkedUsername?: string }[];
+  schedules?: Schedule[];
   onRefresh: () => void;
 }
 
-export default function ManageTab({ isAdmin, userRole, userName = "", allUsers = [], members = [], onRefresh }: ManageTabProps) {
+export default function ManageTab({ isAdmin, userRole, userName = "", allUsers = [], members = [], schedules = [], onRefresh }: ManageTabProps) {
   // 역할별 기본 탭
   const defaultTab: ManageSubTab =
     userRole === "ceo" ? "ceo" :
@@ -67,17 +68,17 @@ export default function ManageTab({ isAdmin, userRole, userName = "", allUsers =
 
       {/* 대표 탭 */}
       {activeSubTab === "ceo" && (
-        <CeoSection onRefresh={onRefresh} allUsers={allUsers} members={members} />
+        <CeoSection onRefresh={onRefresh} allUsers={allUsers} members={members} schedules={schedules} />
       )}
 
       {/* 영업팀 탭 */}
       {activeSubTab === "sales-stats" && (
-        <SalesStatsSection userName={userName} userRole={userRole} allUsers={allUsers} />
+        <SalesStatsSection userName={userName} userRole={userRole} allUsers={allUsers} schedules={schedules} />
       )}
 
       {/* 현장팀 탭 */}
       {activeSubTab === "field" && (
-        <FieldStatsSection allUsers={allUsers} />
+        <FieldStatsSection allUsers={allUsers} schedules={schedules} />
       )}
 
       {/* 일정관리자 탭 */}
@@ -98,23 +99,17 @@ export default function ManageTab({ isAdmin, userRole, userName = "", allUsers =
 
 
 /* ════════════ 대표 전용 섹션 ════════════ */
-function CeoSection({ onRefresh, allUsers, members }: {
+function CeoSection({ onRefresh, allUsers, members, schedules }: {
   onRefresh: () => void;
   allUsers: { id?: string; name: string; username?: string; role?: string; address?: string; branch?: string }[];
   members: { id: string; name: string; linkedUsername?: string }[];
+  schedules: Schedule[];
 }) {
   const [trashItems, setTrashItems] = useState<Schedule[]>([]);
   const [loading, setLoading] = useState(false);
   const [showTrash, setShowTrash] = useState(false);
-  const [totalCount, setTotalCount] = useState(0);
   const [showGoogleImport, setShowGoogleImport] = useState(false);
-
-  useEffect(() => { loadCounts(); }, []);
-
-  async function loadCounts() {
-    const all = await fetchSchedules();
-    setTotalCount(all.length);
-  }
+  const totalCount = schedules.length;
 
   async function loadTrash() {
     setLoading(true);
@@ -137,13 +132,11 @@ function CeoSection({ onRefresh, allUsers, members }: {
   async function handleDeleteAll() {
     const result = await deleteAllSchedules();
     onRefresh();
-    loadCounts();
     alert(`${result.deleted}건 삭제 완료`);
   }
 
   async function handleBackup() {
-    const all = await fetchSchedules();
-    const blob = new Blob([JSON.stringify(all, null, 2)], { type: "application/json" });
+    const blob = new Blob([JSON.stringify(schedules, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
@@ -246,16 +239,10 @@ function CeoSection({ onRefresh, allUsers, members }: {
 
 
 /* ════════════ 현장팀 통계 섹션 ════════════ */
-function FieldStatsSection({ allUsers }: {
+function FieldStatsSection({ allUsers, schedules }: {
   allUsers: { id?: string; name: string; username?: string; role?: string; address?: string; branch?: string }[];
+  schedules: Schedule[];
 }) {
-  const [schedules, setSchedules] = useState<Schedule[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    fetchSchedules().then(s => { setSchedules(s); setLoading(false); }).catch(() => setLoading(false));
-  }, []);
-
   const now = new Date();
   const curMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
 
@@ -306,8 +293,6 @@ function FieldStatsSection({ allUsers }: {
     }
     return Object.values(map).sort((a, b) => b.total - a.total);
   }, [memberStats]);
-
-  if (loading) return <div className="py-8 text-center text-gray-400 text-sm">로딩 중...</div>;
 
   return (
     <div className="px-4 py-4 space-y-5">
@@ -420,28 +405,18 @@ function FieldStatsSection({ allUsers }: {
 
 
 /* ════════════ 영업팀 통계 섹션 ════════════ */
-function SalesStatsSection({ userName, userRole, allUsers }: {
+function SalesStatsSection({ userName, userRole, allUsers, schedules }: {
   userName: string;
   userRole: string;
   allUsers: { id?: string; name: string; username?: string; role?: string; address?: string; branch?: string }[];
+  schedules: Schedule[];
 }) {
-  const [schedules, setSchedules] = useState<Schedule[]>([]);
-  const [loading, setLoading] = useState(true);
   const [filterMode, setFilterMode] = useState<"month" | "date">("month");
   const [selectedMonth, setSelectedMonth] = useState(() => {
     const now = new Date();
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
   });
   const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().slice(0, 10));
-
-  useEffect(() => { loadSchedules(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  async function loadSchedules() {
-    setLoading(true);
-    const all = await fetchSchedules();
-    setSchedules(all);
-    setLoading(false);
-  }
 
   // 필터링된 일정
   const filteredSchedules = filterMode === "month"
@@ -468,8 +443,6 @@ function SalesStatsSection({ userName, userRole, allUsers }: {
   const myConfirmed = mySchedules.filter(s => !s.title.includes("/미입금")).length;
   const myPending = mySchedules.filter(s => s.title.includes("/미입금")).length;
 
-  if (loading) return <div className="py-8 text-center text-gray-400 text-sm">로딩 중...</div>;
-
   return (
     <div className="px-4 py-4 space-y-4">
       {/* 필터 모드 전환 */}
@@ -493,7 +466,6 @@ function SalesStatsSection({ userName, userRole, allUsers }: {
           <input type="date" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)}
             className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-400" />
         )}
-        <button onClick={loadSchedules} className="px-3 py-2 bg-blue-50 text-blue-600 rounded-lg text-xs font-bold active:bg-blue-100">새로고침</button>
       </div>
 
       {/* 요약 카드 */}

@@ -924,6 +924,7 @@ export default function Home() {
             userName={currentUser.name}
             allUsers={allUsers.map(u => ({ id: u.id, name: u.name, username: u.username, role: u.role, address: u.address, branch: u.branch }))}
             members={members.map(m => ({ id: m.id, name: m.name, linkedUsername: m.linkedUsername }))}
+            schedules={schedules}
             onRefresh={() => loadData(undefined, true)}
           />
         </div>

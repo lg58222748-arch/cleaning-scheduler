@@ -2,9 +2,9 @@ import { NextRequest } from "next/server";
 import { getUsers, getPendingUsers, approveUser, rejectUser, changeUserRole, deleteUser, updateUserInfo } from "@/lib/store";
 
 export async function GET() {
-  return Response.json({
-    users: await getUsers(),
-    pendingUsers: await getPendingUsers(),
+  const [users, pendingUsers] = await Promise.all([getUsers(), getPendingUsers()]);
+  return Response.json({ users, pendingUsers }, {
+    headers: { "Cache-Control": "private, max-age=10, stale-while-revalidate=60" },
   });
 }
 

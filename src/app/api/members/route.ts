@@ -2,7 +2,9 @@ import { NextRequest } from "next/server";
 import { getMembers, addMember } from "@/lib/store";
 
 export async function GET() {
-  return Response.json(await getMembers());
+  return Response.json(await getMembers(), {
+    headers: { "Cache-Control": "private, max-age=30, stale-while-revalidate=120" },
+  });
 }
 
 export async function POST(req: NextRequest) {
