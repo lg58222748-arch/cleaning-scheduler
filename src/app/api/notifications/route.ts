@@ -5,6 +5,7 @@ import {
   markNotificationRead,
   markAllNotificationsRead,
   deleteAllNotifications,
+  deleteNotificationsByIds,
   checkHappyCallReminders,
   createSystemNotice,
   getSystemNotices,
@@ -39,6 +40,11 @@ export async function POST(req: NextRequest) {
 
   if (body.action === "clearAll") {
     const count = await deleteAllNotifications();
+    return Response.json({ success: true, deleted: count });
+  }
+
+  if (body.action === "deleteMany" && Array.isArray(body.ids)) {
+    const count = await deleteNotificationsByIds(body.ids.map(String));
     return Response.json({ success: true, deleted: count });
   }
 

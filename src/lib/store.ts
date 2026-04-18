@@ -277,6 +277,12 @@ export async function deleteAllNotifications(): Promise<number> {
   return count;
 }
 
+export async function deleteNotificationsByIds(ids: string[]): Promise<number> {
+  if (!ids || ids.length === 0) return 0;
+  await supabase.from("notifications").delete().in("id", ids);
+  return ids.length;
+}
+
 // 전체 공지 (대표/admin 전용): 모든 사용자에게 in-app 알림 + 푸시 전송
 export async function createSystemNotice(title: string, message: string): Promise<Notification> {
   const { data } = await supabase.from("notifications").insert({ type: "system_notice", title, message, read: false }).select().single();

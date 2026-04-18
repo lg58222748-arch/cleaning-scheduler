@@ -40,6 +40,7 @@ import {
   fetchNotifications,
   markNotificationRead as apiMarkRead,
   markAllNotificationsRead as apiMarkAllRead,
+  deleteNotificationsByIds as apiDeleteNotifications,
   fetchUsers,
   approveUserApi,
   rejectUserApi,
@@ -123,6 +124,10 @@ export default function Home() {
   const [filterActive, setFilterActive] = useState(false);
   const filterLoadedRef = useRef(false);
   const [returnAlerts, setReturnAlerts] = useState<{ id: string; title: string; date: string; reason: string }[]>([]);
+  // 알림 액션 중엔 외부 reload 억제 (모두읽음/지우기 깜빡임 방지)
+  const notifReloadSuppressRef = useRef(0);
+  // 로컬에서 삭제한 알림 ID - 재동기화 시 다시 나타나지 않게
+  const deletedNotifIdsRef = useRef<Set<string>>(new Set<string>());
 
   const loadData = useCallback(async (monthDate?: Date, fullRefresh = false) => {
     try {
@@ -146,8 +151,10 @@ export default function Home() {
         // 알림: 본인 이름 포함된 것만 표시 + 전체 공지(system_notice)는 모두에게
         const allNotifs = notif.notifications as Notification[];
         const uName = currentUser?.name || "";
+        const deleted = deletedNotifIdsRef.current;
         const myNotifs = allNotifs.filter(n =>
-          n.type === "system_notice" || (uName && (n.message.includes(uName) || n.title.includes(uName)))
+          !deleted.has(n.id) &&
+          (n.type === "system_notice" || (uName && (n.message.includes(uName) || n.title.includes(uName))))
         );
         setNotifications(myNotifs);
         setUnreadCount(myNotifs.filter(n => !n.read).length);
@@ -266,10 +273,14 @@ export default function Home() {
       fetchUnassignedSchedules().then(s => setUnassignedSchedules(s)).catch(() => {});
     }
     function reloadNotifications() {
+      // 알림 액션 중이면 reload 억제
+      if (Date.now() < notifReloadSuppressRef.current) return;
       fetchNotifications().then(notif => {
         const allNotifs = notif.notifications as Notification[];
+        const deleted = deletedNotifIdsRef.current;
         const myNotifs = allNotifs.filter(n =>
-          n.type === "system_notice" || (uName && (n.message.includes(uName) || n.title.includes(uName)))
+          !deleted.has(n.id) &&
+          (n.type === "system_notice" || (uName && (n.message.includes(uName) || n.title.includes(uName))))
         );
         setNotifications(myNotifs);
         setUnreadCount(myNotifs.filter(n => !n.read).length);
@@ -692,20 +703,27 @@ export default function Home() {
     await rejectSwapRequest(swapId);
   }
 
-  // Notifications — 낙관적 업데이트
+  // Notifications — 낙관적 업데이트 + reload 억제로 깜빡임 방지
   async function handleMarkRead(id: string) {
+    notifReloadSuppressRef.current = Date.now() + 3000;
     setNotifications((prev) => prev.map((n) => n.id === id ? { ...n, read: true } : n));
     setUnreadCount((c) => Math.max(0, c - 1));
     await apiMarkRead(id);
   }
   async function handleMarkAllRead() {
+    notifReloadSuppressRef.current = Date.now() + 3000;
     setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
     setUnreadCount(0);
     await apiMarkAllRead();
   }
-  function handleClearAllNotifications() {
+  async function handleClearAllNotifications() {
+    // DB 에서도 제거 (현재 화면에 보이는 ID 들)
+    const ids = notifications.map((n) => n.id);
+    ids.forEach((id) => deletedNotifIdsRef.current.add(id));
+    notifReloadSuppressRef.current = Date.now() + 3000;
     setNotifications([]);
     setUnreadCount(0);
+    await apiDeleteNotifications(ids);
   }
 
   // Google Calendar 제거됨 - 직접 등록/영업탭으로 대체

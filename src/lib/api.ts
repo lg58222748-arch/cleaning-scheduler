@@ -249,6 +249,17 @@ export async function markAllNotificationsRead(): Promise<void> {
   } catch { /* 낙관적 업데이트 */ }
 }
 
+export async function deleteNotificationsByIds(ids: string[]): Promise<void> {
+  if (!ids || ids.length === 0) return;
+  try {
+    await safeFetch(`${BASE}/api/notifications`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "deleteMany", ids }),
+    });
+  } catch { /* 낙관적 업데이트 */ }
+}
+
 // Comments
 export async function fetchComments(scheduleId: string): Promise<import("@/types").Comment[]> {
   return safeJson(`${BASE}/api/comments?scheduleId=${scheduleId}`, []);
