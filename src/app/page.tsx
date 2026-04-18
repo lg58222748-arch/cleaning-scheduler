@@ -731,26 +731,17 @@ export default function Home() {
     // API 완료 후에도 확실히 상태 고정
     setNotifications((prev) => prev.map((n) => n.id === id ? { ...n, read: true } : n));
   }
-  async function handleMarkAllRead() {
-    notifReloadSuppressRef.current = Date.now() + 6000;
-    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
-    setUnreadCount(0);
-    await apiMarkAllRead();
-    // API 완료 후에도 확실히 상태 고정 (그 사이 도착한 reload 결과를 덮어씀)
-    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
-    setUnreadCount(0);
-  }
   async function handleClearAllNotifications() {
-    // 해피콜 리마인더는 DB 에서 지우면 서버가 다시 생성하므로 유지 (로컬만 숨김 + 읽음 처리)
+    // 지우기 = 모두 읽음 + 삭제 (해피콜은 DB 유지 → 서버 재생성 차단)
     const deletable = notifications.filter((n) => n.type !== "happy_call_reminder").map((n) => n.id);
     const allIds = notifications.map((n) => n.id);
     allIds.forEach((id) => deletedNotifIdsRef.current.add(id));
     notifReloadSuppressRef.current = Date.now() + 6000;
     setNotifications([]);
     setUnreadCount(0);
+    // DB: 삭제 가능한 것은 삭제, 해피콜은 읽음 처리로 유지
     if (deletable.length > 0) await apiDeleteNotifications(deletable);
     await apiMarkAllRead();
-    // API 완료 후에도 확실히 비움
     setNotifications([]);
     setUnreadCount(0);
   }
@@ -1418,7 +1409,6 @@ export default function Home() {
         <NotificationPanel
           notifications={notifications}
           onMarkRead={handleMarkRead}
-          onMarkAllRead={handleMarkAllRead}
           onClearAll={handleClearAllNotifications}
           onClose={() => { setShowNotifications(false); consumeHash(); }}
         />

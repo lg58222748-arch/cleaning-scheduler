@@ -5,7 +5,6 @@ import { Notification } from "@/types";
 interface NotificationPanelProps {
   notifications: Notification[];
   onMarkRead: (id: string) => void;
-  onMarkAllRead: () => void;
   onClearAll?: () => void;
   onClose: () => void;
 }
@@ -35,7 +34,6 @@ function timeAgo(dateStr: string): string {
 export default function NotificationPanel({
   notifications,
   onMarkRead,
-  onMarkAllRead,
   onClearAll,
   onClose,
 }: NotificationPanelProps) {
@@ -54,11 +52,6 @@ export default function NotificationPanel({
             )}
           </div>
           <div className="flex items-center gap-1.5">
-            {unreadCount > 0 && (
-              <button onClick={onMarkAllRead} className="text-xs px-2.5 py-1 bg-blue-50 text-blue-600 rounded-lg font-medium active:bg-blue-100">
-                모두 읽음
-              </button>
-            )}
             {notifications.length > 0 && onClearAll && (
               <button onClick={onClearAll} className="text-xs px-2.5 py-1 bg-red-50 text-red-500 rounded-lg font-medium active:bg-red-100">
                 지우기
