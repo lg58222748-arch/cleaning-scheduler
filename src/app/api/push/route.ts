@@ -17,7 +17,12 @@ export async function POST(req: NextRequest) {
     const { subscription, userId, userName } = body;
     if (!subscription?.endpoint) return Response.json({ error: "Invalid subscription" }, { status: 400 });
 
-    // 기존 구독 업데이트 또는 새로 추가
+    // 같은 사용자의 다른(stale) 구독 제거 - 중복 푸시 방지
+    if (userId) {
+      await supabase.from("push_subscriptions").delete().eq("user_id", userId).neq("endpoint", subscription.endpoint);
+    }
+
+    // 현재 엔드포인트는 upsert
     const { data: existing } = await supabase.from("push_subscriptions").select("id").eq("endpoint", subscription.endpoint).single();
     if (existing) {
       await supabase.from("push_subscriptions").update({
@@ -38,12 +43,19 @@ export async function POST(req: NextRequest) {
   if (body.action === "subscribe-fcm") {
     const { token, userId, userName } = body;
     if (!token) return Response.json({ error: "Invalid token" }, { status: 400 });
-    const { data: existing } = await supabase.from("push_subscriptions").select("id").eq("endpoint", `fcm:${token}`).single();
+    const endpoint = `fcm:${token}`;
+
+    // 같은 사용자의 다른 구독 제거
+    if (userId) {
+      await supabase.from("push_subscriptions").delete().eq("user_id", userId).neq("endpoint", endpoint);
+    }
+
+    const { data: existing } = await supabase.from("push_subscriptions").select("id").eq("endpoint", endpoint).single();
     if (existing) {
       await supabase.from("push_subscriptions").update({ user_id: userId, user_name: userName }).eq("id", existing.id);
     } else {
       await supabase.from("push_subscriptions").insert({
-        user_id: userId, user_name: userName, endpoint: `fcm:${token}`, p256dh: "fcm", auth: "fcm",
+        user_id: userId, user_name: userName, endpoint, p256dh: "fcm", auth: "fcm",
       });
     }
     return Response.json({ success: true });
@@ -73,6 +85,23 @@ export async function POST(req: NextRequest) {
       }
     }
     return Response.json({ sent, failed });
+  }
+
+  // 기존 중복 구독 정리 - 사용자별 최신 엔드포인트 1개만 남김
+  if (body.action === "dedupe") {
+    const { data: subs } = await supabase.from("push_subscriptions").select("*").order("id", { ascending: false });
+    if (!subs) return Response.json({ kept: 0, deleted: 0 });
+    const seen = new Set<string>();
+    const toDelete: string[] = [];
+    for (const s of subs) {
+      const key = String(s.user_id || s.endpoint);
+      if (seen.has(key)) toDelete.push(s.id);
+      else seen.add(key);
+    }
+    if (toDelete.length > 0) {
+      await supabase.from("push_subscriptions").delete().in("id", toDelete);
+    }
+    return Response.json({ kept: subs.length - toDelete.length, deleted: toDelete.length });
   }
 
   return Response.json({ error: "Invalid action" }, { status: 400 });
