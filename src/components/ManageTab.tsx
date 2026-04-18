@@ -819,26 +819,28 @@ function GoogleCalendarImport({ allUsers, members, onImported }: {
             <button
               onClick={async () => {
                 const targetCals = checkedCals.size > 0 ? savedCalendars.filter(c => checkedCals.has(c.id)) : savedCalendars;
-                const calsWithAssign = targetCals.filter(c => c.assignTo);
-                if (calsWithAssign.length === 0) { setError("담당자를 선택해주세요"); return; }
+                if (targetCals.length === 0) { setError("캘린더를 선택해주세요"); return; }
                 setImporting(true); setImportProgress(0); setError("");
                 let count = 0;
                 let total = 0;
-                for (const cal of calsWithAssign) {
+                for (const cal of targetCals) {
                   try {
                     const data = await fetchFromCalendar(cal.id);
                     if (data.status === "ok" && data.items) total += data.items.length;
                   } catch {}
                 }
                 let done = 0;
-                for (const cal of calsWithAssign) {
+                for (const cal of targetCals) {
                   try {
                     const data = await fetchFromCalendar(cal.id);
                     if (data.status === "ok" && data.items) {
                       for (const ev of data.items) {
                         try {
                           const created = await addUnassignedSchedule({ title: ev.summary || "(제목 없음)", date: ev.date || "", startTime: "09:00", endTime: "18:00", note: ev.description || "" });
-                          if (created?.id) await assignScheduleApi(created.id, cal.assignTo, savedCalendars.find(c => c.id === cal.id)?.name || "");
+                          // assignTo 가 있으면 달력탭으로 배정, 없으면 배정탭(미배정)으로 유지
+                          if (created?.id && cal.assignTo) {
+                            await assignScheduleApi(created.id, cal.assignTo, savedCalendars.find(c => c.id === cal.id)?.name || "");
+                          }
                           count++;
                         } catch {}
                         done++;
@@ -849,7 +851,7 @@ function GoogleCalendarImport({ allUsers, members, onImported }: {
                 }
                 setImporting(false); setImportCount(count); setImportDone(true); onImported();
               }}
-              disabled={(() => { const t = checkedCals.size > 0 ? savedCalendars.filter(c => checkedCals.has(c.id)) : savedCalendars; return t.filter(c => c.assignTo).length === 0; })()}
+              disabled={(() => { const t = checkedCals.size > 0 ? savedCalendars.filter(c => checkedCals.has(c.id)) : savedCalendars; return t.length === 0; })()}
               className="w-full py-3 rounded-xl text-sm font-bold text-white active:opacity-90 disabled:opacity-40"
               style={{ background: "linear-gradient(135deg, #00c473, #00a35e)" }}
             >
