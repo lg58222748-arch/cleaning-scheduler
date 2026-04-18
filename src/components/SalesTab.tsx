@@ -305,6 +305,11 @@ export default function SalesTab({ userName, onCreated }: SalesTabProps) {
   }
 
   async function handleCopy(text: string, label: string) {
+    // 이미 체크된 경우 → 체크 해제만 하고 복사 안 함
+    if (copied.has(label)) {
+      setCopied(prev => { const n = new Set(prev); n.delete(label); return n; });
+      return;
+    }
     try { await navigator.clipboard.writeText(text); } catch {
       const ta = document.createElement("textarea"); ta.value = text; document.body.appendChild(ta); ta.select(); document.execCommand("copy"); document.body.removeChild(ta);
     }
