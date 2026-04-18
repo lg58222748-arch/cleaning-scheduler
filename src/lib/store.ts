@@ -268,6 +268,15 @@ export async function markAllNotificationsRead(): Promise<void> {
   await supabase.from("notifications").update({ read: true }).eq("read", false);
 }
 
+export async function deleteAllNotifications(): Promise<number> {
+  const { data } = await supabase.from("notifications").select("id");
+  const count = data?.length || 0;
+  if (count > 0) {
+    await supabase.from("notifications").delete().gte("id", "00000000-0000-0000-0000-000000000000");
+  }
+  return count;
+}
+
 export async function checkHappyCallReminders(): Promise<Notification[]> {
   const tomorrow = new Date();
   tomorrow.setDate(tomorrow.getDate() + 1);

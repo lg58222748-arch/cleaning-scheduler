@@ -4,6 +4,7 @@ import {
   getUnreadCount,
   markNotificationRead,
   markAllNotificationsRead,
+  deleteAllNotifications,
   checkHappyCallReminders,
 } from "@/lib/store";
 
@@ -27,6 +28,11 @@ export async function POST(req: NextRequest) {
   if (body.action === "markAllRead") {
     await markAllNotificationsRead();
     return Response.json({ success: true });
+  }
+
+  if (body.action === "clearAll") {
+    const count = await deleteAllNotifications();
+    return Response.json({ success: true, deleted: count });
   }
 
   return Response.json({ error: "Invalid action" }, { status: 400 });

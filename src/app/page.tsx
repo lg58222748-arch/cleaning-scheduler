@@ -147,13 +147,12 @@ export default function Home() {
         setSchedules(rangeScheds);
         setUnassignedSchedules(unassignedScheds);
         setSwapRequests(sw);
-        // 알림: 대표는 전체, 나머지는 본인 이름 포함된 것만
+        // 알림: 역할 무관 본인 이름 포함된 것만 표시
         const allNotifs = notif.notifications as Notification[];
         const uName = currentUser?.name || "";
-        const uRole = currentUser?.role || "";
-        const myNotifs = (uRole === "ceo" || uRole === "admin" || uRole === "scheduler")
-          ? allNotifs
-          : allNotifs.filter(n => n.message.includes(uName) || n.title.includes(uName));
+        const myNotifs = uName
+          ? allNotifs.filter(n => n.message.includes(uName) || n.title.includes(uName))
+          : [];
         setNotifications(myNotifs);
         setUnreadCount(myNotifs.filter(n => !n.read).length);
         setAllUsers(usersData.users);
@@ -237,7 +236,6 @@ export default function Home() {
   useEffect(() => {
     if (!currentUser) return;
     const uName = currentUser?.name || "";
-    const uRole = currentUser?.role || "";
 
     function reloadSchedules() {
       const d = selectedDate;
@@ -249,9 +247,9 @@ export default function Home() {
     function reloadNotifications() {
       fetchNotifications().then(notif => {
         const allNotifs = notif.notifications as Notification[];
-        const myNotifs = (uRole === "ceo" || uRole === "admin" || uRole === "scheduler")
-          ? allNotifs
-          : allNotifs.filter(n => n.message.includes(uName) || n.title.includes(uName));
+        const myNotifs = uName
+          ? allNotifs.filter(n => n.message.includes(uName) || n.title.includes(uName))
+          : [];
         setNotifications(myNotifs);
         setUnreadCount(myNotifs.filter(n => !n.read).length);
       }).catch(() => {});
