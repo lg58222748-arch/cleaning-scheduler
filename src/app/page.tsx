@@ -38,9 +38,6 @@ import {
   rejectSwapRequest,
   addUnassignedSchedule,
   fetchNotifications,
-  markNotificationRead as apiMarkRead,
-  markAllNotificationsRead as apiMarkAllRead,
-  deleteNotificationsByIds as apiDeleteNotifications,
   fetchUsers,
   approveUserApi,
   rejectUserApi,
@@ -129,9 +126,14 @@ export default function Home() {
   // 일정 액션(생성/수정/반환/삭제) 중엔 schedule reload 억제 (낙관적 업데이트 보호)
   const scheduleReloadSuppressRef = useRef(0);
   // 로컬에서 삭제한 알림 ID - 재동기화 시 다시 나타나지 않게
+  // 사용자별 localStorage 로 영구 보존 (DB 공용이라 공유되는 것 방지)
   const deletedNotifIdsRef = useRef<Set<string>>(new Set<string>());
   // 배너에서 X 로 닫은 반환 알림 ID - 재동기화 시 다시 뜨지 않게
   const dismissedReturnIdsRef = useRef<Set<string>>(new Set<string>());
+  // 로컬 읽음 처리 ID (DB 공용 read 상태와 분리 - 사용자별)
+  const localReadIdsRef = useRef<Set<string>>(new Set<string>());
+  // 알림 숨김/읽음 로딩 완료 여부
+  const notifHiddenLoadedRef = useRef(false);
 
   const loadData = useCallback(async (monthDate?: Date, fullRefresh = false) => {
     try {
@@ -167,21 +169,20 @@ export default function Home() {
           const deleted = deletedNotifIdsRef.current;
           const isReturn = (n: Notification) => n.type === "schedule_returned" || n.title === "일정 반환";
           const isAdminOrScheduler = uRole === "ceo" || uRole === "admin" || uRole === "scheduler";
+          const localRead = localReadIdsRef.current;
           const myNotifs = allNotifs.filter(n => {
             if (deleted.has(n.id)) return false;
             if (uRole === "sales") return false; // 영업: 모든 알림 제외
             if (n.type === "system_notice") return true;
             if (isReturn(n)) {
               if (isAdminOrScheduler) return true;
-              // 현장팀: 메시지에 본인 이름이 포함되면 수신 (반환 실행자 또는 원 담당자)
               if (uName && n.message.includes(uName)) return true;
               return false;
             }
             if (n.type === "happy_call_reminder") return isAdminOrScheduler;
-            if (isAdminOrScheduler) return true; // 관리자는 모든 알림 수신
-            // 현장팀: 본인 일정 관련만
+            if (isAdminOrScheduler) return true;
             return uName && (n.message.includes(uName) || n.title.includes(uName));
-          });
+          }).map(n => localRead.has(n.id) ? { ...n, read: true } : n);
           setNotifications(myNotifs);
           setUnreadCount(myNotifs.filter(n => !n.read).length);
         }
@@ -233,6 +234,31 @@ export default function Home() {
       active: filterActive,
     }));
   }, [selectedMemberIds, filterActive, currentUser]);
+
+  // 알림 숨김 목록 & 로컬 읽음 상태: 사용자별 localStorage (DB 공용이라 분리 필요)
+  useEffect(() => {
+    if (!currentUser) return;
+    const hKey = `notif_hidden_${currentUser.username}`;
+    const rKey = `notif_localread_${currentUser.username}`;
+    try {
+      const h = localStorage.getItem(hKey);
+      deletedNotifIdsRef.current = h ? new Set(JSON.parse(h)) : new Set();
+    } catch { deletedNotifIdsRef.current = new Set(); }
+    try {
+      const r = localStorage.getItem(rKey);
+      localReadIdsRef.current = r ? new Set(JSON.parse(r)) : new Set();
+    } catch { localReadIdsRef.current = new Set(); }
+    notifHiddenLoadedRef.current = true;
+  }, [currentUser?.username]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  function persistNotifHidden() {
+    if (!currentUser) return;
+    localStorage.setItem(`notif_hidden_${currentUser.username}`, JSON.stringify(Array.from(deletedNotifIdsRef.current)));
+  }
+  function persistLocalRead() {
+    if (!currentUser) return;
+    localStorage.setItem(`notif_localread_${currentUser.username}`, JSON.stringify(Array.from(localReadIdsRef.current)));
+  }
 
   // 초기 로딩: 백그라운드로 최신 데이터 갱신 (캐시는 이미 위에서 복원됨)
   useEffect(() => {
@@ -366,21 +392,20 @@ export default function Home() {
         const deleted = deletedNotifIdsRef.current;
         const isReturn = (n: Notification) => n.type === "schedule_returned" || n.title === "일정 반환";
         const isAdminOrScheduler = uRole === "ceo" || uRole === "admin" || uRole === "scheduler";
+        const localRead = localReadIdsRef.current;
         const myNotifs = allNotifs.filter(n => {
           if (deleted.has(n.id)) return false;
-          if (uRole === "sales") return false; // 영업: 모든 알림 제외
+          if (uRole === "sales") return false;
           if (n.type === "system_notice") return true;
           if (isReturn(n)) {
             if (isAdminOrScheduler) return true;
-            // 현장팀: 메시지에 본인 이름 포함되면 수신 (반환 실행자 또는 원 담당자)
             if (uName && n.message.includes(uName)) return true;
             return false;
           }
           if (n.type === "happy_call_reminder") return isAdminOrScheduler;
-          if (isAdminOrScheduler) return true; // 관리자는 모든 알림 수신
-          // 현장팀: 본인 일정 관련만
+          if (isAdminOrScheduler) return true;
           return uName && (n.message.includes(uName) || n.title.includes(uName));
-        });
+        }).map(n => localRead.has(n.id) ? { ...n, read: true } : n);
         setNotifications(myNotifs);
         setUnreadCount(myNotifs.filter(n => !n.read).length);
       }).catch(() => {});
@@ -807,26 +832,25 @@ export default function Home() {
     await rejectSwapRequest(swapId);
   }
 
-  // Notifications — 낙관적 업데이트 + reload 억제로 깜빡임 방지
+  // Notifications — 사용자별 로컬 처리 (DB 공용이라 다른 사용자와 분리)
   async function handleMarkRead(id: string) {
     notifReloadSuppressRef.current = Date.now() + 6000;
+    // 로컬 읽음 기록 (DB 공용 read 상태와 별개)
+    localReadIdsRef.current.add(id);
+    persistLocalRead();
     setNotifications((prev) => prev.map((n) => n.id === id ? { ...n, read: true } : n));
     setUnreadCount((c) => Math.max(0, c - 1));
-    await apiMarkRead(id);
-    // API 완료 후에도 확실히 상태 고정
-    setNotifications((prev) => prev.map((n) => n.id === id ? { ...n, read: true } : n));
   }
   async function handleClearAllNotifications() {
-    // 지우기 = 모두 읽음 + 삭제 (해피콜은 DB 유지 → 서버 재생성 차단)
-    const deletable = notifications.filter((n) => n.type !== "happy_call_reminder").map((n) => n.id);
+    // 지우기 = 본인 화면에서만 숨김. DB 는 건드리지 않음 → 다른 사용자 영향 없음
     const allIds = notifications.map((n) => n.id);
-    allIds.forEach((id) => deletedNotifIdsRef.current.add(id));
+    allIds.forEach((id) => {
+      deletedNotifIdsRef.current.add(id);
+      localReadIdsRef.current.add(id);
+    });
+    persistNotifHidden();
+    persistLocalRead();
     notifReloadSuppressRef.current = Date.now() + 6000;
-    setNotifications([]);
-    setUnreadCount(0);
-    // DB: 삭제 가능한 것은 삭제, 해피콜은 읽음 처리로 유지
-    if (deletable.length > 0) await apiDeleteNotifications(deletable);
-    await apiMarkAllRead();
     setNotifications([]);
     setUnreadCount(0);
   }
