@@ -986,6 +986,7 @@ export default function Home() {
             schedules={schedules}
             onRefresh={() => loadData(undefined, true)}
             onNavigateToAssign={() => switchTab("assign")}
+            onNavigateToCalendar={() => switchTab("calendar")}
           />
         </div>
 
