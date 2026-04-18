@@ -151,7 +151,7 @@ export default function Home() {
         const allNotifs = notif.notifications as Notification[];
         const uName = currentUser?.name || "";
         const uRole = currentUser?.role || "";
-        const myNotifs = (uRole === "ceo" || uRole === "scheduler")
+        const myNotifs = (uRole === "ceo" || uRole === "admin" || uRole === "scheduler")
           ? allNotifs
           : allNotifs.filter(n => n.message.includes(uName) || n.title.includes(uName));
         setNotifications(myNotifs);
@@ -249,12 +249,24 @@ export default function Home() {
     function reloadNotifications() {
       fetchNotifications().then(notif => {
         const allNotifs = notif.notifications as Notification[];
-        const myNotifs = (uRole === "ceo" || uRole === "scheduler")
+        const myNotifs = (uRole === "ceo" || uRole === "admin" || uRole === "scheduler")
           ? allNotifs
           : allNotifs.filter(n => n.message.includes(uName) || n.title.includes(uName));
         setNotifications(myNotifs);
         setUnreadCount(myNotifs.filter(n => !n.read).length);
       }).catch(() => {});
+    }
+    function reloadUsers() {
+      fetchUsers().then(d => { setAllUsers(d.users); setPendingUsers(d.pendingUsers); }).catch(() => {});
+    }
+    function reloadMembers() {
+      fetchMembers().then(m => setMembers(m)).catch(() => {});
+    }
+    function reloadAll() {
+      reloadSchedules();
+      reloadNotifications();
+      reloadUsers();
+      reloadMembers();
     }
 
     // 폴링 인터벌 (Realtime 실패 시에만 활성화)
@@ -262,7 +274,7 @@ export default function Home() {
     function startPolling() {
       if (pollInterval) return;
       console.log("[RT] 폴링 시작 (Realtime 실패)");
-      pollInterval = setInterval(() => { reloadSchedules(); reloadNotifications(); }, 10000);
+      pollInterval = setInterval(reloadAll, 8000);
     }
     function stopPolling() {
       if (pollInterval) { console.log("[RT] 폴링 중지 (Realtime 복구)"); clearInterval(pollInterval); pollInterval = null; }
@@ -272,18 +284,22 @@ export default function Home() {
     const channel = sbClient.channel("all-db-changes")
       .on("postgres_changes", { event: "*", schema: "public", table: "schedules" }, () => { console.log("[RT] schedules changed"); reloadSchedules(); })
       .on("postgres_changes", { event: "*", schema: "public", table: "notifications" }, () => { console.log("[RT] notifications changed"); reloadNotifications(); })
-      .on("postgres_changes", { event: "*", schema: "public", table: "members" }, () => { fetchMembers().then(m => setMembers(m)).catch(() => {}); })
-      .on("postgres_changes", { event: "*", schema: "public", table: "users" }, () => { fetchUsers().then(d => { setAllUsers(d.users); setPendingUsers(d.pendingUsers); }).catch(() => {}); })
+      .on("postgres_changes", { event: "*", schema: "public", table: "members" }, () => { console.log("[RT] members changed"); reloadMembers(); })
+      .on("postgres_changes", { event: "*", schema: "public", table: "users" }, () => { console.log("[RT] users changed (가입/승인)"); reloadUsers(); })
       .subscribe((status: string) => {
         console.log("[RT] status:", status);
         if (status === "SUBSCRIBED") {
-          stopPolling(); // Realtime 정상 → 폴링 중지
+          stopPolling();
         } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
-          startPolling(); // Realtime 실패 → 폴링 백업 가동
+          startPolling();
         }
       });
 
+    // Realtime 이 오래 안 켜지면(10초 후) 폴링 강제 시작
+    const fallbackTimer = setTimeout(() => { if (!pollInterval) startPolling(); }, 10000);
+
     return () => {
+      clearTimeout(fallbackTimer);
       stopPolling();
       sbClient.removeChannel(channel);
     };
