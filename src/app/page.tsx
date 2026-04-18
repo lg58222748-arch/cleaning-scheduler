@@ -559,6 +559,7 @@ export default function Home() {
   const canAssign = role === "ceo" || role === "scheduler" || role === "sales";
   const canManage = role === "ceo" || role === "sales" || role === "field" || role === "scheduler";
   const canManageAdvanced = role === "ceo" || role === "admin";
+  const canApprovePending = role === "ceo" || role === "admin" || role === "scheduler";
 
   // Members — 낙관적 업데이트
   async function handleAddMember(data: { name: string; phone: string; availableDays: number[] }) {
@@ -1045,8 +1046,8 @@ export default function Home() {
               if (salesUsers.length > 0) groups.push({ key: "sales", title: "영업팀", users: salesUsers });
               const fieldUsers = others.filter(u => u.role === "field");
               if (fieldUsers.length > 0) groups.push({ key: "field", title: "현장팀", users: fieldUsers });
-              // 대표(ceo)만 가입 신청 대기 볼 수 있음 (admin DB 롤도 프론트에선 ceo로 매핑됨)
-              if (canManageAdvanced) groups.push({ key: "pending", title: `가입 신청 대기${pendingUsers.length > 0 ? ` (${pendingUsers.length})` : ""}`, users: pendingUsers });
+              // 대표/admin/일정관리자 는 가입 신청 대기 볼 수 있음
+              if (canApprovePending) groups.push({ key: "pending", title: `가입 신청 대기${pendingUsers.length > 0 ? ` (${pendingUsers.length})` : ""}`, users: pendingUsers });
 
               const allInSortedList = [...(me ? [me] : []), ...others, ...(canManageAdvanced ? pendingUsers : [])];
 
@@ -1151,7 +1152,7 @@ export default function Home() {
                         </button>
                       </div>
                     )}
-                    {u.status === "pending" && canManageAdvanced && (
+                    {u.status === "pending" && canApprovePending && (
                       <div className="flex gap-2 mt-2 pt-2 border-t border-gray-100">
                         <button onClick={() => { setPendingUsers(prev => prev.filter(x => x.id !== u.id)); setAllUsers(prev => [...prev, { ...u, status: "approved" as const, role: "field" as const }]); approveUserApi(u.id).catch(() => {}); }} className="flex-1 py-2 bg-green-500 text-white rounded-lg text-xs font-bold active:bg-green-600">승인</button>
                         <button onClick={() => { setPendingUsers(prev => prev.filter(x => x.id !== u.id)); deleteUserApi(u.id).catch(() => {}); }} className="flex-1 py-2 bg-red-500 text-white rounded-lg text-xs font-bold active:bg-red-600">거절</button>
@@ -1178,7 +1179,7 @@ export default function Home() {
                           <div className="py-4 text-center text-xs text-gray-400">
                             {g.key === "pending" ? "가입 신청 대기 중인 사용자가 없습니다" : "사용자가 없습니다"}
                           </div>
-                        ) : g.key === "pending" && !canManageAdvanced ? (
+                        ) : g.key === "pending" && !canApprovePending ? (
                           <div className="py-4 text-center text-xs text-gray-500 bg-white rounded-lg">
                             <div className="text-base font-bold text-orange-600 mb-1">{g.users.length}명 대기 중</div>
                             <div>상세 정보 및 승인은 대표만 가능합니다</div>
