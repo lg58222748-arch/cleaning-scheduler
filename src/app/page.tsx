@@ -101,6 +101,13 @@ export default function Home() {
     if (typeof window === "undefined") return [];
     try { const s = localStorage.getItem("userOrder"); return s ? JSON.parse(s) : []; } catch { return []; }
   });
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>(() => {
+    if (typeof window === "undefined") return { self: true, ceo: true, scheduler: true, sales: true, field: true, pending: true };
+    try { const s = localStorage.getItem("userGroupsOpen"); return s ? JSON.parse(s) : { self: true, ceo: true, scheduler: true, sales: true, field: true, pending: true }; } catch { return { self: true, ceo: true, scheduler: true, sales: true, field: true, pending: true }; }
+  });
+  function toggleGroup(key: string) {
+    setOpenGroups(prev => { const next = { ...prev, [key]: !prev[key] }; localStorage.setItem("userGroupsOpen", JSON.stringify(next)); return next; });
+  }
   const [dragUserId, setDragUserId] = useState<string | null>(null);
   const [membersSubTab, setMembersSubTab] = useState<"users" | "map">("users");
   const [dragOverUserId, setDragOverUserId] = useState<string | null>(null);
@@ -973,142 +980,172 @@ export default function Home() {
 
         {/* 사용자 탭 */}
         <div className="h-full overflow-y-auto" style={{ display: activeTab === "members" ? "block" : "none" }}>
-          <div className="p-3 space-y-3 pb-20">
-            {/* 전체 사용자 */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
-              <h3 className="text-sm font-bold text-gray-800 mb-3">사용자 ({allUsers.filter(u => u.username !== "admin").length}{canManageAdvanced && pendingUsers.length > 0 ? ` + 대기 ${pendingUsers.length}` : ""})</h3>
-              <div className="space-y-2.5">
-                {(() => {
-                  const list = [...allUsers, ...(canManageAdvanced ? pendingUsers : [])].filter(u => u.username !== "admin");
-                  // userOrder 기준 정렬, 본인은 항상 맨 위
-                  list.sort((a, b) => {
-                    if (a.username === currentUser.username) return -1;
-                    if (b.username === currentUser.username) return 1;
-                    const ai = userOrder.indexOf(a.id);
-                    const bi = userOrder.indexOf(b.id);
-                    if (ai === -1 && bi === -1) return 0;
-                    if (ai === -1) return 1;
-                    if (bi === -1) return 1;
-                    return ai - bi;
-                  });
-                  return list;
-                })().map((u, idx, sortedList) => {
-                  const isMe = u.username === currentUser.username;
-                  const roleLabels: Record<string, string> = { ceo: "대표", scheduler: "일정관리자", sales: "영업팀", field: "현장팀", pending: "대기" };
-                  const roleColors: Record<string, string> = { ceo: "bg-purple-100 text-purple-700", scheduler: "bg-blue-100 text-blue-700", sales: "bg-green-100 text-green-700", field: "bg-orange-100 text-orange-700", pending: "bg-gray-100 text-gray-500" };
-                  return (
-                    <div
-                      key={u.id}
-                      className={`border rounded-xl p-3 transition-all ${isMe ? "border-blue-300 bg-blue-50/30" : u.status === "pending" ? "border-orange-300 bg-orange-50/30" : "border-gray-200"} ${dragOverUserId === u.id && dragUserId !== u.id ? "border-blue-500 border-dashed bg-blue-50/50" : ""} ${dragUserId === u.id ? "opacity-40 scale-95" : ""}`}
-                      onDragOver={(e) => { e.preventDefault(); if (!isMe && canManageAdvanced) setDragOverUserId(u.id); }}
-                      data-userid={u.id}
-                      onDrop={(e) => {
-                        e.preventDefault();
-                        if (!dragUserId || dragUserId === u.id || isMe) return;
-                        const ids = sortedList.filter(x => x.username !== currentUser.username).map(x => x.id);
-                        const fromIdx = ids.indexOf(dragUserId);
-                        const toIdx = ids.indexOf(u.id);
-                        if (fromIdx < 0 || toIdx < 0) return;
-                        ids.splice(fromIdx, 1);
-                        ids.splice(toIdx, 0, dragUserId);
-                        setUserOrder(ids);
-                        localStorage.setItem("userOrder", JSON.stringify(ids));
-                        setDragUserId(null);
-                        setDragOverUserId(null);
-                      }}
-                    >
-                      <div className="flex items-center gap-2.5">
-                        {/* 드래그 핸들 - 대표만 */}
-                        {canManageAdvanced && !isMe && u.status !== "pending" ? (
-                          <div
-                            draggable
-                            onDragStart={(e) => { setDragUserId(u.id); e.dataTransfer.effectAllowed = "move"; }}
-                            onDragEnd={() => { setDragUserId(null); setDragOverUserId(null); }}
-                            onTouchStart={(e) => { setDragUserId(u.id); dragStartY.current = e.touches[0].clientY; dragNodeRef.current = e.currentTarget.parentElement?.parentElement as HTMLDivElement; }}
-                            onTouchMove={(e) => {
-                              if (!dragUserId) return;
-                              const touch = e.touches[0];
-                              const els = document.elementsFromPoint(touch.clientX, touch.clientY);
-                              for (const el of els) {
-                                const card = (el as HTMLElement).closest("[data-userid]");
-                                if (card) { setDragOverUserId(card.getAttribute("data-userid") || null); break; }
-                              }
-                            }}
-                            onTouchEnd={() => {
-                              if (dragUserId && dragOverUserId && dragUserId !== dragOverUserId) {
-                                const ids = sortedList.filter(x => x.username !== currentUser.username).map(x => x.id);
-                                const fromIdx = ids.indexOf(dragUserId);
-                                const toIdx = ids.indexOf(dragOverUserId);
-                                if (fromIdx >= 0 && toIdx >= 0) {
-                                  ids.splice(fromIdx, 1);
-                                  ids.splice(toIdx, 0, dragUserId);
-                                  setUserOrder(ids);
-                                  localStorage.setItem("userOrder", JSON.stringify(ids));
-                                }
-                              }
-                              setDragUserId(null);
-                              setDragOverUserId(null);
-                            }}
-                            className="w-7 h-9 flex items-center justify-center cursor-grab active:cursor-grabbing shrink-0 touch-none"
-                          >
-                            <svg className="w-4 h-5 text-gray-300" viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="6" r="1.5"/><circle cx="15" cy="6" r="1.5"/><circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="9" cy="18" r="1.5"/><circle cx="15" cy="18" r="1.5"/></svg>
-                          </div>
-                        ) : null}
-                        <div className={`w-9 h-9 rounded-full flex items-center justify-center font-bold text-xs shrink-0 ${isMe ? "bg-blue-500 text-white" : u.status === "pending" ? "bg-orange-200 text-orange-700" : "bg-blue-100 text-blue-600"}`}>{u.name[0]}</div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            <span className="text-sm font-medium text-gray-800">{u.name}</span>
-                            {isMe && <span className="text-xs px-1.5 py-0.5 rounded-full bg-blue-500 text-white">본인</span>}
-                            {u.status === "pending"
-                              ? <span className="text-xs px-1.5 py-0.5 rounded-full bg-orange-100 text-orange-700">승인대기</span>
-                              : <span className={`text-xs px-1.5 py-0.5 rounded-full ${roleColors[u.role] || "bg-gray-100 text-gray-500"}`}>{roleLabels[u.role] || u.role}</span>
+          <div className="p-3 space-y-2 pb-20">
+            {(() => {
+              const roleLabels: Record<string, string> = { ceo: "대표", scheduler: "일정관리자", sales: "영업팀", field: "현장팀", pending: "대기" };
+              const roleColors: Record<string, string> = { ceo: "bg-purple-100 text-purple-700", scheduler: "bg-blue-100 text-blue-700", sales: "bg-green-100 text-green-700", field: "bg-orange-100 text-orange-700", pending: "bg-gray-100 text-gray-500" };
+              const groupColors: Record<string, string> = { self: "border-blue-200 bg-blue-50/50", ceo: "border-purple-200 bg-purple-50/30", scheduler: "border-blue-200 bg-blue-50/30", sales: "border-green-200 bg-green-50/30", field: "border-orange-200 bg-orange-50/30", pending: "border-orange-300 bg-orange-50/40" };
+              const groupIcons: Record<string, string> = { self: "👤", ceo: "👑", scheduler: "📋", sales: "💼", field: "🧹", pending: "⏳" };
+
+              // 전체 사용자 → userOrder 로 정렬
+              const sortedAll = [...allUsers].filter(u => u.username !== "admin").sort((a, b) => {
+                const ai = userOrder.indexOf(a.id);
+                const bi = userOrder.indexOf(b.id);
+                if (ai === -1 && bi === -1) return 0;
+                if (ai === -1) return 1;
+                if (bi === -1) return 1;
+                return ai - bi;
+              });
+              const me = sortedAll.find(u => u.username === currentUser.username);
+              const others = sortedAll.filter(u => u.username !== currentUser.username);
+
+              // 그룹 정의
+              const groups: { key: string; title: string; users: typeof sortedAll }[] = [];
+              if (me) groups.push({ key: "self", title: "본인", users: [me] });
+              const ceoUsers = others.filter(u => u.role === "ceo");
+              if (ceoUsers.length > 0) groups.push({ key: "ceo", title: "대표", users: ceoUsers });
+              const schUsers = others.filter(u => u.role === "scheduler");
+              if (schUsers.length > 0) groups.push({ key: "scheduler", title: "일정관리자", users: schUsers });
+              const salesUsers = others.filter(u => u.role === "sales");
+              if (salesUsers.length > 0) groups.push({ key: "sales", title: "영업팀", users: salesUsers });
+              const fieldUsers = others.filter(u => u.role === "field");
+              if (fieldUsers.length > 0) groups.push({ key: "field", title: "현장팀", users: fieldUsers });
+              if (canManageAdvanced && pendingUsers.length > 0) groups.push({ key: "pending", title: "승인 대기", users: pendingUsers });
+
+              const allInSortedList = [...(me ? [me] : []), ...others, ...(canManageAdvanced ? pendingUsers : [])];
+
+              function renderCard(u: typeof sortedAll[0]) {
+                const isMe = u.username === currentUser!.username;
+                return (
+                  <div
+                    key={u.id}
+                    className={`border rounded-xl p-3 transition-all ${isMe ? "border-blue-300 bg-blue-50/30" : u.status === "pending" ? "border-orange-300 bg-orange-50/30" : "border-gray-200 bg-white"} ${dragOverUserId === u.id && dragUserId !== u.id ? "border-blue-500 border-dashed bg-blue-50/50" : ""} ${dragUserId === u.id ? "opacity-40 scale-95" : ""}`}
+                    onDragOver={(e) => { e.preventDefault(); if (!isMe && canManageAdvanced) setDragOverUserId(u.id); }}
+                    data-userid={u.id}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      if (!dragUserId || dragUserId === u.id || isMe) return;
+                      const ids = allInSortedList.filter(x => x.username !== currentUser!.username).map(x => x.id);
+                      const fromIdx = ids.indexOf(dragUserId);
+                      const toIdx = ids.indexOf(u.id);
+                      if (fromIdx < 0 || toIdx < 0) return;
+                      ids.splice(fromIdx, 1);
+                      ids.splice(toIdx, 0, dragUserId);
+                      setUserOrder(ids);
+                      localStorage.setItem("userOrder", JSON.stringify(ids));
+                      setDragUserId(null);
+                      setDragOverUserId(null);
+                    }}
+                  >
+                    <div className="flex items-center gap-2.5">
+                      {canManageAdvanced && !isMe && u.status !== "pending" ? (
+                        <div
+                          draggable
+                          onDragStart={(e) => { setDragUserId(u.id); e.dataTransfer.effectAllowed = "move"; }}
+                          onDragEnd={() => { setDragUserId(null); setDragOverUserId(null); }}
+                          onTouchStart={(e) => { setDragUserId(u.id); dragStartY.current = e.touches[0].clientY; dragNodeRef.current = e.currentTarget.parentElement?.parentElement as HTMLDivElement; }}
+                          onTouchMove={(e) => {
+                            if (!dragUserId) return;
+                            const touch = e.touches[0];
+                            const els = document.elementsFromPoint(touch.clientX, touch.clientY);
+                            for (const el of els) {
+                              const card = (el as HTMLElement).closest("[data-userid]");
+                              if (card) { setDragOverUserId(card.getAttribute("data-userid") || null); break; }
                             }
-                          </div>
-                          <div className="text-xs text-gray-400">{u.phone || "연락처 없음"}</div>
-                          {u.branch && <div className="text-xs text-gray-400">{u.branch}[관리점]</div>}
+                          }}
+                          onTouchEnd={() => {
+                            if (dragUserId && dragOverUserId && dragUserId !== dragOverUserId) {
+                              const ids = allInSortedList.filter(x => x.username !== currentUser!.username).map(x => x.id);
+                              const fromIdx = ids.indexOf(dragUserId);
+                              const toIdx = ids.indexOf(dragOverUserId);
+                              if (fromIdx >= 0 && toIdx >= 0) {
+                                ids.splice(fromIdx, 1);
+                                ids.splice(toIdx, 0, dragUserId);
+                                setUserOrder(ids);
+                                localStorage.setItem("userOrder", JSON.stringify(ids));
+                              }
+                            }
+                            setDragUserId(null);
+                            setDragOverUserId(null);
+                          }}
+                          className="w-7 h-9 flex items-center justify-center cursor-grab active:cursor-grabbing shrink-0 touch-none"
+                        >
+                          <svg className="w-4 h-5 text-gray-300" viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="6" r="1.5"/><circle cx="15" cy="6" r="1.5"/><circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="9" cy="18" r="1.5"/><circle cx="15" cy="18" r="1.5"/></svg>
                         </div>
+                      ) : null}
+                      <div className={`w-9 h-9 rounded-full flex items-center justify-center font-bold text-xs shrink-0 ${isMe ? "bg-blue-500 text-white" : u.status === "pending" ? "bg-orange-200 text-orange-700" : "bg-blue-100 text-blue-600"}`}>{u.name[0]}</div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="text-sm font-medium text-gray-800">{u.name}</span>
+                          {isMe && <span className="text-xs px-1.5 py-0.5 rounded-full bg-blue-500 text-white">본인</span>}
+                          {u.status === "pending"
+                            ? <span className="text-xs px-1.5 py-0.5 rounded-full bg-orange-100 text-orange-700">승인대기</span>
+                            : <span className={`text-xs px-1.5 py-0.5 rounded-full ${roleColors[u.role] || "bg-gray-100 text-gray-500"}`}>{roleLabels[u.role] || u.role}</span>
+                          }
+                        </div>
+                        <div className="text-xs text-gray-400">{u.phone || "연락처 없음"}</div>
+                        {u.branch && <div className="text-xs text-gray-400">{u.branch}[관리점]</div>}
                       </div>
-                      {/* 관리 버튼 - 대표만 */}
-                      {canManageAdvanced && !isMe && u.status !== "pending" && (
-                        <div className="flex items-center gap-2 mt-2 pt-2 border-t border-gray-100">
-                          <select
-                            value={u.role}
-                            onChange={async (e) => {
-                              const newRole = e.target.value as UserRole;
-                              setAllUsers(prev => prev.map(x => x.id === u.id ? { ...x, role: newRole } : x));
-                              await changeUserRoleApi(u.id, newRole);
-                            }}
-                            className="flex-1 text-xs border border-gray-200 rounded-lg px-2 py-1.5 outline-none bg-white"
-                          >
-                            <option value="field">현장팀</option>
-                            <option value="sales">영업팀</option>
-                            <option value="scheduler">일정관리자</option>
-                            <option value="ceo">대표</option>
-                          </select>
-                          <button onClick={() => openProfileUser(u)} className="p-1.5 active:bg-gray-100 rounded-lg border border-gray-200">
-                            <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                          </button>
-                          <button onClick={() => {
-                            if (!confirm(u.name + "님을 탈퇴시키겠습니까?")) return;
-                            setAllUsers(prev => prev.filter(x => x.id !== u.id));
-                            deleteUserApi(u.id).then(() => loadData(undefined, true));
-                          }} className="p-1.5 active:bg-red-50 rounded-lg border border-gray-200">
-                            <svg className="w-4 h-4 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                          </button>
-                        </div>
-                      )}
-                      {/* 승인 대기 - 대표만 승인/거절 */}
-                      {u.status === "pending" && canManageAdvanced && (
-                        <div className="flex gap-2 mt-2 pt-2 border-t border-gray-100">
-                          <button onClick={() => { setPendingUsers(prev => prev.filter(x => x.id !== u.id)); setAllUsers(prev => [...prev, { ...u, status: "approved" as const, role: "field" as const }]); approveUserApi(u.id).catch(() => {}); }} className="flex-1 py-2 bg-green-500 text-white rounded-lg text-xs font-bold active:bg-green-600">승인</button>
-                          <button onClick={() => { setPendingUsers(prev => prev.filter(x => x.id !== u.id)); deleteUserApi(u.id).catch(() => {}); }} className="flex-1 py-2 bg-red-500 text-white rounded-lg text-xs font-bold active:bg-red-600">거절</button>
-                        </div>
-                      )}
                     </div>
-                  );
-                })}
-              </div>
-            </div>
+                    {canManageAdvanced && !isMe && u.status !== "pending" && (
+                      <div className="flex items-center gap-2 mt-2 pt-2 border-t border-gray-100">
+                        <select
+                          value={u.role}
+                          onChange={async (e) => {
+                            const newRole = e.target.value as UserRole;
+                            setAllUsers(prev => prev.map(x => x.id === u.id ? { ...x, role: newRole } : x));
+                            await changeUserRoleApi(u.id, newRole);
+                          }}
+                          className="flex-1 text-xs border border-gray-200 rounded-lg px-2 py-1.5 outline-none bg-white"
+                        >
+                          <option value="field">현장팀</option>
+                          <option value="sales">영업팀</option>
+                          <option value="scheduler">일정관리자</option>
+                          <option value="ceo">대표</option>
+                        </select>
+                        <button onClick={() => openProfileUser(u)} className="p-1.5 active:bg-gray-100 rounded-lg border border-gray-200">
+                          <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                        </button>
+                        <button onClick={() => {
+                          if (!confirm(u.name + "님을 탈퇴시키겠습니까?")) return;
+                          setAllUsers(prev => prev.filter(x => x.id !== u.id));
+                          deleteUserApi(u.id).then(() => loadData(undefined, true));
+                        }} className="p-1.5 active:bg-red-50 rounded-lg border border-gray-200">
+                          <svg className="w-4 h-4 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                        </button>
+                      </div>
+                    )}
+                    {u.status === "pending" && canManageAdvanced && (
+                      <div className="flex gap-2 mt-2 pt-2 border-t border-gray-100">
+                        <button onClick={() => { setPendingUsers(prev => prev.filter(x => x.id !== u.id)); setAllUsers(prev => [...prev, { ...u, status: "approved" as const, role: "field" as const }]); approveUserApi(u.id).catch(() => {}); }} className="flex-1 py-2 bg-green-500 text-white rounded-lg text-xs font-bold active:bg-green-600">승인</button>
+                        <button onClick={() => { setPendingUsers(prev => prev.filter(x => x.id !== u.id)); deleteUserApi(u.id).catch(() => {}); }} className="flex-1 py-2 bg-red-500 text-white rounded-lg text-xs font-bold active:bg-red-600">거절</button>
+                      </div>
+                    )}
+                  </div>
+                );
+              }
+
+              return groups.map(g => {
+                const isOpen = openGroups[g.key] !== false;
+                return (
+                  <div key={g.key} className={`rounded-xl border ${groupColors[g.key] || "border-gray-200 bg-white"} overflow-hidden`}>
+                    <button onClick={() => toggleGroup(g.key)} className="w-full px-4 py-3 flex items-center justify-between active:bg-black/5">
+                      <div className="flex items-center gap-2">
+                        <span className="text-base">{groupIcons[g.key]}</span>
+                        <span className="text-sm font-bold text-gray-800">{g.title}</span>
+                        <span className="text-xs px-2 py-0.5 rounded-full bg-white/80 text-gray-600 font-medium">{g.users.length}명</span>
+                      </div>
+                      <svg className={`w-4 h-4 text-gray-500 transition-transform ${isOpen ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                    </button>
+                    {isOpen && (
+                      <div className="px-3 pb-3 space-y-2">
+                        {g.users.map(u => renderCard(u))}
+                      </div>
+                    )}
+                  </div>
+                );
+              });
+            })()}
           </div>
         </div>
 
