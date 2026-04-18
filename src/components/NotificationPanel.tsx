@@ -13,6 +13,7 @@ const TYPE_CONFIG: Record<string, { icon: string; color: string; bg: string }> =
   schedule_created: { icon: "M12 4v16m8-8H4", color: "text-green-600", bg: "bg-green-100" },
   schedule_cancelled: { icon: "M6 18L18 6M6 6l12 12", color: "text-red-600", bg: "bg-red-100" },
   schedule_updated: { icon: "M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z", color: "text-blue-600", bg: "bg-blue-100" },
+  schedule_returned: { icon: "M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6", color: "text-orange-600", bg: "bg-orange-100" },
   happy_call_reminder: { icon: "M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z", color: "text-orange-600", bg: "bg-orange-100" },
   swap_requested: { icon: "M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4", color: "text-purple-600", bg: "bg-purple-100" },
   swap_approved: { icon: "M5 13l4 4L19 7", color: "text-green-600", bg: "bg-green-100" },

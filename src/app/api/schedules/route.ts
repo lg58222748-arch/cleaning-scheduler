@@ -68,7 +68,7 @@ export async function POST(req: NextRequest) {
     const reason = body.reason || "";
     const msg = `${who ? who + "님이 " : ""}"${schedule.title}" 일정을 반환했습니다.${reason ? " 사유: " + reason : ""}`;
     // 반환은 대표/일정관리자/영업팀/admin 에게만 (현장팀 제외)
-    await addNotification("schedule_updated", "일정 반환", msg, schedule.id, undefined, ["ceo", "admin", "scheduler", "sales"]);
+    await addNotification("schedule_returned", "일정 반환", msg, schedule.id, undefined, ["ceo", "admin", "scheduler", "sales"]);
     return Response.json(schedule);
   }
 

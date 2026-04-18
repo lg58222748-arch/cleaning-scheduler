@@ -1,4 +1,4 @@
-const CACHE_NAME = 'cleaning-scheduler-v5';
+const CACHE_NAME = 'cleaning-scheduler-v6';
 
 self.addEventListener('install', (event) => {
   self.skipWaiting();
@@ -40,15 +40,15 @@ self.addEventListener('push', (event) => {
   const title = data.title || '새집느낌 파트너';
   const body = data.body || '새로운 알림이 있습니다';
 
-  // 동일 내용 30초 이내 재수신 시 무시 → 같은 알림 2번 울리는 것 방지
+  // 동일 내용 5초 이내 재수신 시 무시 → 네트워크/재시도로 인한 즉시 중복만 차단
   const key = hashMsg(title, body);
   const now = Date.now();
   const last = recentPushes.get(key) || 0;
-  if (now - last < 30000) return;
+  if (now - last < 5000) return;
   recentPushes.set(key, now);
   // 오래된 항목 정리
   for (const [k, t] of recentPushes) {
-    if (now - t > 60000) recentPushes.delete(k);
+    if (now - t > 30000) recentPushes.delete(k);
   }
 
   const options = {

@@ -39,6 +39,7 @@ export type NotificationType =
   | "schedule_created"
   | "schedule_cancelled"
   | "schedule_updated"
+  | "schedule_returned"
   | "happy_call_reminder"
   | "swap_requested"
   | "swap_approved"

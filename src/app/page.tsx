@@ -158,7 +158,7 @@ export default function Home() {
           const uName = currentUser?.name || "";
           const uRole = currentUser?.role || "";
           const deleted = deletedNotifIdsRef.current;
-          const isReturn = (n: Notification) => n.title === "일정 반환";
+          const isReturn = (n: Notification) => n.type === "schedule_returned" || n.title === "일정 반환";
           const isAdminRole = uRole === "ceo" || uRole === "admin" || uRole === "scheduler" || uRole === "sales";
           const myNotifs = allNotifs.filter(n => {
             if (deleted.has(n.id)) return false;
@@ -291,7 +291,7 @@ export default function Home() {
         if (Date.now() < notifReloadSuppressRef.current) return;
         const allNotifs = notif.notifications as Notification[];
         const deleted = deletedNotifIdsRef.current;
-        const isReturn = (n: Notification) => n.title === "일정 반환";
+        const isReturn = (n: Notification) => n.type === "schedule_returned" || n.title === "일정 반환";
         const isAdminRole = uRole === "ceo" || uRole === "admin" || uRole === "scheduler" || uRole === "sales";
         const isHappyCallAdmin = uRole === "ceo" || uRole === "admin" || uRole === "scheduler";
         const myNotifs = allNotifs.filter(n => {
@@ -859,7 +859,7 @@ export default function Home() {
       )}
       {/* 반환 알림 배너 - 대표/일정관리자: DB 알림 기반 */}
       {(() => {
-        const returnNotifs = notifications.filter(n => n.title === "일정 반환" && !n.read);
+        const returnNotifs = notifications.filter(n => (n.type === "schedule_returned" || n.title === "일정 반환") && !n.read);
         if (!isAdmin || returnNotifs.length === 0) return null;
         return (
           <div className="bg-orange-500 text-white z-50">
