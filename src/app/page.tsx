@@ -126,8 +126,12 @@ export default function Home() {
   const [returnAlerts, setReturnAlerts] = useState<{ id: string; title: string; date: string; reason: string }[]>([]);
   // 알림 액션 중엔 외부 reload 억제 (모두읽음/지우기 깜빡임 방지)
   const notifReloadSuppressRef = useRef(0);
+  // 일정 액션(생성/수정/반환/삭제) 중엔 schedule reload 억제 (낙관적 업데이트 보호)
+  const scheduleReloadSuppressRef = useRef(0);
   // 로컬에서 삭제한 알림 ID - 재동기화 시 다시 나타나지 않게
   const deletedNotifIdsRef = useRef<Set<string>>(new Set<string>());
+  // 배너에서 X 로 닫은 반환 알림 ID - 재동기화 시 다시 뜨지 않게
+  const dismissedReturnIdsRef = useRef<Set<string>>(new Set<string>());
 
   const loadData = useCallback(async (monthDate?: Date, fullRefresh = false) => {
     try {
@@ -145,8 +149,11 @@ export default function Home() {
           fetchUsers(),
         ]);
         setMembers(m);
-        setSchedules(rangeScheds);
-        setUnassignedSchedules(unassignedScheds);
+        // 일정 액션 중이면 schedule 덮어쓰지 않음
+        if (Date.now() >= scheduleReloadSuppressRef.current) {
+          setSchedules(rangeScheds);
+          setUnassignedSchedules(unassignedScheds);
+        }
         setSwapRequests(sw);
         // 알림 액션(모두읽음/지우기) 직후엔 loadData 결과로 덮어쓰지 않음 (깜빡임 방지)
         if (Date.now() >= notifReloadSuppressRef.current) {
@@ -178,7 +185,9 @@ export default function Home() {
         } catch {}
       } else {
         const rangeScheds = await fetchSchedules(start, end);
-        setSchedules(rangeScheds);
+        if (Date.now() >= scheduleReloadSuppressRef.current) {
+          setSchedules(rangeScheds);
+        }
       }
     } catch {
       // 데이터 로드 실패 - 자동 재시도됨
@@ -278,11 +287,19 @@ export default function Home() {
     const uRole = currentUser?.role || "";
 
     function reloadSchedules() {
+      // 일정 액션(반환/배정/생성/수정/삭제) 중엔 억제 - 낙관적 업데이트가 stale fetch 에 덮이는 것 방지
+      if (Date.now() < scheduleReloadSuppressRef.current) return;
       const d = selectedDate;
       const start = format(startOfMonth(subMonths(d, 1)), "yyyy-MM-dd");
       const end = format(endOfMonth(addMonths(d, 1)), "yyyy-MM-dd");
-      fetchSchedules(start, end).then(s => setSchedules(s)).catch(() => {});
-      fetchUnassignedSchedules().then(s => setUnassignedSchedules(s)).catch(() => {});
+      fetchSchedules(start, end).then(s => {
+        if (Date.now() < scheduleReloadSuppressRef.current) return;
+        setSchedules(s);
+      }).catch(() => {});
+      fetchUnassignedSchedules().then(s => {
+        if (Date.now() < scheduleReloadSuppressRef.current) return;
+        setUnassignedSchedules(s);
+      }).catch(() => {});
     }
     function reloadNotifications() {
       // 알림 액션 중이면 reload 억제
@@ -632,6 +649,8 @@ export default function Home() {
     setShowScheduleForm(false);
     setEditingSchedule(null);
     consumeHash();
+    // 낙관적 업데이트 보호
+    scheduleReloadSuppressRef.current = Date.now() + 4000;
 
     if (editingSchedule) {
       // 수정: UI 즉시 반영
@@ -679,12 +698,15 @@ export default function Home() {
     }
   }
   function handleDeleteSchedule(id: string) {
+    scheduleReloadSuppressRef.current = Date.now() + 4000;
     setSchedules((prev) => prev.filter((s) => s.id !== id));
     setUnassignedSchedules((prev) => prev.filter((s) => s.id !== id));
     softDeleteSchedule(id).catch(() => {});
   }
 
   function handleUnassignSchedule(id: string, reason: string = "") {
+    // 낙관적 업데이트 보호: 4초간 reload 무시 (stale fetch 가 이미 제거한 스케줄을 되돌리는 것 방지)
+    scheduleReloadSuppressRef.current = Date.now() + 4000;
     const target = schedules.find((s) => s.id === id);
     setSchedules((prev) => prev.filter((s) => s.id !== id));
     if (target) {
@@ -809,6 +831,20 @@ export default function Home() {
     .filter((s) => s.date === dateStr)
     .sort((a, b) => a.startTime.localeCompare(b.startTime));
 
+  // 반환 배너용 안정 계산: dismissed 제외 + 본인이 반환한 건 본인 배너에서 숨김
+  const returnBannerNotifs = (() => {
+    const dismissed = dismissedReturnIdsRef.current;
+    const myName = currentUser?.name || "";
+    return notifications.filter(n => {
+      const isRet = n.type === "schedule_returned" || n.title === "일정 반환";
+      if (!isRet) return false;
+      if (n.read) return false;
+      if (dismissed.has(n.id)) return false;
+      if (myName && n.message.startsWith(`${myName}님이`)) return false;
+      return true;
+    });
+  })();
+
   return (
     <div className="h-[100dvh] bg-white pb-14 flex flex-col overflow-hidden" style={{ paddingTop: "env(safe-area-inset-top, 0px)" }}>
       {/* 카카오톡 인앱브라우저 감지 → 외부 브라우저 이동 */}
@@ -858,30 +894,34 @@ export default function Home() {
           </div>
         </div>
       )}
-      {/* 반환 알림 배너 - 대표/일정관리자: DB 알림 기반 */}
-      {(() => {
-        const returnNotifs = notifications.filter(n => (n.type === "schedule_returned" || n.title === "일정 반환") && !n.read);
-        if (!isAdmin || returnNotifs.length === 0) return null;
-        return (
-          <div className="bg-orange-500 text-white z-50">
-            {returnNotifs.slice(0, 5).map((n) => (
-              <div key={n.id} className="px-3 py-2 flex items-center gap-2 border-b border-orange-400/30 last:border-0">
-                <span className="text-sm">↩</span>
-                <div className="flex-1 min-w-0">
-                  <div className="text-xs font-medium">{n.message}</div>
-                  <div className="text-xs opacity-70">{new Date(n.createdAt).toLocaleString("ko")}</div>
-                </div>
-                <button onClick={() => handleMarkRead(n.id)} className="text-white/60 active:text-white shrink-0 p-1">
-                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" /></svg>
-                </button>
+      {/* 반환 알림 배너 - 대표/일정관리자: DB 알림 기반, dismiss 처리 후 안정 */}
+      {isAdmin && returnBannerNotifs.length > 0 && (
+        <div className="bg-orange-500 text-white z-50">
+          {returnBannerNotifs.slice(0, 5).map((n) => (
+            <div key={n.id} className="px-3 py-2 flex items-center gap-2 border-b border-orange-400/30 last:border-0">
+              <span className="text-sm">↩</span>
+              <div className="flex-1 min-w-0">
+                <div className="text-xs font-medium">{n.message}</div>
+                <div className="text-xs opacity-70">{new Date(n.createdAt).toLocaleString("ko")}</div>
               </div>
-            ))}
-            {returnNotifs.length > 5 && (
-              <div className="px-3 py-1 text-xs opacity-80 text-center">+{returnNotifs.length - 5}건 더</div>
-            )}
-          </div>
-        );
-      })()}
+              <button
+                onClick={() => {
+                  dismissedReturnIdsRef.current.add(n.id);
+                  handleMarkRead(n.id);
+                  // 즉시 재계산 트리거
+                  setNotifications((prev) => [...prev]);
+                }}
+                className="text-white/60 active:text-white shrink-0 p-1"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
+            </div>
+          ))}
+          {returnBannerNotifs.length > 5 && (
+            <div className="px-3 py-1 text-xs opacity-80 text-center">+{returnBannerNotifs.length - 5}건 더</div>
+          )}
+        </div>
+      )}
       {/* Compact mobile header */}
       <header className="bg-white border-b border-gray-200 sticky top-0 z-40">
         <div className="px-4 flex items-center justify-between h-11">
@@ -1081,6 +1121,7 @@ export default function Home() {
         {canAssign && (
           <div className="h-full" style={{ display: activeTab === "assign" ? "block" : "none" }}>
             <AssignTab members={members} schedules={unassignedSchedules} onAssigned={(scheduleId, memberId, memberName) => {
+              scheduleReloadSuppressRef.current = Date.now() + 4000;
               // 낙관적 업데이트: 즉시 UI 반영
               const target = unassignedSchedules.find((s) => s.id === scheduleId);
               if (target) {
@@ -1092,6 +1133,7 @@ export default function Home() {
               // API는 백그라운드 (안 기다림)
               assignScheduleApi(scheduleId, memberId, memberName);
             }} onDeleted={(id) => {
+              scheduleReloadSuppressRef.current = Date.now() + 4000;
               setUnassignedSchedules((prev) => prev.filter((s) => s.id !== id));
             }} onOpenDetail={(s) => {
               setDetailMode("assign");
@@ -1494,6 +1536,7 @@ export default function Home() {
           onDelete={(id) => { handleDeleteSchedule(id); setDetailSchedule(null); consumeHash(); }}
           onUnassign={(id, reason) => { setDetailSchedule(null); consumeHash(); handleUnassignSchedule(id, reason); }}
           onAssign={(scheduleId, memberId, memberName) => {
+            scheduleReloadSuppressRef.current = Date.now() + 4000;
             const target = unassignedSchedules.find((s) => s.id === scheduleId);
             if (target) {
               setUnassignedSchedules((prev) => prev.filter((s) => s.id !== scheduleId));
