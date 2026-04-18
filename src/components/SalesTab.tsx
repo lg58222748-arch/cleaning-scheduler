@@ -24,32 +24,150 @@ interface ParsedSchedule {
   time: string;
 }
 
+interface FormSession {
+  id: string;
+  name: string;
+  services: ServiceEntry[];
+  pyeong: string;
+  buildType: string;
+  salesNote: string;
+  copied: Set<string>;
+}
+
+interface ConfirmSession {
+  id: string;
+  name: string;
+  services: ServiceEntry[];
+  customerText: string;
+  parsedName: string;
+  parsedPhone: string;
+  parsedAddr: string;
+  parsedWishDate: string;
+  parsedPyeong: string;
+  parsedNote: string;
+  parsedQuote: string;
+  parsedDeposit: string;
+  parsedBalance: string;
+  parsedSalesNote: string;
+  calendarNote: string;
+  schedules: ParsedSchedule[];
+  confirmMsg: string;
+  confirmed: boolean;
+  postDone: number[];
+  copied: Set<string>;
+}
+
+function makeFormSession(name: string): FormSession {
+  return { id: "f-" + Date.now() + "-" + Math.random().toString(36).slice(2, 6), name, services: [], pyeong: "", buildType: "선택", salesNote: "", copied: new Set() };
+}
+
+function makeConfirmSession(name: string): ConfirmSession {
+  return {
+    id: "c-" + Date.now() + "-" + Math.random().toString(36).slice(2, 6), name,
+    services: [], customerText: "",
+    parsedName: "", parsedPhone: "", parsedAddr: "", parsedWishDate: "",
+    parsedPyeong: "", parsedNote: "", parsedQuote: "", parsedDeposit: "", parsedBalance: "", parsedSalesNote: "",
+    calendarNote: "", schedules: [], confirmMsg: "", confirmed: false, postDone: [], copied: new Set(),
+  };
+}
+
 export default function SalesTab({ userName, onCreated }: SalesTabProps) {
   const [step, setStep] = useState<1 | 2 | 3>(1);
 
-  // Step 1
-  const [services, setServices] = useState<ServiceEntry[]>([]);
-  const [pyeong, setPyeong] = useState("");
-  const [buildType, setBuildType] = useState("선택");
-  const [salesNote, setSalesNote] = useState("");
-  const [copied, setCopied] = useState<Set<string>>(new Set());
+  // 세션 목록
+  const [formSessions, setFormSessions] = useState<FormSession[]>(() => [makeFormSession("양식1")]);
+  const [activeFormId, setActiveFormId] = useState<string>(() => formSessions[0].id);
+  const [confirmSessions, setConfirmSessions] = useState<ConfirmSession[]>(() => [makeConfirmSession("확정1")]);
+  const [activeConfirmId, setActiveConfirmId] = useState<string>(() => confirmSessions[0].id);
 
-  // Step 2
-  const [customerText, setCustomerText] = useState("");
-  const [parsedName, setParsedName] = useState("");
-  const [parsedPhone, setParsedPhone] = useState("");
-  const [parsedAddr, setParsedAddr] = useState("");
-  const [parsedWishDate, setParsedWishDate] = useState("");
-  const [parsedPyeong, setParsedPyeong] = useState("");
-  const [parsedNote, setParsedNote] = useState("");
-  const [parsedQuote, setParsedQuote] = useState("");
-  const [parsedDeposit, setParsedDeposit] = useState("");
-  const [parsedBalance, setParsedBalance] = useState("");
-  const [parsedSalesNote, setParsedSalesNote] = useState("");
-  const [calendarNote, setCalendarNote] = useState("");
-  const [schedules, setSchedules] = useState<ParsedSchedule[]>([]);
-  const [confirmMsg, setConfirmMsg] = useState("");
+  // 활성 세션 (없으면 안전한 기본값)
+  const activeForm: FormSession = formSessions.find(s => s.id === activeFormId) || formSessions[0];
+  const activeConfirm: ConfirmSession = confirmSessions.find(s => s.id === activeConfirmId) || confirmSessions[0];
+
+  function updateForm(patch: Partial<FormSession>) {
+    setFormSessions(prev => prev.map(s => s.id === activeFormId ? { ...s, ...patch } : s));
+  }
+  function updateConfirm(patch: Partial<ConfirmSession>) {
+    setConfirmSessions(prev => prev.map(s => s.id === activeConfirmId ? { ...s, ...patch } : s));
+  }
+  function addFormSession() {
+    const n = makeFormSession(`양식${formSessions.length + 1}`);
+    setFormSessions(prev => [...prev, n]);
+    setActiveFormId(n.id);
+  }
+  function removeFormSession(id: string) {
+    if (formSessions.length <= 1) return;
+    const idx = formSessions.findIndex(s => s.id === id);
+    const next = formSessions.filter(s => s.id !== id);
+    setFormSessions(next);
+    if (activeFormId === id) setActiveFormId(next[Math.max(0, idx - 1)].id);
+  }
+  function addConfirmSession() {
+    const n = makeConfirmSession(`확정${confirmSessions.length + 1}`);
+    setConfirmSessions(prev => [...prev, n]);
+    setActiveConfirmId(n.id);
+  }
+  function removeConfirmSession(id: string) {
+    if (confirmSessions.length <= 1) return;
+    const idx = confirmSessions.findIndex(s => s.id === id);
+    const next = confirmSessions.filter(s => s.id !== id);
+    setConfirmSessions(next);
+    if (activeConfirmId === id) setActiveConfirmId(next[Math.max(0, idx - 1)].id);
+  }
+
+  // 활성 세션 필드 접근용 별칭 (렌더/함수에서 사용)
+  const services = activeForm.services;
+  const pyeong = activeForm.pyeong;
+  const buildType = activeForm.buildType;
+  const salesNote = activeForm.salesNote;
+
+  const customerText = activeConfirm.customerText;
+  const parsedName = activeConfirm.parsedName;
+  const parsedPhone = activeConfirm.parsedPhone;
+  const parsedAddr = activeConfirm.parsedAddr;
+  const parsedWishDate = activeConfirm.parsedWishDate;
+  const parsedPyeong = activeConfirm.parsedPyeong;
+  const parsedNote = activeConfirm.parsedNote;
+  const parsedSalesNote = activeConfirm.parsedSalesNote;
+  const calendarNote = activeConfirm.calendarNote;
+  const schedules: ParsedSchedule[] = activeConfirm.schedules;
+  const confirmMsg = activeConfirm.confirmMsg;
+  const confirmed = activeConfirm.confirmed;
+  const postDone = activeConfirm.postDone;
+
+  // setter 래퍼 (기존 코드 호환)
+  const setServices = (v: ServiceEntry[] | ((prev: ServiceEntry[]) => ServiceEntry[])) => updateForm({ services: typeof v === "function" ? v(activeForm.services) : v });
+  const setPyeong = (v: string) => updateForm({ pyeong: v });
+  const setBuildType = (v: string) => updateForm({ buildType: v });
+  const setSalesNote = (v: string) => updateForm({ salesNote: v });
+
+  const setCustomerText = (v: string) => updateConfirm({ customerText: v });
+  const setParsedName = (v: string) => updateConfirm({ parsedName: v });
+  const setParsedPhone = (v: string) => updateConfirm({ parsedPhone: v });
+  const setParsedAddr = (v: string) => updateConfirm({ parsedAddr: v });
+  const setParsedWishDate = (v: string) => updateConfirm({ parsedWishDate: v });
+  const setParsedPyeong = (v: string) => updateConfirm({ parsedPyeong: v });
+  const setParsedNote = (v: string) => updateConfirm({ parsedNote: v });
+  const setParsedQuote = (v: string) => updateConfirm({ parsedQuote: v });
+  const setParsedDeposit = (v: string) => updateConfirm({ parsedDeposit: v });
+  const setParsedBalance = (v: string) => updateConfirm({ parsedBalance: v });
+  const setParsedSalesNote = (v: string) => updateConfirm({ parsedSalesNote: v });
+  const setCalendarNote = (v: string) => updateConfirm({ calendarNote: v });
+  const setSchedules = (v: ParsedSchedule[] | ((prev: ParsedSchedule[]) => ParsedSchedule[])) => updateConfirm({ schedules: typeof v === "function" ? v(activeConfirm.schedules) : v });
+  const setConfirmMsg = (v: string) => updateConfirm({ confirmMsg: v });
+  const setConfirmed = (v: boolean) => updateConfirm({ confirmed: v });
+  const setPostDone = (v: number[] | ((prev: number[]) => number[])) => updateConfirm({ postDone: typeof v === "function" ? v(activeConfirm.postDone) : v });
+
+  // 전역 상태 (파싱 중/저장 중은 동시에 하나만)
   const [saving, setSaving] = useState(false);
+  const [globalCopied, setGlobalCopied] = useState<Set<string>>(new Set()); // Step 3 템플릿 복사 상태
+
+  // 렌더/복사 체크에 사용할 통합 copied (읽기 전용)
+  const copied: { has: (label: string) => boolean } = { has: (label: string) => {
+    if (label === "form" || label === "dep") return activeForm.copied.has(label);
+    if (label.startsWith("tpl")) return globalCopied.has(label);
+    return activeConfirm.copied.has(label);
+  } };
 
   // 서비스 토글 (복수 선택)
   function toggleService(name: string) {
@@ -123,6 +241,8 @@ export default function SalesTab({ userName, onCreated }: SalesTabProps) {
   // AI 파싱 - Claude API 우선, 실패시 regex fallback
   async function parseCustomer() {
     setParsing(true);
+    // Step 1 에서 세팅한 services 를 Step 2 세션에 복사 (아직 없으면)
+    const confirmServices = activeConfirm.services.length > 0 ? activeConfirm.services : activeForm.services;
 
     // 1차: Claude API 시도
     try {
@@ -133,14 +253,17 @@ export default function SalesTab({ userName, onCreated }: SalesTabProps) {
       });
       const data = await res.json();
       if (data.success) {
-        setParsedName(data.name || "");
-        setParsedPhone(data.phone || "");
-        setParsedAddr(data.addr || "");
-        setParsedWishDate(data.date || "");
-        setParsedNote(data.note || "");
-        setParsedPyeong(pyeong);
-        setSchedules(services.map((s) => ({ service: s.name, date: "", time: "선택" })));
-        generateConfirmMsg(data.name, data.addr, data.phone, data.date, data.note);
+        updateConfirm({
+          parsedName: data.name || "",
+          parsedPhone: data.phone || "",
+          parsedAddr: data.addr || "",
+          parsedWishDate: data.date || "",
+          parsedNote: data.note || "",
+          parsedPyeong: activeForm.pyeong,
+          services: confirmServices,
+          schedules: confirmServices.map((s) => ({ service: s.name, date: "", time: "선택" })),
+        });
+        generateConfirmMsg(data.name, data.addr, data.phone, data.date, data.note, confirmServices);
         setParsing(false);
         setTimeout(() => parsedResultRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 100);
         return;
@@ -173,11 +296,11 @@ export default function SalesTab({ userName, onCreated }: SalesTabProps) {
       const m7 = line.match(/7\)\s*평수\s*[:：]\s*(.+)/); if (m7) parsedPyeongFromText = m7[1].trim();
     }
 
-    // Step1에서 서비스 선택 안 했으면 양식에서 추출한 서비스로 설정
-    if (services.length === 0 && parsedSvcFromText) {
+    // Step1 혹은 activeConfirm 에서 서비스 선택 안 했으면 양식에서 추출한 서비스로 설정
+    let svcList: ServiceEntry[] = activeConfirm.services.length > 0 ? activeConfirm.services : activeForm.services;
+    if (svcList.length === 0 && parsedSvcFromText) {
       const svcNames = parsedSvcFromText.split(/[,，\s]+/).filter(Boolean);
-      setServices(svcNames.map((n) => {
-        // 양식에서 견적/예약금도 추출
+      svcList = svcNames.map((n) => {
         let quote = "", deposit = "";
         let inSvc = false;
         for (const line of lines) {
@@ -189,9 +312,9 @@ export default function SalesTab({ userName, onCreated }: SalesTabProps) {
           }
         }
         return { name: n, quote, deposit };
-      }));
+      });
     }
-    if (!pyeong && parsedPyeongFromText) setPyeong(parsedPyeongFromText);
+    const pyeongToUse = activeForm.pyeong || parsedPyeongFromText;
 
     // 2차: 양식 뒤 자유형식 답변 추출
     // 마지막 "*" 줄 이후의 내용물을 모두 수집
@@ -246,31 +369,33 @@ export default function SalesTab({ userName, onCreated }: SalesTabProps) {
       else if (c.type === "note" && !note) note = c.value;
     }
 
-    setParsedName(name);
-    setParsedPhone(phone);
-    setParsedAddr(addr);
-    setParsedWishDate(wish);
-    setParsedNote(note);
-    setParsedPyeong(pyeong);
-
-    // 서비스별 일정
-    setSchedules(services.map((s) => ({ service: s.name, date: "", time: "선택" })));
+    updateConfirm({
+      parsedName: name,
+      parsedPhone: phone,
+      parsedAddr: addr,
+      parsedWishDate: wish,
+      parsedNote: note,
+      parsedPyeong: pyeongToUse,
+      services: svcList,
+      schedules: svcList.map((s) => ({ service: s.name, date: "", time: "선택" })),
+    });
 
     // 확정 메시지 생성
-    generateConfirmMsg(name, addr, phone, wish, note);
+    generateConfirmMsg(name, addr, phone, wish, note, svcList);
   }
 
-  function generateConfirmMsg(name?: string, addr?: string, phone?: string, _wish?: string, note?: string) {
+  function generateConfirmMsg(name?: string, addr?: string, phone?: string, _wish?: string, note?: string, overrideServices?: ServiceEntry[]) {
     const n = name || parsedName;
-    const svcList = services.map((s) => s.name).join(", ");
-    // 일정별 날짜에서 청소희망날짜 자동 생성
+    const svcs = overrideServices || activeConfirm.services;
+    const schedsArr = activeConfirm.schedules.length > 0 ? activeConfirm.schedules : svcs.map(s => ({ service: s.name, date: "", time: "선택" }));
+    const svcList = svcs.map((s) => s.name).join(", ");
     const timeDesc: Record<string, string> = {
       "오전": " 오전(7~9시 사이 방문)",
       "오후": " 오후(13시~15시 사이 방문)",
       "시무": " 시무(9시~11시 사이 방문)",
       "사이": " 사이(11시~13시 사이 방문)",
     };
-    const schedDateStr = schedules
+    const schedDateStr = schedsArr
       .filter(s => s.date)
       .map(s => `${s.date}${s.time && s.time !== "선택" ? timeDesc[s.time] || ` ${s.time}` : ""}`)
       .join("\n4)청소희망날짜 : ") || _wish || parsedWishDate;
@@ -279,18 +404,18 @@ export default function SalesTab({ userName, onCreated }: SalesTabProps) {
     msg += `4)청소희망날짜 : ${schedDateStr}\n`;
     msg += `5)고객님 특이사항 : ${note || parsedNote}\n\n`;
     msg += `──────────────────\n`;
-    msg += `6)서비스 종류 : ${svcList}\n7)평수 : ${(parsedPyeong || pyeong) ? (parsedPyeong || pyeong) + "평" : ""}${buildType && buildType !== "선택" ? " " + buildType : ""}\n`;
+    msg += `6)서비스 종류 : ${svcList}\n7)평수 : ${(parsedPyeong || activeForm.pyeong) ? (parsedPyeong || activeForm.pyeong) + "평" : ""}${activeForm.buildType && activeForm.buildType !== "선택" ? " " + activeForm.buildType : ""}\n`;
 
-    services.forEach((s) => {
+    svcs.forEach((s) => {
       msg += `► ${s.name}\n`;
       msg += `8)견적금액(공급가액) : ${s.quote ? parseInt(s.quote).toLocaleString() + "원" : ""}\n`;
       msg += `9)예 약 금 : ${s.deposit ? parseInt(s.deposit).toLocaleString() + "원" : ""}\n`;
       msg += `10)잔 금 : ${getBalance(s) > 0 ? getBalance(s).toLocaleString() + "원" : ""}\n`;
     });
 
-    if (services.length > 1) {
-      const totalQuote = services.reduce((sum, s) => sum + (parseInt(s.quote) || 0), 0);
-      const totalDeposit = services.reduce((sum, s) => sum + (parseInt(s.deposit) || 0), 0);
+    if (svcs.length > 1) {
+      const totalQuote = svcs.reduce((sum, s) => sum + (parseInt(s.quote) || 0), 0);
+      const totalDeposit = svcs.reduce((sum, s) => sum + (parseInt(s.deposit) || 0), 0);
       const totalBalance = totalQuote - totalDeposit;
       msg += `──────────────────\n`;
       msg += `총 견적금액 : ${totalQuote > 0 ? totalQuote.toLocaleString() + "원" : ""}\n`;
@@ -298,27 +423,39 @@ export default function SalesTab({ userName, onCreated }: SalesTabProps) {
       msg += `총 잔금 : ${totalBalance > 0 ? totalBalance.toLocaleString() + "원" : ""}\n`;
     }
 
-    if (salesNote) msg += `11)상담사 특이사항 : ${salesNote}\n`;
+    if (activeForm.salesNote) msg += `11)상담사 특이사항 : ${activeForm.salesNote}\n`;
     msg += `\n*예약금은 본사 확정 비용, 잔금과 세금 증빙은 당일 관리점에서 작업 마무리 후 처리됩니다.\n`;
     msg += `*최종 정산은 현장 작업 완료 후 공급가액과 부가세를 구분하여 안내드립니다.`;
     setConfirmMsg(msg);
   }
 
-  async function handleCopy(text: string, label: string) {
-    // 이미 체크된 경우 → 체크 해제만 하고 복사 안 함
-    if (copied.has(label)) {
-      setCopied(prev => { const n = new Set(prev); n.delete(label); return n; });
-      return;
+  // 라벨 접두사로 어느 세션의 copied 에 저장할지 결정
+  function copiedHas(label: string) {
+    if (label === "form" || label === "dep") return activeForm.copied.has(label);
+    if (label.startsWith("tpl")) return globalCopied.has(label);
+    return activeConfirm.copied.has(label); // post*, 그 외
+  }
+  function copiedToggle(label: string, add: boolean) {
+    if (label === "form" || label === "dep") {
+      const next = new Set(activeForm.copied);
+      if (add) next.add(label); else next.delete(label);
+      updateForm({ copied: next });
+    } else if (label.startsWith("tpl")) {
+      setGlobalCopied(prev => { const n = new Set(prev); if (add) n.add(label); else n.delete(label); return n; });
+    } else {
+      const next = new Set(activeConfirm.copied);
+      if (add) next.add(label); else next.delete(label);
+      updateConfirm({ copied: next });
     }
+  }
+
+  async function handleCopy(text: string, label: string) {
+    if (copiedHas(label)) { copiedToggle(label, false); return; }
     try { await navigator.clipboard.writeText(text); } catch {
       const ta = document.createElement("textarea"); ta.value = text; document.body.appendChild(ta); ta.select(); document.execCommand("copy"); document.body.removeChild(ta);
     }
-    setCopied(prev => new Set(prev).add(label));
+    copiedToggle(label, true);
   }
-
-  // 예약 확정 → 배정탭 등록
-  const [confirmed, setConfirmed] = useState(false);
-  const [postDone, setPostDone] = useState<number[]>([]);
 
   const POST_MSGS = [
     { label: "1. 최종 확정 예약 양식", getText: () => confirmMsg },
@@ -349,9 +486,10 @@ export default function SalesTab({ userName, onCreated }: SalesTabProps) {
     }
 
     setSaving(true);
+    const confirmSvcs = activeConfirm.services;
     for (let i = 0; i < schedules.length; i++) {
       const sched = schedules[i];
-      const svc = services[i];
+      const svc = confirmSvcs[i];
       if (!svc) continue;
       const noteExtra = calendarNote ? `/${calendarNote}` : "";
       const originalTitle = `U${parsedName}/${parsedAddr?.split(" ").slice(0, 2).join("")}/${userName} [${i + 1}/${schedules.length}]/${svc.name}${noteExtra}`;
@@ -392,6 +530,21 @@ export default function SalesTab({ userName, onCreated }: SalesTabProps) {
       <div className="flex-1 overflow-y-auto pb-6">
       {/* ===== STEP 1 ===== */}
       {step === 1 && (
+        <>
+        {/* 세션 탭 바 */}
+        <div className="flex items-center gap-1 px-2 py-2 border-b border-gray-100 overflow-x-auto bg-gray-50">
+          {formSessions.map(s => (
+            <div key={s.id} className={`flex items-center gap-1 rounded-lg shrink-0 ${activeFormId === s.id ? "bg-green-700 text-white" : "bg-white text-gray-600 border border-gray-200"}`}>
+              <button onClick={() => setActiveFormId(s.id)} className="px-3 py-1.5 text-xs font-bold">
+                {s.name}
+              </button>
+              {formSessions.length > 1 && (
+                <button onClick={() => removeFormSession(s.id)} className={`pr-2 text-xs font-bold ${activeFormId === s.id ? "opacity-80 hover:opacity-100" : "opacity-50"}`}>✕</button>
+              )}
+            </div>
+          ))}
+          <button onClick={addFormSession} className="px-3 py-1.5 rounded-lg text-xs font-bold bg-white border border-dashed border-green-400 text-green-700 shrink-0 active:bg-green-50">+</button>
+        </div>
         <div className="p-3 flex flex-col md:flex-row md:gap-6">
         <div className="space-y-3 md:flex-1">
           {/* 서비스 선택 (복수) */}
@@ -514,31 +667,61 @@ export default function SalesTab({ userName, onCreated }: SalesTabProps) {
             </button>
           </div>
 
-          <button onClick={() => { setStep(2); if (services.length > 0) setSchedules(services.map((s) => ({ service: s.name, date: "", time: "선택" }))); }}
+          <button onClick={() => {
+            setStep(2);
+            if (services.length > 0) {
+              updateConfirm({
+                services: [...services],
+                schedules: services.map((s) => ({ service: s.name, date: "", time: "선택" })),
+              });
+            }
+          }}
             className="w-full py-2 rounded-lg text-xs font-bold text-white" style={{ background: "#1a6b3c" }}>
             STEP 2 · 파싱으로 이동 →
           </button>
           <div className="h-8" />
         </div>
         </div>
+        </>
       )}
 
       {/* ===== STEP 2 ===== */}
       {step === 2 && (
+        <>
+        {/* 세션 탭 바 */}
+        <div className="flex items-center gap-1 px-2 py-2 border-b border-gray-100 overflow-x-auto bg-gray-50">
+          {confirmSessions.map(s => {
+            const displayName = s.parsedName ? `${s.name} · ${s.parsedName}` : s.name;
+            return (
+              <div key={s.id} className={`flex items-center gap-1 rounded-lg shrink-0 ${activeConfirmId === s.id ? "bg-green-700 text-white" : "bg-white text-gray-600 border border-gray-200"}`}>
+                <button onClick={() => setActiveConfirmId(s.id)} className="px-3 py-1.5 text-xs font-bold">
+                  {displayName}
+                </button>
+                {confirmSessions.length > 1 && (
+                  <button onClick={() => removeConfirmSession(s.id)} className={`pr-2 text-xs font-bold ${activeConfirmId === s.id ? "opacity-80 hover:opacity-100" : "opacity-50"}`}>✕</button>
+                )}
+              </div>
+            );
+          })}
+          <button onClick={addConfirmSession} className="px-3 py-1.5 rounded-lg text-xs font-bold bg-white border border-dashed border-green-400 text-green-700 shrink-0 active:bg-green-50">+</button>
+        </div>
         <div className="p-3 flex flex-col md:flex-row md:gap-6">
         <div className="space-y-3 md:flex-1">
           {/* 예약 보관함 */}
           <SavedBookings onLoad={(data) => {
-            if (data.services) setServices(data.services);
-            if (data.parsedName) setParsedName(data.parsedName);
-            if (data.parsedPhone) setParsedPhone(data.parsedPhone);
-            if (data.parsedAddr) setParsedAddr(data.parsedAddr);
-            if (data.parsedWishDate) setParsedWishDate(data.parsedWishDate);
-            if (data.confirmMsg) setConfirmMsg(data.confirmMsg);
-            if (data.customerText) setCustomerText(data.customerText);
-            setParsedPyeong(data.pyeong || pyeong);
+            // 현재 활성 확정 세션에 불러오기
+            updateConfirm({
+              services: data.services || activeConfirm.services,
+              parsedName: data.parsedName || activeConfirm.parsedName,
+              parsedPhone: data.parsedPhone || activeConfirm.parsedPhone,
+              parsedAddr: data.parsedAddr || activeConfirm.parsedAddr,
+              parsedWishDate: data.parsedWishDate || activeConfirm.parsedWishDate,
+              parsedPyeong: data.pyeong || activeConfirm.parsedPyeong,
+              confirmMsg: data.confirmMsg || activeConfirm.confirmMsg,
+              customerText: data.customerText || activeConfirm.customerText,
+            });
           }} onSave={() => ({
-            services, parsedName, parsedPhone, parsedAddr, parsedWishDate, confirmMsg, userName, customerText, pyeong,
+            services: activeConfirm.services, parsedName, parsedPhone, parsedAddr, parsedWishDate, confirmMsg, userName, customerText, pyeong: parsedPyeong,
           })} />
 
           {/* 고객 답장 붙여넣기 */}
@@ -607,9 +790,9 @@ export default function SalesTab({ userName, onCreated }: SalesTabProps) {
               <div>
                 <label className="text-xs font-bold text-green-700 mb-1 block">캘린더 저장 제목</label>
                 <div className="flex flex-wrap gap-1.5 mb-2">
-                  {services.map((s, i) => (
+                  {activeConfirm.services.map((s, i) => (
                     <span key={s.name} className="text-xs px-2 py-1 bg-green-700 text-white rounded-lg font-medium">
-                      U{parsedName}/{parsedAddr?.split(" ")[0]}/{userName} [{i + 1}/{services.length}]/{s.name}
+                      U{parsedName}/{parsedAddr?.split(" ")[0]}/{userName} [{i + 1}/{activeConfirm.services.length}]/{s.name}
                     </span>
                   ))}
                 </div>
@@ -622,13 +805,13 @@ export default function SalesTab({ userName, onCreated }: SalesTabProps) {
                 <span className="text-xs font-bold text-gray-600 block mb-1.5">저장될 제목 예시</span>
                 <div className="space-y-1">
                   <div className="text-xs text-red-500 font-medium">미입금: u{userName}/미입금/{parsedName || "고객이름"}</div>
-                  {services.map((s, i) => {
+                  {activeConfirm.services.map((s, i) => {
                     const noteExtra = calendarNote ? `/${calendarNote}` : "";
                     const time = schedules[i]?.time;
                     const timePrefix = time && time !== "선택" ? `[${time}] ` : "";
                     return (
                       <div key={s.name} className="text-xs text-green-700 font-medium">
-                        입금완료: {timePrefix}U{parsedName || "이름"}/{parsedAddr?.split(" ").slice(0, 2).join("") || "지역"}/{userName} [{i + 1}/{services.length}]/{s.name}{noteExtra}
+                        입금완료: {timePrefix}U{parsedName || "이름"}/{parsedAddr?.split(" ").slice(0, 2).join("") || "지역"}/{userName} [{i + 1}/{activeConfirm.services.length}]/{s.name}{noteExtra}
                       </div>
                     );
                   })}
@@ -697,6 +880,7 @@ export default function SalesTab({ userName, onCreated }: SalesTabProps) {
           <div className="h-8" />
         </div>
         </div>
+        </>
       )}
 
       {/* ===== STEP 3 · 안내 양식 ===== */}
