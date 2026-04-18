@@ -1045,7 +1045,7 @@ function TemplateCard({
       onDragOver={(e) => { e.preventDefault(); onDragOver?.(); }}
       onDrop={(e) => { e.preventDefault(); onDrop?.(); }}
     >
-      <div className="w-full px-3 py-2.5 flex items-center gap-2">
+      <div className="w-full px-3 py-1.5 flex items-center gap-2">
         {isAdmin && (
           <>
             <div
@@ -1066,17 +1066,17 @@ function TemplateCard({
                 }
               }}
               onTouchEnd={() => onDrop?.()}
-              className="flex items-center justify-center w-6 h-9 cursor-grab active:cursor-grabbing shrink-0 touch-none"
+              className="flex items-center justify-center w-5 h-6 cursor-grab active:cursor-grabbing shrink-0 touch-none"
               title="드래그로 순서 이동"
             >
-              <svg className="w-4 h-5 text-gray-300" viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="6" r="1.5"/><circle cx="15" cy="6" r="1.5"/><circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="9" cy="18" r="1.5"/><circle cx="15" cy="18" r="1.5"/></svg>
+              <svg className="w-3.5 h-4 text-gray-300" viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="6" r="1.5"/><circle cx="15" cy="6" r="1.5"/><circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="9" cy="18" r="1.5"/><circle cx="15" cy="18" r="1.5"/></svg>
             </div>
-            <div className="flex flex-col gap-0.5 shrink-0">
-              <button disabled={!canMoveUp} onClick={() => onMoveUp?.()} className="p-0.5 rounded active:bg-gray-200 disabled:opacity-20">
-                <svg className="w-3.5 h-3.5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" /></svg>
+            <div className="flex flex-col gap-0 shrink-0 -my-0.5">
+              <button disabled={!canMoveUp} onClick={() => onMoveUp?.()} className="p-0 rounded active:bg-gray-200 disabled:opacity-20 leading-none">
+                <svg className="w-3 h-3 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" /></svg>
               </button>
-              <button disabled={!canMoveDown} onClick={() => onMoveDown?.()} className="p-0.5 rounded active:bg-gray-200 disabled:opacity-20">
-                <svg className="w-3.5 h-3.5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+              <button disabled={!canMoveDown} onClick={() => onMoveDown?.()} className="p-0 rounded active:bg-gray-200 disabled:opacity-20 leading-none">
+                <svg className="w-3 h-3 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
               </button>
             </div>
           </>
