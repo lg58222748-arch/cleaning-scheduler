@@ -242,12 +242,19 @@ export async function getUnreadCount(): Promise<number> {
   return count || 0;
 }
 
-export async function addNotification(type: NotificationType, title: string, message: string, scheduleId?: string): Promise<Notification> {
+export async function addNotification(type: NotificationType, title: string, message: string, scheduleId?: string, targetNames?: string[]): Promise<Notification> {
   const { data } = await supabase.from("notifications").insert({ type, title, message, schedule_id: scheduleId, read: false }).select().single();
-  // 푸시 알림: 메시지에 이름이 언급된 사용자에게만 전송 (타지점 사용자 제외)
+  // 푸시 알림
   try {
-    const { sendPushToMentioned } = await import("./push");
-    sendPushToMentioned(title, message, type).catch(() => {});
+    if (targetNames && targetNames.length > 0) {
+      // 명시적 대상: 정확한 이름 매칭으로 해당 사용자에게만
+      const { sendPushToNames } = await import("./push");
+      sendPushToNames(targetNames, title, message, type).catch(() => {});
+    } else {
+      // 대상 미지정: 메시지 내 이름 매칭 (레거시)
+      const { sendPushToMentioned } = await import("./push");
+      sendPushToMentioned(title, message, type).catch(() => {});
+    }
   } catch { /* push 모듈 로드 실패 무시 */ }
   return rowToNotification(data!);
 }

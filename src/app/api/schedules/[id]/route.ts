@@ -13,11 +13,17 @@ export async function PUT(
   const schedule = await updateSchedule(id, body);
   if (!schedule) return Response.json({ error: "Not found" }, { status: 404 });
 
+  // 일정 변경: 담당자에게만 푸시 (담당자 변경이면 신/구 담당자 둘 다)
+  const targets = new Set<string>();
+  if (schedule.memberName && schedule.memberName !== "미배정") targets.add(schedule.memberName);
+  if (before?.memberName && before.memberName !== "미배정" && before.memberName !== schedule.memberName) targets.add(before.memberName);
+
   await addNotification(
     "schedule_updated",
     "일정 변경",
     `${schedule.date} ${schedule.startTime} "${schedule.title}" 일정이 변경되었습니다.${before?.memberName !== schedule.memberName ? ` (${before?.memberName} → ${schedule.memberName})` : ""}`,
-    schedule.id
+    schedule.id,
+    targets.size > 0 ? Array.from(targets) : undefined
   );
 
   return Response.json(schedule);
@@ -39,7 +45,8 @@ export async function DELETE(
       "schedule_cancelled",
       "일정 취소",
       `${schedule.date} ${schedule.startTime} "${schedule.title}" 일정이 취소되었습니다. (담당: ${schedule.memberName})`,
-      id
+      id,
+      schedule.memberName && schedule.memberName !== "미배정" ? [schedule.memberName] : undefined
     );
   }
 

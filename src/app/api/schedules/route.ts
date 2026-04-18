@@ -56,7 +56,8 @@ export async function POST(req: NextRequest) {
     const schedule = await assignSchedule(body.scheduleId, body.memberId, body.memberName);
     if (!schedule) return Response.json({ error: "Not found" }, { status: 404 });
     const msg = `"${schedule.title}" 일정이 ${schedule.memberName}님에게 배정되었습니다.`;
-    await addNotification("schedule_created", "일정 배정", msg, schedule.id);
+    // 배정받은 본인에게만 푸시
+    await addNotification("schedule_created", "일정 배정", msg, schedule.id, [schedule.memberName]);
     return Response.json(schedule);
   }
 
@@ -66,6 +67,7 @@ export async function POST(req: NextRequest) {
     const who = body.returnedBy || "";
     const reason = body.reason || "";
     const msg = `${who ? who + "님이 " : ""}"${schedule.title}" 일정을 반환했습니다.${reason ? " 사유: " + reason : ""}`;
+    // 반환은 대상이 없음 → 레거시(이름 매칭) 유지. 관리자는 in-app 알림 필터로 전체 볼 수 있음
     await addNotification("schedule_updated", "일정 반환", msg, schedule.id);
     return Response.json(schedule);
   }
@@ -103,7 +105,8 @@ export async function POST(req: NextRequest) {
     "schedule_created",
     "새 일정 등록",
     `${schedule.date} ${schedule.startTime} "${schedule.title}" 일정이 ${schedule.memberName}님에게 배정되었습니다.`,
-    schedule.id
+    schedule.id,
+    schedule.memberName && schedule.memberName !== "미배정" ? [schedule.memberName] : undefined
   );
 
   return Response.json(schedule, { status: 201 });
