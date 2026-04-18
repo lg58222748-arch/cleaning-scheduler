@@ -242,11 +242,15 @@ export async function getUnreadCount(): Promise<number> {
   return count || 0;
 }
 
-export async function addNotification(type: NotificationType, title: string, message: string, scheduleId?: string, targetNames?: string[]): Promise<Notification> {
+export async function addNotification(type: NotificationType, title: string, message: string, scheduleId?: string, targetNames?: string[], targetRoles?: string[]): Promise<Notification> {
   const { data } = await supabase.from("notifications").insert({ type, title, message, schedule_id: scheduleId, read: false }).select().single();
   // 푸시 알림
   try {
-    if (targetNames && targetNames.length > 0) {
+    if (targetRoles && targetRoles.length > 0) {
+      // 역할 기반 타겟팅
+      const { sendPushToRoles } = await import("./push");
+      sendPushToRoles(targetRoles, title, message, type).catch(() => {});
+    } else if (targetNames && targetNames.length > 0) {
       // 명시적 대상: 정확한 이름 매칭으로 해당 사용자에게만
       const { sendPushToNames } = await import("./push");
       sendPushToNames(targetNames, title, message, type).catch(() => {});

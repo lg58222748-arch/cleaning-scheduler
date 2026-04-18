@@ -67,8 +67,8 @@ export async function POST(req: NextRequest) {
     const who = body.returnedBy || "";
     const reason = body.reason || "";
     const msg = `${who ? who + "님이 " : ""}"${schedule.title}" 일정을 반환했습니다.${reason ? " 사유: " + reason : ""}`;
-    // 반환은 대상이 없음 → 레거시(이름 매칭) 유지. 관리자는 in-app 알림 필터로 전체 볼 수 있음
-    await addNotification("schedule_updated", "일정 반환", msg, schedule.id);
+    // 반환은 대표/일정관리자/영업팀/admin 에게만 (현장팀 제외)
+    await addNotification("schedule_updated", "일정 반환", msg, schedule.id, undefined, ["ceo", "admin", "scheduler", "sales"]);
     return Response.json(schedule);
   }
 

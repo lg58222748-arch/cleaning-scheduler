@@ -148,16 +148,27 @@ export default function Home() {
         setSchedules(rangeScheds);
         setUnassignedSchedules(unassignedScheds);
         setSwapRequests(sw);
-        // 알림: 본인 이름 포함된 것만 표시 + 전체 공지(system_notice)는 모두에게
-        const allNotifs = notif.notifications as Notification[];
-        const uName = currentUser?.name || "";
-        const deleted = deletedNotifIdsRef.current;
-        const myNotifs = allNotifs.filter(n =>
-          !deleted.has(n.id) &&
-          (n.type === "system_notice" || (uName && (n.message.includes(uName) || n.title.includes(uName))))
-        );
-        setNotifications(myNotifs);
-        setUnreadCount(myNotifs.filter(n => !n.read).length);
+        // 알림 액션(모두읽음/지우기) 직후엔 loadData 결과로 덮어쓰지 않음 (깜빡임 방지)
+        if (Date.now() >= notifReloadSuppressRef.current) {
+          // 알림 필터:
+          // - system_notice: 모두
+          // - 일정 반환: 대표/admin/일정관리자/영업팀 (현장팀 제외)
+          // - 그 외: 본인 이름 포함된 것만 (현장팀 포함)
+          const allNotifs = notif.notifications as Notification[];
+          const uName = currentUser?.name || "";
+          const uRole = currentUser?.role || "";
+          const deleted = deletedNotifIdsRef.current;
+          const isReturn = (n: Notification) => n.title === "일정 반환";
+          const isAdminRole = uRole === "ceo" || uRole === "admin" || uRole === "scheduler" || uRole === "sales";
+          const myNotifs = allNotifs.filter(n => {
+            if (deleted.has(n.id)) return false;
+            if (n.type === "system_notice") return true;
+            if (isReturn(n)) return isAdminRole;
+            return uName && (n.message.includes(uName) || n.title.includes(uName));
+          });
+          setNotifications(myNotifs);
+          setUnreadCount(myNotifs.filter(n => !n.read).length);
+        }
         setAllUsers(usersData.users);
         setPendingUsers(usersData.pendingUsers);
         // 캐시 저장
@@ -278,10 +289,14 @@ export default function Home() {
       fetchNotifications().then(notif => {
         const allNotifs = notif.notifications as Notification[];
         const deleted = deletedNotifIdsRef.current;
-        const myNotifs = allNotifs.filter(n =>
-          !deleted.has(n.id) &&
-          (n.type === "system_notice" || (uName && (n.message.includes(uName) || n.title.includes(uName))))
-        );
+        const isReturn = (n: Notification) => n.title === "일정 반환";
+        const isAdminRole = uRole === "ceo" || uRole === "admin" || uRole === "scheduler" || uRole === "sales";
+        const myNotifs = allNotifs.filter(n => {
+          if (deleted.has(n.id)) return false;
+          if (n.type === "system_notice") return true;
+          if (isReturn(n)) return isAdminRole;
+          return uName && (n.message.includes(uName) || n.title.includes(uName));
+        });
         setNotifications(myNotifs);
         setUnreadCount(myNotifs.filter(n => !n.read).length);
       }).catch(() => {});
@@ -705,25 +720,33 @@ export default function Home() {
 
   // Notifications — 낙관적 업데이트 + reload 억제로 깜빡임 방지
   async function handleMarkRead(id: string) {
-    notifReloadSuppressRef.current = Date.now() + 3000;
+    notifReloadSuppressRef.current = Date.now() + 6000;
     setNotifications((prev) => prev.map((n) => n.id === id ? { ...n, read: true } : n));
     setUnreadCount((c) => Math.max(0, c - 1));
     await apiMarkRead(id);
+    // API 완료 후에도 확실히 상태 고정
+    setNotifications((prev) => prev.map((n) => n.id === id ? { ...n, read: true } : n));
   }
   async function handleMarkAllRead() {
-    notifReloadSuppressRef.current = Date.now() + 3000;
+    notifReloadSuppressRef.current = Date.now() + 6000;
     setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
     setUnreadCount(0);
     await apiMarkAllRead();
+    // API 완료 후에도 확실히 상태 고정 (그 사이 도착한 reload 결과를 덮어씀)
+    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+    setUnreadCount(0);
   }
   async function handleClearAllNotifications() {
     // DB 에서도 제거 (현재 화면에 보이는 ID 들)
     const ids = notifications.map((n) => n.id);
     ids.forEach((id) => deletedNotifIdsRef.current.add(id));
-    notifReloadSuppressRef.current = Date.now() + 3000;
+    notifReloadSuppressRef.current = Date.now() + 6000;
     setNotifications([]);
     setUnreadCount(0);
     await apiDeleteNotifications(ids);
+    // API 완료 후에도 확실히 비움
+    setNotifications([]);
+    setUnreadCount(0);
   }
 
   // Google Calendar 제거됨 - 직접 등록/영업탭으로 대체
