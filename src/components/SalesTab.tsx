@@ -435,17 +435,18 @@ export default function SalesTab({ userName, onCreated }: SalesTabProps) {
     return true;
   }
 
-  function generateConfirmMsg(name?: string, addr?: string, phone?: string, _wish?: string, note?: string, overrideServices?: ServiceEntry[], overridePyeong?: string) {
+  function generateConfirmMsg(name?: string, addr?: string, phone?: string, _wish?: string, note?: string, overrideServices?: ServiceEntry[], overridePyeong?: string, overrideSchedules?: ParsedSchedule[]) {
     const n = name || parsedName;
     const svcs = overrideServices || activeConfirm.services;
-    const schedsArr = activeConfirm.schedules.length > 0 ? activeConfirm.schedules : svcs.map(s => ({ service: s.name, date: "", time: "선택" }));
+    const schedsRaw = overrideSchedules || activeConfirm.schedules;
+    const schedsArr = schedsRaw.length > 0 ? schedsRaw : svcs.map(s => ({ service: s.name, date: "", time: "선택" }));
     const pyeongVal = overridePyeong || parsedPyeong;
     const svcList = svcs.map((s) => s.name).join(", ");
     const timeDesc: Record<string, string> = {
       "오전": " 오전(7~9시 사이 방문)",
       "오후": " 오후(13시~15시 사이 방문)",
-      "시무": " 시무(9시~11시 사이 방문)",
-      "사이": " 사이(11시~13시 사이 방문)",
+      "시무": " 시무(별도협의)",
+      "사이": " 사이(별도협의)",
     };
     const schedDateStr = schedsArr
       .filter(s => s.date)
@@ -802,11 +803,11 @@ export default function SalesTab({ userName, onCreated }: SalesTabProps) {
                     <div className="flex gap-2">
                       <input type="date" value={sched.date} onChange={(e) => {
                         const updated = [...schedules]; updated[i] = { ...sched, date: e.target.value }; setSchedules(updated);
-                        setTimeout(() => generateConfirmMsg(), 50);
+                        generateConfirmMsg(undefined, undefined, undefined, undefined, undefined, undefined, undefined, updated);
                       }} style={{ fontSize: "12px" }} className="flex-1 px-3 py-2 border border-gray-200 rounded-lg outline-none focus:border-green-500" />
                       <select value={sched.time} onChange={(e) => {
                         const updated = [...schedules]; updated[i] = { ...sched, time: e.target.value }; setSchedules(updated);
-                        setTimeout(() => generateConfirmMsg(), 50);
+                        generateConfirmMsg(undefined, undefined, undefined, undefined, undefined, undefined, undefined, updated);
                       }} style={{ fontSize: "12px" }} className="px-3 py-2 border border-gray-200 rounded-lg outline-none bg-white focus:border-green-500">
                         <option value="선택">시간대</option>
                         {TIME_SLOTS.map((t) => <option key={t} value={t}>{t}</option>)}
