@@ -131,9 +131,15 @@ export async function sendPushToAll(title: string, message: string, tag?: string
 export async function sendPushToUsers(userIds: string[], title: string, message: string, tag?: string) {
   init();
   const unique = Array.from(new Set(userIds.filter(Boolean)));
-  if (unique.length === 0) return;
+  if (unique.length === 0) { console.log("[Push] userIds 없음"); return; }
   const { data: subs } = await supabase.from("push_subscriptions").select("*").in("user_id", unique);
-  if (!subs || subs.length === 0) return;
+  console.log(`[Push] tag=${tag} 대상 user=${unique.length}명 구독=${subs?.length || 0}건`);
+  if (!subs || subs.length === 0) {
+    console.warn(`[Push] 구독 없음 - userIds:`, unique);
+    return;
+  }
+  const endpoints = subs.map(s => (s.endpoint?.startsWith("fcm:") ? "FCM" : "WEB") + "/" + String(s.user_id).slice(0, 8));
+  console.log(`[Push] 발송 시작:`, endpoints);
   await sendToSubs(subs, title, message, tag);
 }
 
