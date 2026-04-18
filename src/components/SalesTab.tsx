@@ -114,7 +114,7 @@ export default function SalesTab({ userName, onCreated }: SalesTabProps) {
   // 예약금 안내 텍스트
   function getDepositText() {
     const totalDeposit = services.reduce((sum, s) => sum + (parseInt(s.deposit) || 0), 0);
-    return `예약금 안내드립니다.\n\n입금 계좌\n하나은행 12345678901\n예금주: 새집느낌\n\n예약금: ${totalDeposit.toLocaleString()}원\n\n입금 확인 후 예약 확정 안내드리겠습니다.\n감사합니다!`;
+    return `우리은행1005 504 852384 주식회사 새집느낌 여기로 \n\n예약금 ${totalDeposit > 0 ? totalDeposit.toLocaleString() : ""}원\n\n보내주시면 예약 확정 도와드리겠습니다 :)\n\n예약자 성함으로 입금부탁드립니다, 예약자 성함이 아닌 경우 입금자명 따로 기재부탁드립니다,\n\n-----------------------------\n\n1번~5번 성함 주소 연락처만 한번더 체크해서 작성해주시면 예약 확정 해드리겠습니다 감사합니다 ^^`;
   }
 
   const [parsing, setParsing] = useState(false);
