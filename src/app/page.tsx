@@ -691,19 +691,38 @@ export default function Home() {
 
   // Google Calendar 제거됨 - 직접 등록/영업탭으로 대체
 
-  // Derived - schedules는 이미 배정된 것만 (DB레벨 분리)
+  // Derived - 역할별 일정 필터 (타인 일정 안 보이게)
   const myLinkedMember = members.find((m) => m.linkedUsername === currentUser.username);
-  const baseCalendarSchedules = (role === "field")
-    ? schedules.filter((s) =>
+  const baseCalendarSchedules = (() => {
+    // 관리자(대표/admin/일정관리자): 전체 일정 조회
+    if (role === "ceo" || role === "admin" || role === "scheduler") return schedules;
+    // 현장팀: 본인 일정만
+    if (role === "field") {
+      return schedules.filter((s) =>
         s.memberName === currentUser.name ||
         s.assignedToName === currentUser.name ||
         s.assignedTo === currentUser.id ||
         (myLinkedMember && s.memberId === myLinkedMember.id)
-      )
-    : schedules;
-  // 팀원 필터 적용 (현장팀은 이미 자기 일정만 보이므로 필터 무시)
+      );
+    }
+    // 영업팀: 본인이 상담/등록한 일정만 (제목에 username 포함)
+    if (role === "sales") {
+      const u = currentUser.username;
+      const name = currentUser.name;
+      return schedules.filter((s) =>
+        s.title.includes(`/${u}/`) ||
+        s.title.includes(`/${u}[`) ||
+        s.title.endsWith(`/${u}`) ||
+        s.title.startsWith(`u${u}/`) ||
+        s.memberName === name ||
+        s.assignedToName === name
+      );
+    }
+    return [];
+  })();
+  // 팀원 필터 적용 (현장팀/영업팀은 이미 자기 일정만 보이므로 필터 무시)
   const calendarSchedules = (() => {
-    if (!filterActive || role === "field") return baseCalendarSchedules;
+    if (!filterActive || role === "field" || role === "sales") return baseCalendarSchedules;
     if (selectedMemberIds.size === 0) return [];
     const filterNames = new Set<string>();
     allUsers.filter(u => u.role === "field").forEach(u => {
