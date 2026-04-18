@@ -778,9 +778,11 @@ export default function Home() {
     return [];
   })();
   // 팀원 필터 적용 (현장팀/영업팀은 이미 자기 일정만 보이므로 필터 무시)
-  // 본인 일정은 필터와 무관하게 항상 표시, 선택된 팀원 일정만 추가 표시
+  // 본인 일정은 항상 표시, 필터에 선택된 팀원 일정도 추가 표시
+  // 필터 ON + 선택 0명이면 필터 OFF 로 간주 (실수로 숨기는 것 방지)
   const calendarSchedules = (() => {
     if (!filterActive || role === "field" || role === "sales") return baseCalendarSchedules;
+    if (selectedMemberIds.size === 0) return baseCalendarSchedules;
     const filterNames = new Set<string>();
     allUsers.filter(u => u.role === "field").forEach(u => {
       if (selectedMemberIds.has(u.id)) filterNames.add(u.name);
