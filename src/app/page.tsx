@@ -985,7 +985,6 @@ export default function Home() {
               const roleLabels: Record<string, string> = { ceo: "대표", scheduler: "일정관리자", sales: "영업팀", field: "현장팀", pending: "대기" };
               const roleColors: Record<string, string> = { ceo: "bg-purple-100 text-purple-700", scheduler: "bg-blue-100 text-blue-700", sales: "bg-green-100 text-green-700", field: "bg-orange-100 text-orange-700", pending: "bg-gray-100 text-gray-500" };
               const groupColors: Record<string, string> = { self: "border-blue-200 bg-blue-50/50", ceo: "border-purple-200 bg-purple-50/30", scheduler: "border-blue-200 bg-blue-50/30", sales: "border-green-200 bg-green-50/30", field: "border-orange-200 bg-orange-50/30", pending: "border-orange-300 bg-orange-50/40" };
-              const groupIcons: Record<string, string> = { self: "👤", ceo: "👑", scheduler: "📋", sales: "💼", field: "🧹", pending: "⏳" };
 
               // 전체 사용자 → userOrder 로 정렬
               const sortedAll = [...allUsers].filter(u => u.username !== "admin").sort((a, b) => {
@@ -1131,7 +1130,6 @@ export default function Home() {
                   <div key={g.key} className={`rounded-xl border ${groupColors[g.key] || "border-gray-200 bg-white"} overflow-hidden`}>
                     <button onClick={() => toggleGroup(g.key)} className="w-full px-4 py-3 flex items-center justify-between active:bg-black/5">
                       <div className="flex items-center gap-2">
-                        <span className="text-base">{groupIcons[g.key]}</span>
                         <span className="text-sm font-bold text-gray-800">{g.title}</span>
                         <span className="text-xs px-2 py-0.5 rounded-full bg-white/80 text-gray-600 font-medium">{g.users.length}명</span>
                       </div>
