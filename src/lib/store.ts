@@ -307,6 +307,31 @@ export async function deleteSystemNotice(id: string): Promise<boolean> {
   return !error;
 }
 
+// 구버전 배포가 돌더라도 재생성 못하게, 모든 내일 일정에 대해
+// 푸시 없이 happy_call_reminder 마커만 미리 생성 (이미 있으면 스킵)
+export async function prefillHappyCallMarkers(): Promise<number> {
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const tomorrowStr = tomorrow.toISOString().split("T")[0];
+  const { data: tomorrowSchedules } = await supabase.from("schedules").select("id").eq("date", tomorrowStr);
+  if (!tomorrowSchedules) return 0;
+  let created = 0;
+  for (const s of tomorrowSchedules) {
+    const { data: existing } = await supabase.from("notifications").select("id").eq("type", "happy_call_reminder").eq("schedule_id", String(s.id));
+    if (!existing || existing.length === 0) {
+      await supabase.from("notifications").insert({
+        type: "happy_call_reminder",
+        title: "해피콜 요청",
+        message: "[자동 생성 마커]",
+        schedule_id: String(s.id),
+        read: true,
+      });
+      created++;
+    }
+  }
+  return created;
+}
+
 export async function checkHappyCallReminders(): Promise<Notification[]> {
   const tomorrow = new Date();
   tomorrow.setDate(tomorrow.getDate() + 1);

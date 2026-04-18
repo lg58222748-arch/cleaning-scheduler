@@ -9,6 +9,7 @@ import {
   createSystemNotice,
   getSystemNotices,
   deleteSystemNotice,
+  prefillHappyCallMarkers,
 } from "@/lib/store";
 
 export async function GET(req: NextRequest) {
@@ -55,6 +56,11 @@ export async function POST(req: NextRequest) {
   if (body.action === "deleteNotice" && body.id) {
     const ok = await deleteSystemNotice(String(body.id));
     return Response.json({ success: ok });
+  }
+
+  if (body.action === "prefillHappyCall") {
+    const count = await prefillHappyCallMarkers();
+    return Response.json({ success: true, created: count });
   }
 
   return Response.json({ error: "Invalid action" }, { status: 400 });
