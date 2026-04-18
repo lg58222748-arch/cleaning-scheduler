@@ -778,14 +778,23 @@ export default function Home() {
     return [];
   })();
   // 팀원 필터 적용 (현장팀/영업팀은 이미 자기 일정만 보이므로 필터 무시)
-  // 순수 필터: 선택된 팀원의 일정만, 선택 없으면 빈 목록
+  // 본인 일정은 필터와 무관하게 항상 표시, 선택된 팀원 일정만 추가 표시
   const calendarSchedules = (() => {
     if (!filterActive || role === "field" || role === "sales") return baseCalendarSchedules;
     const filterNames = new Set<string>();
     allUsers.filter(u => u.role === "field").forEach(u => {
       if (selectedMemberIds.has(u.id)) filterNames.add(u.name);
     });
+    const myName = currentUser.name;
+    const myId = currentUser.id;
+    const myLinkedId = myLinkedMember?.id;
     return baseCalendarSchedules.filter((s) =>
+      // 본인(대표/admin/scheduler) 관련 일정은 항상 표시
+      s.memberName === myName ||
+      s.assignedToName === myName ||
+      s.assignedTo === myId ||
+      (myLinkedId && s.memberId === myLinkedId) ||
+      // 필터에 선택된 팀원의 일정
       selectedMemberIds.has(s.assignedTo || "") ||
       selectedMemberIds.has(s.memberId) ||
       filterNames.has(s.assignedToName || "") ||
