@@ -58,6 +58,7 @@ export default function ScheduleDetail({
   const [saving, setSaving] = useState(false);
   const [noteChanged, setNoteChanged] = useState(false);
   const [schedColor, setSchedColor] = useState(schedule.color || "#FDDCCC");
+  const [localDate, setLocalDate] = useState(schedule.date);
   const [showReturnModal, setShowReturnModal] = useState(false);
   const [returnReason, setReturnReason] = useState("");
   const [assignMemberId, setAssignMemberId] = useState("");
@@ -178,7 +179,7 @@ export default function ScheduleDetail({
   const statusClass = schedule.status === "confirmed" ? "bg-green-100 text-green-700" : schedule.status === "pending" ? "bg-yellow-100 text-yellow-700" : "bg-orange-100 text-orange-700";
 
   const dayNames = ["일", "월", "화", "수", "목", "금", "토"];
-  const schedDate = new Date(schedule.date + "T00:00:00");
+  const schedDate = new Date(localDate + "T00:00:00");
   const dayName = dayNames[schedDate.getDay()];
   const month = schedDate.getMonth() + 1;
   const day = schedDate.getDate();
@@ -355,11 +356,12 @@ export default function ScheduleDetail({
                     <div className="flex items-center gap-2">
                       <input
                         type="date"
-                        value={schedule.date}
-                        onChange={async (e) => {
+                        value={localDate}
+                        onChange={(e) => {
                           const newDate = e.target.value;
-                          if (!newDate || newDate === schedule.date) return;
-                          schedule.date = newDate;
+                          if (!newDate || newDate === localDate) return;
+                          setLocalDate(newDate);         // 화면 즉시 갱신
+                          schedule.date = newDate;        // prop 동기화
                           apiUpdateSchedule(schedule.id, { date: newDate }).then(() => onUpdated?.()).catch(() => {});
                         }}
                         className="font-medium text-xs px-2 py-1 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-400 outline-none"
