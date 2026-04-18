@@ -6,6 +6,7 @@ import { addUnassignedSchedule } from "@/lib/api";
 interface SalesTabProps {
   userName: string;
   onCreated: () => void;
+  isAdmin?: boolean;
 }
 
 const ALL_SERVICES = ["입주청소", "거주청소", "인테리어청소", "사이청소", "새집증후군 시공", "줄눈시공", "탄성코트", "에어컨청소(완전분해)"];
@@ -71,7 +72,7 @@ function makeConfirmSession(name: string): ConfirmSession {
   };
 }
 
-export default function SalesTab({ userName, onCreated }: SalesTabProps) {
+export default function SalesTab({ userName, onCreated, isAdmin = false }: SalesTabProps) {
   const [step, setStep] = useState<1 | 2 | 3>(1);
 
   // 세션 목록
@@ -169,35 +170,43 @@ export default function SalesTab({ userName, onCreated }: SalesTabProps) {
   const [saving, setSaving] = useState(false);
   const [globalCopied, setGlobalCopied] = useState<Set<string>>(new Set()); // Step 3 템플릿 복사 상태
 
-  // 안내 양식 순서 (localStorage 저장 - 제목 배열)
-  const [templates, setTemplates] = useState<{ title: string; content: string }[]>(() => {
-    if (typeof window === "undefined") return DEFAULT_TEMPLATES;
+  // 안내 양식 (제목/내용 수정 + 순서 저장) — 전체 객체 저장
+  const [templates, setTemplates] = useState<{ id: string; title: string; content: string }[]>(() => {
+    const defaults = DEFAULT_TEMPLATES.map((t, i) => ({ id: `tpl-${i}`, ...t }));
+    if (typeof window === "undefined") return defaults;
     try {
-      const saved = localStorage.getItem("salesTemplatesOrder");
+      const saved = localStorage.getItem("salesTemplates");
       if (saved) {
-        const orderedTitles: string[] = JSON.parse(saved);
-        const sorted: typeof DEFAULT_TEMPLATES = [];
-        for (const t of orderedTitles) {
-          const found = DEFAULT_TEMPLATES.find(d => d.title === t);
-          if (found) sorted.push(found);
-        }
-        // 새로 추가된 템플릿은 뒤에 붙임
-        for (const d of DEFAULT_TEMPLATES) {
-          if (!sorted.find(s => s.title === d.title)) sorted.push(d);
-        }
-        return sorted;
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
       }
     } catch {}
-    return DEFAULT_TEMPLATES;
+    return defaults;
   });
+  function saveTemplates(next: { id: string; title: string; content: string }[]) {
+    setTemplates(next);
+    localStorage.setItem("salesTemplates", JSON.stringify(next));
+  }
   function moveTemplate(idx: number, delta: number) {
     const newIdx = idx + delta;
     if (newIdx < 0 || newIdx >= templates.length) return;
     const next = [...templates];
     [next[idx], next[newIdx]] = [next[newIdx], next[idx]];
-    setTemplates(next);
-    localStorage.setItem("salesTemplatesOrder", JSON.stringify(next.map(t => t.title)));
+    saveTemplates(next);
   }
+  function moveTemplateToIdx(fromIdx: number, toIdx: number) {
+    if (fromIdx === toIdx || fromIdx < 0 || toIdx < 0) return;
+    const next = [...templates];
+    const [item] = next.splice(fromIdx, 1);
+    next.splice(toIdx, 0, item);
+    saveTemplates(next);
+  }
+  function updateTemplateField(id: string, field: "title" | "content", value: string) {
+    const next = templates.map(t => t.id === id ? { ...t, [field]: value } : t);
+    saveTemplates(next);
+  }
+  const [dragTplId, setDragTplId] = useState<string | null>(null);
+  const [dragOverTplId, setDragOverTplId] = useState<string | null>(null);
 
   // 렌더/복사 체크에 사용할 통합 copied (읽기 전용)
   const copied: { has: (label: string) => boolean } = { has: (label: string) => {
@@ -950,18 +959,38 @@ export default function SalesTab({ userName, onCreated }: SalesTabProps) {
       {/* ===== STEP 3 · 안내 양식 ===== */}
       {step === 3 && (
         <div className="p-4 space-y-3">
-          <div className="text-xs font-bold text-green-700 mb-2">안내 양식 모음 · 위/아래 화살표로 순서 변경</div>
+          <div className="text-xs font-bold text-green-700 mb-2">
+            안내 양식 모음
+            {isAdmin ? " · 화살표/드래그로 순서 변경, 제목·내용 수정 가능" : " (관리자만 수정 가능)"}
+          </div>
           {templates.map((tpl, i) => (
             <TemplateCard
-              key={tpl.title + i}
+              key={tpl.id}
+              id={tpl.id}
               title={tpl.title}
               content={tpl.content}
               onCopy={(text) => handleCopy(text, `tpl${i}`)}
               copied={copied.has(`tpl${i}`)}
+              isAdmin={isAdmin}
               canMoveUp={i > 0}
               canMoveDown={i < templates.length - 1}
               onMoveUp={() => moveTemplate(i, -1)}
               onMoveDown={() => moveTemplate(i, 1)}
+              onChangeTitle={(v) => updateTemplateField(tpl.id, "title", v)}
+              onChangeContent={(v) => updateTemplateField(tpl.id, "content", v)}
+              isDragging={dragTplId === tpl.id}
+              isDragOver={dragOverTplId === tpl.id && dragTplId !== tpl.id}
+              onDragStart={() => setDragTplId(tpl.id)}
+              onDragEnd={() => { setDragTplId(null); setDragOverTplId(null); }}
+              onDragOver={() => { if (dragTplId && dragTplId !== tpl.id) setDragOverTplId(tpl.id); }}
+              onDrop={() => {
+                if (!dragTplId || dragTplId === tpl.id) return;
+                const fromIdx = templates.findIndex(t => t.id === dragTplId);
+                const toIdx = templates.findIndex(t => t.id === tpl.id);
+                moveTemplateToIdx(fromIdx, toIdx);
+                setDragTplId(null);
+                setDragOverTplId(null);
+              }}
             />
           ))}
         </div>
@@ -989,37 +1018,99 @@ const DEFAULT_TEMPLATES = [
 ];
 
 // ===== 안내 양식 카드 =====
-function TemplateCard({ title, content, onCopy, copied, canMoveUp, canMoveDown, onMoveUp, onMoveDown }: {
-  title: string; content: string; onCopy: (text: string) => void; copied: boolean;
+function TemplateCard({
+  id, title, content, onCopy, copied, isAdmin,
+  canMoveUp, canMoveDown, onMoveUp, onMoveDown,
+  onChangeTitle, onChangeContent,
+  isDragging, isDragOver, onDragStart, onDragEnd, onDragOver, onDrop,
+}: {
+  id: string; title: string; content: string; onCopy: (text: string) => void; copied: boolean; isAdmin: boolean;
   canMoveUp?: boolean; canMoveDown?: boolean; onMoveUp?: () => void; onMoveDown?: () => void;
+  onChangeTitle?: (v: string) => void; onChangeContent?: (v: string) => void;
+  isDragging?: boolean; isDragOver?: boolean;
+  onDragStart?: () => void; onDragEnd?: () => void; onDragOver?: () => void; onDrop?: () => void;
 }) {
   const [open, setOpen] = useState(false);
-  const [editText, setEditText] = useState(content);
+  const [editingTitle, setEditingTitle] = useState(false);
+  const [titleDraft, setTitleDraft] = useState(title);
 
   return (
-    <div className="border border-gray-200 rounded-xl overflow-hidden">
-      <div className="w-full px-3 py-2.5 flex items-center gap-2 active:bg-gray-50">
-        <div className="flex flex-col gap-0.5 shrink-0">
-          <button disabled={!canMoveUp} onClick={(e) => { e.stopPropagation(); onMoveUp?.(); }} className="p-0.5 rounded active:bg-gray-200 disabled:opacity-20">
-            <svg className="w-3.5 h-3.5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" /></svg>
+    <div
+      data-tplid={id}
+      className={`border rounded-xl overflow-hidden transition-all ${isDragOver ? "border-green-500 border-dashed bg-green-50/40" : isDragging ? "opacity-40 scale-95 border-gray-200" : "border-gray-200"}`}
+      onDragOver={(e) => { e.preventDefault(); onDragOver?.(); }}
+      onDrop={(e) => { e.preventDefault(); onDrop?.(); }}
+    >
+      <div className="w-full px-3 py-2.5 flex items-center gap-2">
+        {isAdmin && (
+          <>
+            <div
+              draggable
+              onDragStart={() => onDragStart?.()}
+              onDragEnd={() => onDragEnd?.()}
+              onTouchStart={() => onDragStart?.()}
+              onTouchMove={(e) => {
+                const touch = e.touches[0];
+                const els = document.elementsFromPoint(touch.clientX, touch.clientY);
+                for (const el of els) {
+                  const card = (el as HTMLElement).closest("[data-tplid]");
+                  if (card) {
+                    const overId = card.getAttribute("data-tplid");
+                    if (overId && overId !== id) onDragOver?.();
+                    break;
+                  }
+                }
+              }}
+              onTouchEnd={() => onDrop?.()}
+              className="flex items-center justify-center w-6 h-9 cursor-grab active:cursor-grabbing shrink-0 touch-none"
+              title="드래그로 순서 이동"
+            >
+              <svg className="w-4 h-5 text-gray-300" viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="6" r="1.5"/><circle cx="15" cy="6" r="1.5"/><circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="9" cy="18" r="1.5"/><circle cx="15" cy="18" r="1.5"/></svg>
+            </div>
+            <div className="flex flex-col gap-0.5 shrink-0">
+              <button disabled={!canMoveUp} onClick={() => onMoveUp?.()} className="p-0.5 rounded active:bg-gray-200 disabled:opacity-20">
+                <svg className="w-3.5 h-3.5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" /></svg>
+              </button>
+              <button disabled={!canMoveDown} onClick={() => onMoveDown?.()} className="p-0.5 rounded active:bg-gray-200 disabled:opacity-20">
+                <svg className="w-3.5 h-3.5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+              </button>
+            </div>
+          </>
+        )}
+        {isAdmin && editingTitle ? (
+          <input
+            value={titleDraft}
+            autoFocus
+            onChange={(e) => setTitleDraft(e.target.value)}
+            onBlur={() => { if (titleDraft.trim() && titleDraft !== title) onChangeTitle?.(titleDraft.trim()); setEditingTitle(false); }}
+            onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); if (e.key === "Escape") { setTitleDraft(title); setEditingTitle(false); } }}
+            className="flex-1 text-sm font-medium text-gray-800 border-b-2 border-green-400 outline-none bg-transparent px-1 py-0.5"
+          />
+        ) : (
+          <button
+            onClick={() => setOpen(!open)}
+            onDoubleClick={() => { if (isAdmin) { setTitleDraft(title); setEditingTitle(true); } }}
+            className="flex-1 flex items-center justify-between text-left active:bg-gray-50 rounded px-1"
+            title={isAdmin ? "더블클릭하여 제목 수정" : ""}
+          >
+            <span className="text-sm font-medium text-gray-800">{title}</span>
+            <svg className={`w-4 h-4 text-gray-400 transition-transform ${open ? "rotate-90" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
           </button>
-          <button disabled={!canMoveDown} onClick={(e) => { e.stopPropagation(); onMoveDown?.(); }} className="p-0.5 rounded active:bg-gray-200 disabled:opacity-20">
-            <svg className="w-3.5 h-3.5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
-          </button>
-        </div>
-        <button onClick={() => { setOpen(!open); setEditText(content); }} className="flex-1 flex items-center justify-between text-left">
-          <span className="text-sm font-medium text-gray-800">{title}</span>
-          <svg className={`w-4 h-4 text-gray-400 transition-transform ${open ? "rotate-90" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-          </svg>
-        </button>
+        )}
       </div>
       {open && (
         <div className="px-3 pb-3 border-t border-gray-100">
-          <textarea value={editText} onChange={(e) => setEditText(e.target.value)} rows={8}
+          <textarea
+            value={content}
+            readOnly={!isAdmin}
+            onChange={(e) => isAdmin && onChangeContent?.(e.target.value)}
+            rows={8}
             style={{ fontSize: "12px" }}
-            className="w-full mt-2 text-gray-700 leading-relaxed bg-gray-50 rounded-lg p-2 outline-none resize-y" />
-          <button onClick={() => onCopy(editText)} className="mt-2 w-full py-2 bg-green-700 text-white rounded-lg text-xs font-bold active:bg-green-800">
+            className={`w-full mt-2 text-gray-700 leading-relaxed rounded-lg p-2 outline-none resize-y ${isAdmin ? "bg-white border border-gray-200 focus:border-green-500" : "bg-gray-50"}`}
+          />
+          <button onClick={() => onCopy(content)} className="mt-2 w-full py-2 bg-green-700 text-white rounded-lg text-xs font-bold active:bg-green-800">
             {copied ? "복사됨!" : "복사"}
           </button>
         </div>

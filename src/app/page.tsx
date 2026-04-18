@@ -1150,7 +1150,7 @@ export default function Home() {
         {/* Sales tab */}
         {canSales && (
           <div className="h-full flex flex-col" style={{ display: activeTab === "sales" ? "flex" : "none" }}>
-            <SalesTab userName={currentUser.name} onCreated={() => loadData(undefined, true)} />
+            <SalesTab userName={currentUser.name} onCreated={() => loadData(undefined, true)} isAdmin={canManageAdvanced} />
           </div>
         )}
       </main>
