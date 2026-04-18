@@ -173,7 +173,8 @@ export default function Home() {
             if (n.type === "system_notice") return true;
             if (isReturn(n)) {
               if (isAdminOrScheduler) return true;
-              if (uName && n.message.startsWith(`${uName}님이`)) return true;
+              // 현장팀: 메시지에 본인 이름이 포함되면 수신 (반환 실행자 또는 원 담당자)
+              if (uName && n.message.includes(uName)) return true;
               return false;
             }
             if (n.type === "happy_call_reminder") return isAdminOrScheduler;
@@ -371,7 +372,8 @@ export default function Home() {
           if (n.type === "system_notice") return true;
           if (isReturn(n)) {
             if (isAdminOrScheduler) return true;
-            if (uName && n.message.startsWith(`${uName}님이`)) return true;
+            // 현장팀: 메시지에 본인 이름 포함되면 수신 (반환 실행자 또는 원 담당자)
+            if (uName && n.message.includes(uName)) return true;
             return false;
           }
           if (n.type === "happy_call_reminder") return isAdminOrScheduler;

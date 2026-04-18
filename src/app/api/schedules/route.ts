@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import { getSchedules, getSchedulesByRange, getUnassignedSchedules, searchSchedules, addSchedule, addUnassignedSchedule, assignSchedule, unassignSchedule, addNotification, deleteAllSchedules, softDeleteSchedule, getDeletedSchedules, restoreSchedule, emptyTrash } from "@/lib/store";
+import { supabase } from "@/lib/supabase";
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
@@ -62,13 +63,25 @@ export async function POST(req: NextRequest) {
   }
 
   if (body.action === "unassign" && body.scheduleId) {
+    // 원래 담당자를 unassign 전에 기록 (unassign 후엔 member_name 이 "미배정" 으로 바뀜)
+    const { data: before } = await supabase.from("schedules").select("member_name").eq("id", body.scheduleId).single();
+    const originalAssignee = before?.member_name && before.member_name !== "미배정" ? String(before.member_name) : "";
+
     const schedule = await unassignSchedule(body.scheduleId);
     if (!schedule) return Response.json({ error: "Not found" }, { status: 404 });
     const who = body.returnedBy || "";
     const reason = body.reason || "";
-    const msg = `${who ? who + "님이 " : ""}"${schedule.title}" 일정을 반환했습니다.${reason ? " 사유: " + reason : ""}`;
-    // 관리자(ceo/admin/scheduler) + 반환 실행자 본인. 영업팀 제외.
-    await addNotification("schedule_returned", "일정 반환", msg, schedule.id, who ? [who] : undefined, ["ceo", "admin", "scheduler"]);
+    const actorSelfReturn = who && originalAssignee && who === originalAssignee;
+    const msg = actorSelfReturn
+      ? `${who}님이 "${schedule.title}" 일정을 반환했습니다.${reason ? " 사유: " + reason : ""}`
+      : `${who ? who + "님이 " : ""}${originalAssignee ? originalAssignee + "님의 " : ""}"${schedule.title}" 일정을 반환했습니다.${reason ? " 사유: " + reason : ""}`;
+
+    // 타겟: 관리자(ceo/admin/scheduler) + 반환 실행자 + 원래 담당자
+    const targetNames: string[] = [];
+    if (who) targetNames.push(who);
+    if (originalAssignee && originalAssignee !== who) targetNames.push(originalAssignee);
+
+    await addNotification("schedule_returned", "일정 반환", msg, schedule.id, targetNames.length > 0 ? targetNames : undefined, ["ceo", "admin", "scheduler"]);
     return Response.json(schedule);
   }
 
