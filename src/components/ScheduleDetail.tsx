@@ -351,7 +351,24 @@ export default function ScheduleDetail({
                   <svg className="w-5 h-5 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                   </svg>
-                  <span className="font-medium">{dateDisplay}</span>
+                  {isAdmin ? (
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="date"
+                        value={schedule.date}
+                        onChange={async (e) => {
+                          const newDate = e.target.value;
+                          if (!newDate || newDate === schedule.date) return;
+                          schedule.date = newDate;
+                          apiUpdateSchedule(schedule.id, { date: newDate }).then(() => onUpdated?.()).catch(() => {});
+                        }}
+                        className="font-medium text-xs px-2 py-1 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-400 outline-none"
+                      />
+                      <span className="text-gray-500">({dayName})</span>
+                    </div>
+                  ) : (
+                    <span className="font-medium">{dateDisplay}</span>
+                  )}
                   <span className={`text-xs px-2 py-0.5 rounded-full ml-auto ${statusClass}`}>{statusLabel}</span>
                 </div>
 

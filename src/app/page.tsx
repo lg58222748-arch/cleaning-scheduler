@@ -1430,7 +1430,13 @@ export default function Home() {
       )}
       {showSearch && (
         <SearchPanel
-          onSelectSchedule={(s) => { setShowSearch(false); consumeHash(); setDetailMode("calendar"); openDetailSchedule(s); }}
+          onSelectSchedule={(s) => {
+            setShowSearch(false);
+            consumeHash();
+            setDetailMode("calendar");
+            // 검색 패널 닫힘 완료 후 상세 열기 (해시 충돌 방지)
+            setTimeout(() => openDetailSchedule(s), 100);
+          }}
           onClose={() => { setShowSearch(false); consumeHash(); }}
         />
       )}
