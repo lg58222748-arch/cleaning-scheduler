@@ -375,9 +375,11 @@ export default function ScheduleDetail({
                     onChange={(e) => {
                       const newDate = e.target.value;
                       if (!newDate || newDate === localDate) return;
+                      // 즉시 반영: 로컬/공유 객체/부모 상태 모두 먼저 업데이트, API 는 백그라운드
                       setLocalDate(newDate);
                       schedule.date = newDate;
-                      apiUpdateSchedule(schedule.id, { date: newDate }).then(() => onUpdated?.()).catch(() => {});
+                      onUpdated?.();
+                      apiUpdateSchedule(schedule.id, { date: newDate }).catch(() => {});
                     }}
                     className="absolute opacity-0 pointer-events-none w-0 h-0"
                     aria-hidden="true"
