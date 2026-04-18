@@ -533,6 +533,7 @@ export default function SalesTab({ userName, onCreated }: SalesTabProps) {
         <>
         {/* 세션 탭 바 */}
         <div className="flex items-center gap-1 px-2 py-2 border-b border-gray-100 overflow-x-auto bg-gray-50">
+          <button onClick={addFormSession} className="px-3 py-1.5 rounded-lg text-xs font-bold bg-white border border-dashed border-green-400 text-green-700 shrink-0 active:bg-green-50 sticky left-0 z-10">+</button>
           {formSessions.map(s => (
             <div key={s.id} className={`flex items-center gap-1 rounded-lg shrink-0 ${activeFormId === s.id ? "bg-green-700 text-white" : "bg-white text-gray-600 border border-gray-200"}`}>
               <button onClick={() => setActiveFormId(s.id)} className="px-3 py-1.5 text-xs font-bold">
@@ -543,7 +544,6 @@ export default function SalesTab({ userName, onCreated }: SalesTabProps) {
               )}
             </div>
           ))}
-          <button onClick={addFormSession} className="px-3 py-1.5 rounded-lg text-xs font-bold bg-white border border-dashed border-green-400 text-green-700 shrink-0 active:bg-green-50">+</button>
         </div>
         <div className="p-3 flex flex-col md:flex-row md:gap-6">
         <div className="space-y-3 md:flex-1">
@@ -690,6 +690,7 @@ export default function SalesTab({ userName, onCreated }: SalesTabProps) {
         <>
         {/* 세션 탭 바 */}
         <div className="flex items-center gap-1 px-2 py-2 border-b border-gray-100 overflow-x-auto bg-gray-50">
+          <button onClick={addConfirmSession} className="px-3 py-1.5 rounded-lg text-xs font-bold bg-white border border-dashed border-green-400 text-green-700 shrink-0 active:bg-green-50 sticky left-0 z-10">+</button>
           {confirmSessions.map(s => {
             const displayName = s.parsedName ? `${s.name} · ${s.parsedName}` : s.name;
             return (
@@ -703,7 +704,6 @@ export default function SalesTab({ userName, onCreated }: SalesTabProps) {
               </div>
             );
           })}
-          <button onClick={addConfirmSession} className="px-3 py-1.5 rounded-lg text-xs font-bold bg-white border border-dashed border-green-400 text-green-700 shrink-0 active:bg-green-50">+</button>
         </div>
         <div className="p-3 flex flex-col md:flex-row md:gap-6">
         <div className="space-y-3 md:flex-1">
