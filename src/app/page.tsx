@@ -293,10 +293,12 @@ export default function Home() {
         const deleted = deletedNotifIdsRef.current;
         const isReturn = (n: Notification) => n.title === "일정 반환";
         const isAdminRole = uRole === "ceo" || uRole === "admin" || uRole === "scheduler" || uRole === "sales";
+        const isHappyCallAdmin = uRole === "ceo" || uRole === "admin" || uRole === "scheduler";
         const myNotifs = allNotifs.filter(n => {
           if (deleted.has(n.id)) return false;
           if (n.type === "system_notice") return true;
           if (isReturn(n)) return isAdminRole;
+          if (n.type === "happy_call_reminder") return isHappyCallAdmin;
           return uName && (n.message.includes(uName) || n.title.includes(uName));
         });
         setNotifications(myNotifs);
@@ -739,13 +741,15 @@ export default function Home() {
     setUnreadCount(0);
   }
   async function handleClearAllNotifications() {
-    // DB 에서도 제거 (현재 화면에 보이는 ID 들)
-    const ids = notifications.map((n) => n.id);
-    ids.forEach((id) => deletedNotifIdsRef.current.add(id));
+    // 해피콜 리마인더는 DB 에서 지우면 서버가 다시 생성하므로 유지 (로컬만 숨김 + 읽음 처리)
+    const deletable = notifications.filter((n) => n.type !== "happy_call_reminder").map((n) => n.id);
+    const allIds = notifications.map((n) => n.id);
+    allIds.forEach((id) => deletedNotifIdsRef.current.add(id));
     notifReloadSuppressRef.current = Date.now() + 6000;
     setNotifications([]);
     setUnreadCount(0);
-    await apiDeleteNotifications(ids);
+    if (deletable.length > 0) await apiDeleteNotifications(deletable);
+    await apiMarkAllRead();
     // API 완료 후에도 확실히 비움
     setNotifications([]);
     setUnreadCount(0);

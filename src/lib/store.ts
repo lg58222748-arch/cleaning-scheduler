@@ -322,7 +322,9 @@ export async function checkHappyCallReminders(): Promise<Notification[]> {
         "happy_call_reminder",
         "해피콜 요청",
         `내일 ${s.start_time} "${s.title}" 일정이 있습니다. ${s.member_name}님에게 해피콜을 진행해주세요.`,
-        String(s.id)
+        String(s.id),
+        undefined,
+        ["ceo", "admin", "scheduler"]
       );
       newReminders.push(n);
     }
