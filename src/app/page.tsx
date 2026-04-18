@@ -275,6 +275,7 @@ export default function Home() {
   useEffect(() => {
     if (!currentUser) return;
     const uName = currentUser?.name || "";
+    const uRole = currentUser?.role || "";
 
     function reloadSchedules() {
       const d = selectedDate;
