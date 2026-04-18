@@ -169,6 +169,36 @@ export default function SalesTab({ userName, onCreated }: SalesTabProps) {
   const [saving, setSaving] = useState(false);
   const [globalCopied, setGlobalCopied] = useState<Set<string>>(new Set()); // Step 3 템플릿 복사 상태
 
+  // 안내 양식 순서 (localStorage 저장 - 제목 배열)
+  const [templates, setTemplates] = useState<{ title: string; content: string }[]>(() => {
+    if (typeof window === "undefined") return DEFAULT_TEMPLATES;
+    try {
+      const saved = localStorage.getItem("salesTemplatesOrder");
+      if (saved) {
+        const orderedTitles: string[] = JSON.parse(saved);
+        const sorted: typeof DEFAULT_TEMPLATES = [];
+        for (const t of orderedTitles) {
+          const found = DEFAULT_TEMPLATES.find(d => d.title === t);
+          if (found) sorted.push(found);
+        }
+        // 새로 추가된 템플릿은 뒤에 붙임
+        for (const d of DEFAULT_TEMPLATES) {
+          if (!sorted.find(s => s.title === d.title)) sorted.push(d);
+        }
+        return sorted;
+      }
+    } catch {}
+    return DEFAULT_TEMPLATES;
+  });
+  function moveTemplate(idx: number, delta: number) {
+    const newIdx = idx + delta;
+    if (newIdx < 0 || newIdx >= templates.length) return;
+    const next = [...templates];
+    [next[idx], next[newIdx]] = [next[newIdx], next[idx]];
+    setTemplates(next);
+    localStorage.setItem("salesTemplatesOrder", JSON.stringify(next.map(t => t.title)));
+  }
+
   // 렌더/복사 체크에 사용할 통합 copied (읽기 전용)
   const copied: { has: (label: string) => boolean } = { has: (label: string) => {
     if (label === "form" || label === "dep") return activeForm.copied.has(label);
@@ -920,10 +950,19 @@ export default function SalesTab({ userName, onCreated }: SalesTabProps) {
       {/* ===== STEP 3 · 안내 양식 ===== */}
       {step === 3 && (
         <div className="p-4 space-y-3">
-          {/* 안내 양식 모음 */}
-          <div className="text-xs font-bold text-green-700 mb-2">안내 양식 모음</div>
-          {TEMPLATES.map((tpl, i) => (
-            <TemplateCard key={i} title={tpl.title} content={tpl.content} onCopy={(text) => handleCopy(text, `tpl${i}`)} copied={copied.has(`tpl${i}`)} />
+          <div className="text-xs font-bold text-green-700 mb-2">안내 양식 모음 · 위/아래 화살표로 순서 변경</div>
+          {templates.map((tpl, i) => (
+            <TemplateCard
+              key={tpl.title + i}
+              title={tpl.title}
+              content={tpl.content}
+              onCopy={(text) => handleCopy(text, `tpl${i}`)}
+              copied={copied.has(`tpl${i}`)}
+              canMoveUp={i > 0}
+              canMoveDown={i < templates.length - 1}
+              onMoveUp={() => moveTemplate(i, -1)}
+              onMoveDown={() => moveTemplate(i, 1)}
+            />
           ))}
         </div>
       )}
@@ -933,30 +972,48 @@ export default function SalesTab({ userName, onCreated }: SalesTabProps) {
 }
 
 // ===== 안내 양식 데이터 =====
-const TEMPLATES = [
-  { title: "사전 고지사항 (QnA)", content: `안녕하세요 청소로 행복을 드리는 새집느낌입니다.\n입주청소를 처음 받아보는 분들을 위해 드리는 방문 전 사전 진행 약관 및 고지사항입니다.\n\nQ.외창 청소는 기본인가요?\nA.입주청소는 기본적으로 내부 공간 케어를 진행하기 때문에 외창은 추가비용이 발생 되는 부분입니다.\n\nQ.빌트인 가전,블라인드 청소도 해주시나요?\nA.가전과 커튼 블라인드가 있는 상태에서 내부까지 청소하게 되는것은 거주 청소로 분류 됩니다.\n\nQ.입주청소에 곰팡이도 포함되나요?\nA.곰팡이 같은 특수 오염은 추가 비용에 의한 서비스 사항으로 분류됩니다.\n\nQ.추가비용이 나올 상황들은?\nA.-심각한 분진 및 먼지\n-가전 내부청소\n-심각한 니코틴 오염\n-별도 설치한 서랍장, 붙박이장\n-3층 이상 엘레베이터 없을 경우\n-다량의 곰팡이/스티커/시트지\n-주차비 필요 시\n\n감사합니다.` },
-  { title: "예약/변경/취소 안내", content: `[입주청소 예약 / 변경 / 취소 안내]\n\n* 예약금 결제 후 24시간 경과 시 취소 → 예약금 50%만 환불\n* 1주 내 변경/취소 → 예약금 환불 불가\n* 1주 전 변경 → 1회만 가능, 변경 후 취소는 환불 불가\n* 당일 현장 철수 시 → 청소비용 20% 위약금\n* 탄성코트+입주청소 날짜는 최소 7일\n\n위 내용 꼭 숙지해주시길 부탁드립니다!` },
-  { title: "확인 안내 (해피콜)", content: `확인했습니다!\n\n해피콜은 보통 1일전 오후 12시~18시 사이 드리고 있으니 참고 부탁드리며,\n방문에 필요한 집 비밀번호, 임시 방문증 등은 1일 전 해피콜 드린 관리사님께 전달주시면 감사드리겠습니다.\n\n그럼 1일 전날 해피콜 연락 드리고 방문드리겠습니다.\n\n믿고 맡겨주신만큼 최선을 다해서 꼼꼼하게 작업해드리겠습니다^^` },
-  { title: "인터넷 할인 안내", content: `아참 그리구요 이번에 이사하실때 인터넷도 알아보고 계시다면 1644-0199로 연락주시면\n\n저희 새집느낌 인터넷 센터 통해서 48만원 지원금도 받고 청소 비용도 10~20만원 할인받을 수 있으셔서 참고하시면 좋으실거 같으세용\n\n참고해보세요 고객님^^\n오늘도 좋은 하루되세요!` },
-  { title: "AS 고지사항", content: `[AS 관련 안내]\n\n작업 완료 후 현장에서 바로 검수를 진행해 주시기 바랍니다.\n현장 철수 이후 발생하는 오염이나 하자는 AS 대상에 포함되지 않을 수 있습니다.\n\n작업 당일 검수 시 발견된 미흡한 부분은 즉시 보완 작업 진행해 드립니다.\n\nAS 접수: 작업 완료 후 3일 이내\n- 사진 촬영 후 담당자에게 전달\n- 확인 후 일정 조율하여 재방문\n\n감사합니다.` },
-  { title: "추가비용 안내", content: `[추가비용 안내]\n\n다음 항목은 기본 청소에 포함되지 않아 추가 비용이 발생할 수 있습니다:\n\n- 외부 유리창 청소\n- 에어컨 완전분해 청소\n- 세탁기 청소\n- 곰팡이 제거\n- 니코틴 제거\n- 스티커/시트지 제거\n- 걸레받이 시공\n- 탄성코트\n- 줄눈시공\n\n상담 시 확인되지 않은 현장 상황에 따라 추가 비용이 발생할 수 있으며,\n작업 전 고객님께 안내 후 진행됩니다.\n\n감사합니다.` },
-  { title: "일정 변경 양식", content: `[일정 변경 요청]\n\n기존 예약일: \n변경 희망일: \n변경 사유: \n\n* 1주 전 변경: 1회만 가능\n* 변경 후 취소 시 예약금 환불 불가\n* 1주 이내 변경은 예약금 환불 불가` },
-  { title: "일정 취소 양식", content: `[일정 취소 요청]\n\n예약일: \n취소 사유: \n\n* 예약금 결제 후 24시간 경과 → 50%만 환불\n* 1주 이내 취소 → 예약금 환불 불가\n* 당일 취소/철수 → 청소비용 20% 위약금` },
+const DEFAULT_TEMPLATES = [
+  { title: "견적질문 - 입주청소", content: `문의주셔서 감사합니다.\n\n이사가시는 곳 지역 :\n\n이사 날짜:\n\n청소 원하시는 날짜 :\n\n이사가시는 곳 구조( 예 : 아파트,빌라,오피스텔,단독주택 ) :\n\n이사가시는 곳 평수 (공급면적):\n\n인테리어 여부 :\n(새로 인테리어 하고 들어가는 부분이 있다면 기재부탁드립니다)\n\n곰팡이 니코틴 스티커 여부 : \n\n거실에 베란다 있는지 여부 :\n\n말씀해주시면 견적안내드리겠습니다^^` },
+  { title: "견적질문 - 거주청소", content: `문의주셔서 감사합니다.\n\n지역 :\n\n청소 원하시는 날짜 :\n\n구조( 예 : 아파트,빌라,오피스텔,단독주택 ) :\n\n평수 (공급면적):\n\n인테리어 여부 :\n(새로 인테리어 하고 들어가는 부분이 있다면 기재부탁드립니다)\n\n집 내부 곰팡이 니코틴 스티커 여부 :\n\n거실에 베란다 있는지 여부 :\n\n반려동물 키우는지 여부 :\n\n거주청소를 원하는 이유 (예 하자보수로 인한 청소, 대청소, 출산맞이 청소 등 ) :\n\n짐을빼는 전체 탈거 거주청소 or 짐을안빼는 일반 거주청소 유형 선택 : \n\n말씀해주시면 견적안내드리겠습니다^^` },
+  { title: "견적질문 - 포장이사", content: `문의주셔서 감사합니다.\n\n출발 주소지 :\n\n도착 주소지 : \n\n희망날짜 : \n\n이사가시는 곳 구조( 예 : 아파트,빌라,오피스텔,단독주택 ) :\n\n이사가시는 곳 평수 (공급면적):\n\n말씀해주시면 견적안내드리겠습니다^^` },
+  { title: "견적질문 - 상가청소", content: `1)상가청소 양식\n\n지역 :\n업종 :\n연락처 :\n\n남겨주시면 베테랑 종합청소 전문가분을 통해서 바로 상담 받으실 수 있도록 전화드리겠습니다.` },
+  { title: "견적답변 - 입주청소", content: `네! 총 비용은 448000원에 진행 가능하시구요.\n\n여기에 스팀살균 피톤치드 모두 포함된 금액이라고 보시면 되세요. \n\n오늘 당일 예약 서비스로 욕실 세면대,거울에 오염방지 코팅도 함께 진행해드리고 있습니다!\n\n인원은 3명정도 방문드리고 있구요 소요시간은 보통 4~6시간 예상되세요.\n\n작업 범위는 외부유리창을 제외한 내부에서 보이는 모든 공간이 청소 범위이시구요, 형광등커버, 서랍장,선반 이런것들도 탈거할 수 있는 모든 것들을 빼내서 안쪽까지 꼼꼼하게 청소해드리고 있어요.\n\n또한 웬만하면 완벽하게 작업해드리려고하지만 혹시라도 미흡한 부분이 나올 경우 AS는 기간없이 언제든 가능합니다!\n\n입주청소 비용 인원\n\nhttps://blog.naver.com/newhousefeeling/223288427070\n\n입주청소\n\nhttps://blog.naver.com/newhousefeeling/223116032099` },
+  { title: "견적답변 - 일반거주청소", content: `네! 거주청소 총 비용은 450000원에 진행 가능하시구요.\n\n여기에 스팀살균 피톤치드 모두 포함된 금액이라고 보시면 되세요. \n\n오늘 당일 예약 서비스로 욕실 세면대,거울에 오염방지 코팅도 함께 진행해드리고 있습니다!\n\n인원은 3명정도 방문드리고 있구요 소요시간은 보통 4~6시간 예상되세요.\n\n작업 범위는 외부유리창을 제외한 내부에서 보이는 모든 공간이 청소 범위이시구요, 형광등커버, 서랍장,선반 이런것들도 탈거할 수 있는 모든 것들을 빼내서 안쪽까지 꼼꼼하게 청소해드리고 있어요.\n\n서랍장 내부는 짐이 없는 곳들은 모두 탈거해서 청소가 진행되시구요, 짐이 있을경우 개인용품 방지 차원에서 그대로 둔 상태에서 문짝 앞뒷쪽까지 모두 청소들어가며, 가전청소는 겉면까지 작업들어가고 있습니다!\n\n저희 새집느낌 거주 대청소는 하루 한집만 운영하고 있으며 경력 5년이상 베테랑 전문 관리사가 방문드립니다.\n\n또한 웬만하면 완벽하게 작업해드리려고하지만 혹시라도 미흡한 부분이 나올 경우 AS는 기간없이 언제든 가능합니다!\n\n청소 비용 인원\n\nhttps://blog.naver.com/newhousefeeling/223288427070` },
+  { title: "견적답변 - 탈거거주청소", content: `네! 거주청소 총 비용은 970000원에 진행 가능하시구요.\n\n여기에 스팀살균 피톤치드 모두 포함된 금액이라고 보시면 되세요. \n\n오늘 당일 예약 서비스로 욕실 세면대,거울에 오염방지 코팅도 함께 진행해드리고 있습니다!\n\n인원은 3명정도 방문드리고 있구요 소요시간은 보통 6~8시간 예상되세요.\n\n작업 범위는 외부유리창을 제외한 내부에서 보이는 모든 공간이 청소 범위이시구요, 형광등커버, 서랍장,선반 이런것들도 탈거할 수 있는 모든 것들을 빼내서 안쪽까지 꼼꼼하게 청소해드리고 있어요.\n\n서랍장 내부 모두 탈거해서 청소가 진행되시구요\n\n저희 새집느낌 거주 대청소는 하루 한집만 운영하고 있으며 경력 5년이상 베테랑 전문 관리사가 방문드립니다.\n\n또한 웬만하면 완벽하게 작업해드리려고하지만 혹시라도 미흡한 부분이 나올 경우 AS는 기간없이 언제든 가능합니다!\n\n청소 비용 인원\n\nhttps://blog.naver.com/newhousefeeling/223288427070` },
+  { title: "추가비용 안내", content: `<추가 견적 안내 사항>\n저희 업체는 현장 추가비용은 만들지 않으려고 노력하고 있습니다. \n웬만한 적은 범위들은 서비스로 진행되시며 \n추가 견적이 나올 수 있는 상황은 다음과 같습니다.^^\n\n-상담때 확인이 안된 인테리어로 인한 심각한 분진 및 먼지\n-가전 내부청소\n-천장, 몰딩의 심각한 니코틴 오염\n-별도로 설치한 서랍장, 붙박이장(안방 화장대,작은방 1개 까지 기본 옵션)\n-3층 이상으로 엘리베이터가 없을경우\n-다량의 심각한 곰팡이\n-다량의 심각한 스티커 및 시트지\n-주차비가 별도로 필요할 경우\n-이사지연,기타시공으로 인한 작업대기시간 생길 경우\n-반려동물 털,배설물 오염이 심할 경우` },
+  { title: "붙박이장 비용 안내", content: `새로 설치한 부분이시라면 비용이 따로 발생되고 사이즈에 따라 달라지세용 ^^\n\n기본 옵션 외 붙박이장 가격표 안내드립니다.\n\n(작은방1개, 안방 화장대,전체 펜트리 기본)\n\n그외 별도로 설치된 옵션장 가격표\n\n1자~5자 30000원\n\n6자~15자 50000원\n\n16자~30자 70000원이상 예상해주시면 되세요😊` },
+  { title: "가전청소 비용 안내", content: `네, 고객님 😊\n가전 청소의 경우 완전 분해 세척은 아닌 점 참고 부탁드립니다.\n가전 전용 세척제와 스팀 청소를 기반으로, 외관 및 분해하지 않는 범위 내에서 최대한 꼼꼼하게 진행됩니다.\n\n가전 청소 비용 안내\n\n-에어컨 청소: 1대당 15,000원\n-냉장고 청소: 30,000원 ~ 50,000원\n-세탁기 청소: 20,000원 ~ 50,000원\n-김치냉장고 청소: 30,000원 ~ 50,000원\n-스타일러 청소: 30,000원 ~ 50,000원\n\n세트 상품 안내\n\n-에어컨 + 냉장고 + 세탁기 세트: 50,000원\n(원룸·투룸 고객님 전용)` },
+  { title: "에어컨청소 안내 (분해/간단)", content: `넵 고객님 😊\n에어컨 청소 비용은 이미 사용하신 에어컨 기준으로 아래와 같습니다.\n\n-벽걸이 에어컨: 7만 원\n-스탠드 에어컨: 13만 원\n-천장형 1way 에어컨: 10만 원\n\n또한 새 에어컨의 경우에는\n-1대당 15,000원으로 진행됩니다.\n\n청소 방식도 안내드리면,\n\n이미 사용한 에어컨은 내부 부속품을 모두 분리하여 진행하는 완전 분해 청소로 진행되며\n새 에어컨은 필터 및 외부 커버 위주 청소로 진행됩니다.\n\n추가로 궁금하신 점 있으시면 편하게 문의 주세요!` },
+  { title: "날짜 변경 안내", content: `안녕하세요! 가능하십니다! 근데 죄송하지만, 저희가 날짜 변경 담당자가 평일만 근무를 하고 있어서 월요일에 연락 다시 주시면 빠르게 변경 도와드리겠습니다!` },
+  { title: "불만접수 (AS) 양식", content: `!!!!!!!!!!AS접수양식!!!!!!!!!!!!\n\nAS 발생 팀 :\n고객 성함 : \n연락처 : \n청소일 : \n접수내용: ` },
 ];
 
 // ===== 안내 양식 카드 =====
-function TemplateCard({ title, content, onCopy, copied }: { title: string; content: string; onCopy: (text: string) => void; copied: boolean }) {
+function TemplateCard({ title, content, onCopy, copied, canMoveUp, canMoveDown, onMoveUp, onMoveDown }: {
+  title: string; content: string; onCopy: (text: string) => void; copied: boolean;
+  canMoveUp?: boolean; canMoveDown?: boolean; onMoveUp?: () => void; onMoveDown?: () => void;
+}) {
   const [open, setOpen] = useState(false);
   const [editText, setEditText] = useState(content);
 
   return (
     <div className="border border-gray-200 rounded-xl overflow-hidden">
-      <button onClick={() => { setOpen(!open); setEditText(content); }} className="w-full px-3 py-2.5 flex items-center justify-between active:bg-gray-50">
-        <span className="text-sm font-medium text-gray-800">{title}</span>
-        <svg className={`w-4 h-4 text-gray-400 transition-transform ${open ? "rotate-90" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-        </svg>
-      </button>
+      <div className="w-full px-3 py-2.5 flex items-center gap-2 active:bg-gray-50">
+        <div className="flex flex-col gap-0.5 shrink-0">
+          <button disabled={!canMoveUp} onClick={(e) => { e.stopPropagation(); onMoveUp?.(); }} className="p-0.5 rounded active:bg-gray-200 disabled:opacity-20">
+            <svg className="w-3.5 h-3.5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" /></svg>
+          </button>
+          <button disabled={!canMoveDown} onClick={(e) => { e.stopPropagation(); onMoveDown?.(); }} className="p-0.5 rounded active:bg-gray-200 disabled:opacity-20">
+            <svg className="w-3.5 h-3.5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+          </button>
+        </div>
+        <button onClick={() => { setOpen(!open); setEditText(content); }} className="flex-1 flex items-center justify-between text-left">
+          <span className="text-sm font-medium text-gray-800">{title}</span>
+          <svg className={`w-4 h-4 text-gray-400 transition-transform ${open ? "rotate-90" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
+        </button>
+      </div>
       {open && (
         <div className="px-3 pb-3 border-t border-gray-100">
           <textarea value={editText} onChange={(e) => setEditText(e.target.value)} rows={8}
