@@ -519,11 +519,11 @@ export default function Home() {
   }
 
   const role = currentUser.role;
-  const isAdmin = role === "ceo" || role === "scheduler";
+  const isAdmin = role === "ceo" || role === "scheduler" || role === "admin";
   const canSales = role === "ceo" || role === "sales";
   const canAssign = role === "ceo" || role === "scheduler" || role === "sales";
   const canManage = role === "ceo" || role === "sales" || role === "field" || role === "scheduler";
-  const canManageAdvanced = role === "ceo";
+  const canManageAdvanced = role === "ceo" || role === "admin";
 
   // Members — 낙관적 업데이트
   async function handleAddMember(data: { name: string; phone: string; availableDays: number[] }) {
