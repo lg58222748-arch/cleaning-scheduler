@@ -298,10 +298,29 @@ export default function Home() {
     // Realtime 이 오래 안 켜지면(10초 후) 폴링 강제 시작
     const fallbackTimer = setTimeout(() => { if (!pollInterval) startPolling(); }, 10000);
 
+    // 앱이 백그라운드 → 포그라운드로 돌아올 때 강제 전체 갱신
+    // (Chrome/WebView 는 백그라운드에서 Realtime 연결을 끊음 → 복귀 시 스냅샷 동기화 필요)
+    const onVisible = () => {
+      if (document.visibilityState === "visible") {
+        console.log("[VIS] 포그라운드 복귀 → 전체 갱신");
+        reloadAll();
+        // Realtime 채널도 재구독 유도
+        try {
+          (channel as unknown as { state?: string }).state !== "joined" && sbClient.channel("all-db-changes");
+        } catch {}
+      }
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", onVisible);
+    window.addEventListener("online", onVisible);
+
     return () => {
       clearTimeout(fallbackTimer);
       stopPolling();
       sbClient.removeChannel(channel);
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", onVisible);
+      window.removeEventListener("online", onVisible);
     };
   }, [currentUser, selectedDate]); // eslint-disable-line react-hooks/exhaustive-deps
 
