@@ -243,7 +243,12 @@ export async function getUnreadCount(): Promise<number> {
 }
 
 export async function addNotification(type: NotificationType, title: string, message: string, scheduleId?: string, targetNames?: string[], targetRoles?: string[]): Promise<Notification> {
-  const { data } = await supabase.from("notifications").insert({ type, title, message, schedule_id: scheduleId, read: false }).select().single();
+  const { data, error } = await supabase.from("notifications").insert({ type, title, message, schedule_id: scheduleId, read: false }).select().single();
+  if (error || !data) {
+    console.error("[Notify] DB insert 실패:", { type, title, error });
+    throw new Error(`notification insert failed: ${error?.message || "no data"}`);
+  }
+  console.log("[Notify] 생성:", { id: data.id, type, title, targetRoles, targetNames });
   // 푸시 알림 - role/name 타겟을 user_id 로 합쳐 중복 제거 후 1회만 발송
   // (FCM tag 가 같으면 2번째 푸시는 소리 없이 덮어쓰기 → 이중 발송 시 안 울리던 버그 차단)
   try {
