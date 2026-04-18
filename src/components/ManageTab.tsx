@@ -18,8 +18,9 @@ interface ManageTabProps {
 
 export default function ManageTab({ isAdmin, userRole, userName = "", allUsers = [], members = [], schedules = [], onRefresh }: ManageTabProps) {
   // 역할별 기본 탭
+  const isTopAdmin = userRole === "ceo" || userRole === "admin";
   const defaultTab: ManageSubTab =
-    userRole === "ceo" ? "ceo" :
+    isTopAdmin ? "ceo" :
     userRole === "sales" ? "sales-stats" :
     userRole === "field" ? "field" :
     userRole === "scheduler" ? "scheduler" : "sales-stats";
@@ -28,8 +29,8 @@ export default function ManageTab({ isAdmin, userRole, userName = "", allUsers =
 
   // 표시할 탭 결정
   const tabs: { id: ManageSubTab; label: string }[] = [];
-  if (userRole === "ceo") {
-    tabs.push({ id: "ceo", label: "대표" });
+  if (isTopAdmin) {
+    tabs.push({ id: "ceo", label: userRole === "admin" ? "관리자" : "대표" });
     tabs.push({ id: "sales-stats", label: "영업팀" });
     tabs.push({ id: "field", label: "현장팀" });
     tabs.push({ id: "scheduler", label: "일정관리" });
@@ -423,7 +424,7 @@ function SalesStatsSection({ userName, userRole, allUsers, schedules }: {
     ? schedules.filter(s => s.date.startsWith(selectedMonth))
     : schedules.filter(s => s.date === selectedDate);
 
-  const isCeo = userRole === "ceo";
+  const isCeo = userRole === "ceo" || userRole === "admin";
 
   // 본인 일정만 필터 (대표는 전체)
   function getUserSchedules(name: string, source: Schedule[]) {
