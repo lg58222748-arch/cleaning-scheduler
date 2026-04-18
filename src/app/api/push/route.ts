@@ -87,6 +87,17 @@ export async function POST(req: NextRequest) {
     return Response.json({ sent, failed });
   }
 
+  // 구독 해제 - DB 에서 삭제하여 서버가 더이상 푸시 안 보내도록
+  if (body.action === "unsubscribe") {
+    const { endpoint, userId } = body;
+    if (endpoint) {
+      await supabase.from("push_subscriptions").delete().eq("endpoint", endpoint);
+    } else if (userId) {
+      await supabase.from("push_subscriptions").delete().eq("user_id", userId);
+    }
+    return Response.json({ success: true });
+  }
+
   // 기존 중복 구독 정리 - 사용자별 최신 엔드포인트 1개만 남김
   if (body.action === "dedupe") {
     const { data: subs } = await supabase.from("push_subscriptions").select("*").order("id", { ascending: false });

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'cleaning-scheduler-v4';
+const CACHE_NAME = 'cleaning-scheduler-v5';
 
 self.addEventListener('install', (event) => {
   self.skipWaiting();
@@ -26,18 +26,38 @@ self.addEventListener('message', (event) => {
   }
 });
 
+// 최근 표시한 푸시 - 중복 재수신 방지 (30초 윈도우)
+const recentPushes = new Map();
+
+function hashMsg(title, body) {
+  return `${title}|${body}`.slice(0, 200);
+}
+
 // 푸시 알림 수신
 self.addEventListener('push', (event) => {
   if (!notificationsEnabled) return;
   const data = event.data ? event.data.json() : {};
   const title = data.title || '새집느낌 파트너';
+  const body = data.body || '새로운 알림이 있습니다';
+
+  // 동일 내용 30초 이내 재수신 시 무시 → 같은 알림 2번 울리는 것 방지
+  const key = hashMsg(title, body);
+  const now = Date.now();
+  const last = recentPushes.get(key) || 0;
+  if (now - last < 30000) return;
+  recentPushes.set(key, now);
+  // 오래된 항목 정리
+  for (const [k, t] of recentPushes) {
+    if (now - t > 60000) recentPushes.delete(k);
+  }
+
   const options = {
-    body: data.body || '새로운 알림이 있습니다',
+    body,
     icon: '/icons/icon-192.png',
     badge: '/icons/badge-mono.png',
     data: { url: 'https://cleaning-scheduler-chi.vercel.app' },
-    tag: data.tag || 'default',
-    renotify: true,
+    tag: `${data.tag || 'default'}-${now}`,
+    renotify: false,
     silent: false,
   };
   event.waitUntil(self.registration.showNotification(title, options));

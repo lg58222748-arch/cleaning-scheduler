@@ -38,10 +38,21 @@ export default function AdminPanel({ onClose, onRefresh }: AdminPanelProps) {
       if (!("serviceWorker" in navigator) || !("PushManager" in window)) return;
       const reg = await navigator.serviceWorker.ready;
       if (!next) {
-        // OFF: push 구독 해제 + SW에 알림 끄기 전달
+        // OFF: push 구독 해제 + DB 삭제 + SW에 알림 끄기 전달
         reg.active?.postMessage({ type: "SET_NOTIFICATIONS_ENABLED", enabled: false });
         const sub = await reg.pushManager.getSubscription();
-        if (sub) await sub.unsubscribe();
+        if (sub) {
+          const endpoint = sub.endpoint;
+          await sub.unsubscribe();
+          // 서버 DB 에서도 삭제 → 서버가 더이상 푸시 안 보냄
+          const saved = localStorage.getItem("currentUser");
+          const user = saved ? JSON.parse(saved) : null;
+          fetch("/api/push", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ action: "unsubscribe", endpoint, userId: user?.id }),
+          }).catch(() => {});
+        }
       } else {
         // ON: push 재구독 + SW에 알림 켜기 전달
         reg.active?.postMessage({ type: "SET_NOTIFICATIONS_ENABLED", enabled: true });
