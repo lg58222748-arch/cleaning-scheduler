@@ -245,11 +245,43 @@ export default function SalesTab({ userName, onCreated }: SalesTabProps) {
   const [parsing, setParsing] = useState(false);
   const parsedResultRef = useRef<HTMLDivElement>(null);
 
+  // 양식(6)서비스 종류·7)평수·► 항목) 에서 서비스/평수 추출
+  function extractFormData(text: string): { services: ServiceEntry[]; pyeong: string } {
+    const lines = text.split("\n").map((l) => l.trim()).filter(Boolean);
+    let svcFromText = "", pyeongFromText = "";
+    for (const line of lines) {
+      const m6 = line.match(/6\)\s*서비스\s*종류\s*[:：]\s*(.+)/); if (m6) svcFromText = m6[1].trim();
+      const m7 = line.match(/7\)\s*평수\s*[:：]\s*(.+)/); if (m7) pyeongFromText = m7[1].trim();
+    }
+    let services: ServiceEntry[] = [];
+    if (svcFromText) {
+      const svcNames = svcFromText.split(/[,，\s]+/).filter(Boolean);
+      services = svcNames.map((n) => {
+        let quote = "", deposit = "";
+        let inSvc = false;
+        for (const line of lines) {
+          if (line.includes(`► ${n}`)) { inSvc = true; continue; }
+          if (inSvc && line.includes("►")) break;
+          if (inSvc) {
+            const qm = line.match(/견적금액.*[:：]\s*([\d,]+)/); if (qm) quote = qm[1].replace(/,/g, "");
+            const dm = line.match(/예\s*약\s*금.*[:：]\s*([\d,]+)/); if (dm) deposit = dm[1].replace(/,/g, "");
+          }
+        }
+        return { name: n, quote, deposit };
+      });
+    }
+    // 평수에서 숫자만 추출 (예: "25평 확장형" → "25")
+    const pyeongNumMatch = pyeongFromText.match(/\d+/);
+    const pyeong = pyeongNumMatch ? pyeongNumMatch[0] : pyeongFromText;
+    return { services, pyeong };
+  }
+
   // AI 파싱 - Claude API 우선, 실패시 regex fallback
   async function parseCustomer() {
     setParsing(true);
-    // 양식 발송 세션과 완전 독립 → activeConfirm.services 만 사용
-    const confirmServices = activeConfirm.services;
+    // 양식 영역에서 서비스/평수 항상 추출 (AI 결과와 병합)
+    const formData = extractFormData(customerText);
+    const confirmServices = activeConfirm.services.length > 0 ? activeConfirm.services : formData.services;
 
     // 1차: Claude API 시도
     try {
@@ -266,9 +298,11 @@ export default function SalesTab({ userName, onCreated }: SalesTabProps) {
           parsedAddr: data.addr || "",
           parsedWishDate: data.date || "",
           parsedNote: data.note || "",
+          parsedPyeong: formData.pyeong || activeConfirm.parsedPyeong,
+          services: confirmServices,
           schedules: confirmServices.map((s) => ({ service: s.name, date: "", time: "선택" })),
         });
-        generateConfirmMsg(data.name, data.addr, data.phone, data.date, data.note, confirmServices);
+        generateConfirmMsg(data.name, data.addr, data.phone, data.date, data.note, confirmServices, formData.pyeong);
         setParsing(false);
         setTimeout(() => parsedResultRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 100);
         return;
@@ -287,39 +321,19 @@ export default function SalesTab({ userName, onCreated }: SalesTabProps) {
 
     let name = "", phone = "", addr = "", wish = "", note = "";
 
-    // 1차: 양식 번호로 파싱
-    let parsedSvcFromText = "";
-    let parsedPyeongFromText = "";
+    // 양식 번호(1~5)로 파싱
     for (const line of lines) {
       const m1 = line.match(/1\)\s*성함\s*[:：]\s*(.+)/); if (m1 && m1[1].trim()) name = m1[1].trim();
       const m2 = line.match(/2\)\s*주소\s*[:：]\s*(.+)/); if (m2 && m2[1].trim()) addr = m2[1].trim();
       const m3 = line.match(/3\)\s*연락처\s*[:：]\s*(.+)/); if (m3 && m3[1].trim()) phone = m3[1].trim();
       const m4 = line.match(/4\)\s*.*날짜\s*[:：]?\s*(.+)/); if (m4 && m4[1].trim()) wish = m4[1].trim();
       const m5 = line.match(/5\)\s*.*특이사항\s*[:：]?\s*(.+)/); if (m5 && m5[1].trim()) note = m5[1].trim();
-      // 서비스/평수도 양식에서 추출
-      const m6 = line.match(/6\)\s*서비스\s*종류\s*[:：]\s*(.+)/); if (m6) parsedSvcFromText = m6[1].trim();
-      const m7 = line.match(/7\)\s*평수\s*[:：]\s*(.+)/); if (m7) parsedPyeongFromText = m7[1].trim();
     }
 
-    // activeConfirm 에 서비스가 없으면 양식 파싱 결과로 설정 (activeForm 과 독립)
-    let svcList: ServiceEntry[] = activeConfirm.services;
-    if (svcList.length === 0 && parsedSvcFromText) {
-      const svcNames = parsedSvcFromText.split(/[,，\s]+/).filter(Boolean);
-      svcList = svcNames.map((n) => {
-        let quote = "", deposit = "";
-        let inSvc = false;
-        for (const line of lines) {
-          if (line.includes(`► ${n}`)) { inSvc = true; continue; }
-          if (inSvc && line.includes("►")) break;
-          if (inSvc) {
-            const qm = line.match(/견적금액.*[:：]\s*([\d,]+)/); if (qm) quote = qm[1].replace(/,/g, "");
-            const dm = line.match(/예\s*약\s*금.*[:：]\s*([\d,]+)/); if (dm) deposit = dm[1].replace(/,/g, "");
-          }
-        }
-        return { name: n, quote, deposit };
-      });
-    }
-    const pyeongToUse = parsedPyeongFromText || activeConfirm.parsedPyeong;
+    // 서비스/평수 추출 (공통 헬퍼 사용)
+    const formData = extractFormData(t);
+    const svcList: ServiceEntry[] = activeConfirm.services.length > 0 ? activeConfirm.services : formData.services;
+    const pyeongToUse = formData.pyeong || activeConfirm.parsedPyeong;
 
     // 2차: 양식 뒤 자유형식 답변 추출
     // 마지막 "*" 줄 이후의 내용물을 모두 수집
@@ -386,13 +400,14 @@ export default function SalesTab({ userName, onCreated }: SalesTabProps) {
     });
 
     // 확정 메시지 생성
-    generateConfirmMsg(name, addr, phone, wish, note, svcList);
+    generateConfirmMsg(name, addr, phone, wish, note, svcList, pyeongToUse);
   }
 
-  function generateConfirmMsg(name?: string, addr?: string, phone?: string, _wish?: string, note?: string, overrideServices?: ServiceEntry[]) {
+  function generateConfirmMsg(name?: string, addr?: string, phone?: string, _wish?: string, note?: string, overrideServices?: ServiceEntry[], overridePyeong?: string) {
     const n = name || parsedName;
     const svcs = overrideServices || activeConfirm.services;
     const schedsArr = activeConfirm.schedules.length > 0 ? activeConfirm.schedules : svcs.map(s => ({ service: s.name, date: "", time: "선택" }));
+    const pyeongVal = overridePyeong || parsedPyeong;
     const svcList = svcs.map((s) => s.name).join(", ");
     const timeDesc: Record<string, string> = {
       "오전": " 오전(7~9시 사이 방문)",
@@ -409,7 +424,7 @@ export default function SalesTab({ userName, onCreated }: SalesTabProps) {
     msg += `4)청소희망날짜 : ${schedDateStr}\n`;
     msg += `5)고객님 특이사항 : ${note || parsedNote}\n\n`;
     msg += `──────────────────\n`;
-    msg += `6)서비스 종류 : ${svcList}\n7)평수 : ${parsedPyeong ? parsedPyeong + "평" : ""}\n`;
+    msg += `6)서비스 종류 : ${svcList}\n7)평수 : ${pyeongVal ? pyeongVal + "평" : ""}\n`;
 
     svcs.forEach((s) => {
       msg += `► ${s.name}\n`;
