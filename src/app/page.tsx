@@ -1009,7 +1009,7 @@ export default function Home() {
               if (salesUsers.length > 0) groups.push({ key: "sales", title: "영업팀", users: salesUsers });
               const fieldUsers = others.filter(u => u.role === "field");
               if (fieldUsers.length > 0) groups.push({ key: "field", title: "현장팀", users: fieldUsers });
-              if (canManageAdvanced && pendingUsers.length > 0) groups.push({ key: "pending", title: "승인 대기", users: pendingUsers });
+              if (canManageAdvanced) groups.push({ key: "pending", title: `가입 신청 대기${pendingUsers.length > 0 ? ` (${pendingUsers.length})` : ""}`, users: pendingUsers });
 
               const allInSortedList = [...(me ? [me] : []), ...others, ...(canManageAdvanced ? pendingUsers : [])];
 
@@ -1137,7 +1137,13 @@ export default function Home() {
                     </button>
                     {isOpen && (
                       <div className="px-3 pb-3 space-y-2">
-                        {g.users.map(u => renderCard(u))}
+                        {g.users.length === 0 ? (
+                          <div className="py-4 text-center text-xs text-gray-400">
+                            {g.key === "pending" ? "가입 신청 대기 중인 사용자가 없습니다" : "사용자가 없습니다"}
+                          </div>
+                        ) : (
+                          g.users.map(u => renderCard(u))
+                        )}
                       </div>
                     )}
                   </div>
