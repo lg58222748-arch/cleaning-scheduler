@@ -102,8 +102,9 @@ export default function Home() {
     try { const s = localStorage.getItem("userOrder"); return s ? JSON.parse(s) : []; } catch { return []; }
   });
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>(() => {
-    if (typeof window === "undefined") return { self: true, ceo: true, scheduler: true, sales: true, field: true, pending: true };
-    try { const s = localStorage.getItem("userGroupsOpen"); return s ? JSON.parse(s) : { self: true, ceo: true, scheduler: true, sales: true, field: true, pending: true }; } catch { return { self: true, ceo: true, scheduler: true, sales: true, field: true, pending: true }; }
+    const defaults = { self: false, ceo: false, scheduler: false, sales: false, field: false, pending: false };
+    if (typeof window === "undefined") return defaults;
+    try { const s = localStorage.getItem("userGroupsOpen"); return s ? JSON.parse(s) : defaults; } catch { return defaults; }
   });
   function toggleGroup(key: string) {
     setOpenGroups(prev => { const next = { ...prev, [key]: !prev[key] }; localStorage.setItem("userGroupsOpen", JSON.stringify(next)); return next; });
@@ -1126,7 +1127,7 @@ export default function Home() {
               }
 
               return groups.map(g => {
-                const isOpen = openGroups[g.key] !== false;
+                const isOpen = openGroups[g.key] === true;
                 return (
                   <div key={g.key} className={`rounded-xl border ${groupColors[g.key] || "border-gray-200 bg-white"} overflow-hidden`}>
                     <button onClick={() => toggleGroup(g.key)} className="w-full px-4 py-3 flex items-center justify-between active:bg-black/5">
