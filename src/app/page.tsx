@@ -170,7 +170,11 @@ export default function Home() {
           const myNotifs = allNotifs.filter(n => {
             if (deleted.has(n.id)) return false;
             if (n.type === "system_notice") return true;
-            if (isReturn(n)) return isAdminRole;
+            if (isReturn(n)) {
+              if (isAdminRole) return true;
+              if (uName && n.message.startsWith(`${uName}님이`)) return true;
+              return false;
+            }
             return uName && (n.message.includes(uName) || n.title.includes(uName));
           });
           setNotifications(myNotifs);
@@ -361,7 +365,11 @@ export default function Home() {
         const myNotifs = allNotifs.filter(n => {
           if (deleted.has(n.id)) return false;
           if (n.type === "system_notice") return true;
-          if (isReturn(n)) return isAdminRole;
+          if (isReturn(n)) {
+            if (isAdminRole) return true;
+            if (uName && n.message.startsWith(`${uName}님이`)) return true;
+            return false;
+          }
           if (n.type === "happy_call_reminder") return isHappyCallAdmin;
           return uName && (n.message.includes(uName) || n.title.includes(uName));
         });

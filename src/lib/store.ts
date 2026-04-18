@@ -244,17 +244,20 @@ export async function getUnreadCount(): Promise<number> {
 
 export async function addNotification(type: NotificationType, title: string, message: string, scheduleId?: string, targetNames?: string[], targetRoles?: string[]): Promise<Notification> {
   const { data } = await supabase.from("notifications").insert({ type, title, message, schedule_id: scheduleId, read: false }).select().single();
-  // 푸시 알림
+  // 푸시 알림 - roles 와 names 둘 다 주어지면 모두에게 발송 (중복은 SW dedup 으로 차단)
   try {
+    let sent = false;
     if (targetRoles && targetRoles.length > 0) {
-      // 역할 기반 타겟팅
       const { sendPushToRoles } = await import("./push");
       sendPushToRoles(targetRoles, title, message, type).catch(() => {});
-    } else if (targetNames && targetNames.length > 0) {
-      // 명시적 대상: 정확한 이름 매칭으로 해당 사용자에게만
+      sent = true;
+    }
+    if (targetNames && targetNames.length > 0) {
       const { sendPushToNames } = await import("./push");
       sendPushToNames(targetNames, title, message, type).catch(() => {});
-    } else {
+      sent = true;
+    }
+    if (!sent) {
       // 대상 미지정: 메시지 내 이름 매칭 (레거시)
       const { sendPushToMentioned } = await import("./push");
       sendPushToMentioned(title, message, type).catch(() => {});
