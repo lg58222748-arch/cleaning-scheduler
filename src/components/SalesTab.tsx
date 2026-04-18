@@ -248,8 +248,8 @@ export default function SalesTab({ userName, onCreated }: SalesTabProps) {
   // AI 파싱 - Claude API 우선, 실패시 regex fallback
   async function parseCustomer() {
     setParsing(true);
-    // Step 1 에서 세팅한 services 를 Step 2 세션에 복사 (아직 없으면)
-    const confirmServices = activeConfirm.services.length > 0 ? activeConfirm.services : activeForm.services;
+    // 양식 발송 세션과 완전 독립 → activeConfirm.services 만 사용
+    const confirmServices = activeConfirm.services;
 
     // 1차: Claude API 시도
     try {
@@ -266,8 +266,6 @@ export default function SalesTab({ userName, onCreated }: SalesTabProps) {
           parsedAddr: data.addr || "",
           parsedWishDate: data.date || "",
           parsedNote: data.note || "",
-          parsedPyeong: activeForm.pyeong,
-          services: confirmServices,
           schedules: confirmServices.map((s) => ({ service: s.name, date: "", time: "선택" })),
         });
         generateConfirmMsg(data.name, data.addr, data.phone, data.date, data.note, confirmServices);
@@ -303,8 +301,8 @@ export default function SalesTab({ userName, onCreated }: SalesTabProps) {
       const m7 = line.match(/7\)\s*평수\s*[:：]\s*(.+)/); if (m7) parsedPyeongFromText = m7[1].trim();
     }
 
-    // Step1 혹은 activeConfirm 에서 서비스 선택 안 했으면 양식에서 추출한 서비스로 설정
-    let svcList: ServiceEntry[] = activeConfirm.services.length > 0 ? activeConfirm.services : activeForm.services;
+    // activeConfirm 에 서비스가 없으면 양식 파싱 결과로 설정 (activeForm 과 독립)
+    let svcList: ServiceEntry[] = activeConfirm.services;
     if (svcList.length === 0 && parsedSvcFromText) {
       const svcNames = parsedSvcFromText.split(/[,，\s]+/).filter(Boolean);
       svcList = svcNames.map((n) => {
@@ -321,7 +319,7 @@ export default function SalesTab({ userName, onCreated }: SalesTabProps) {
         return { name: n, quote, deposit };
       });
     }
-    const pyeongToUse = activeForm.pyeong || parsedPyeongFromText;
+    const pyeongToUse = parsedPyeongFromText || activeConfirm.parsedPyeong;
 
     // 2차: 양식 뒤 자유형식 답변 추출
     // 마지막 "*" 줄 이후의 내용물을 모두 수집
@@ -411,7 +409,7 @@ export default function SalesTab({ userName, onCreated }: SalesTabProps) {
     msg += `4)청소희망날짜 : ${schedDateStr}\n`;
     msg += `5)고객님 특이사항 : ${note || parsedNote}\n\n`;
     msg += `──────────────────\n`;
-    msg += `6)서비스 종류 : ${svcList}\n7)평수 : ${(parsedPyeong || activeForm.pyeong) ? (parsedPyeong || activeForm.pyeong) + "평" : ""}${activeForm.buildType && activeForm.buildType !== "선택" ? " " + activeForm.buildType : ""}\n`;
+    msg += `6)서비스 종류 : ${svcList}\n7)평수 : ${parsedPyeong ? parsedPyeong + "평" : ""}\n`;
 
     svcs.forEach((s) => {
       msg += `► ${s.name}\n`;
@@ -430,7 +428,7 @@ export default function SalesTab({ userName, onCreated }: SalesTabProps) {
       msg += `총 잔금 : ${totalBalance > 0 ? totalBalance.toLocaleString() + "원" : ""}\n`;
     }
 
-    if (activeForm.salesNote) msg += `11)상담사 특이사항 : ${activeForm.salesNote}\n`;
+    if (activeConfirm.parsedSalesNote) msg += `11)상담사 특이사항 : ${activeConfirm.parsedSalesNote}\n`;
     msg += `\n*예약금은 본사 확정 비용, 잔금과 세금 증빙은 당일 관리점에서 작업 마무리 후 처리됩니다.\n`;
     msg += `*최종 정산은 현장 작업 완료 후 공급가액과 부가세를 구분하여 안내드립니다.`;
     setConfirmMsg(msg);
@@ -674,15 +672,7 @@ export default function SalesTab({ userName, onCreated }: SalesTabProps) {
             </button>
           </div>
 
-          <button onClick={() => {
-            setStep(2);
-            if (services.length > 0) {
-              updateConfirm({
-                services: [...services],
-                schedules: services.map((s) => ({ service: s.name, date: "", time: "선택" })),
-              });
-            }
-          }}
+          <button onClick={() => setStep(2)}
             className="w-full py-2 rounded-lg text-xs font-bold text-white" style={{ background: "#1a6b3c" }}>
             STEP 2 · 파싱으로 이동 →
           </button>
