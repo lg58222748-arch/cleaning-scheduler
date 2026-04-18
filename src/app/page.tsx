@@ -985,6 +985,7 @@ export default function Home() {
             members={members.map(m => ({ id: m.id, name: m.name, linkedUsername: m.linkedUsername }))}
             schedules={schedules}
             onRefresh={() => loadData(undefined, true)}
+            onNavigateToAssign={() => switchTab("assign")}
           />
         </div>
 
