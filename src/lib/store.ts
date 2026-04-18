@@ -24,7 +24,7 @@ function rowToComment(r: Record<string, unknown>): Comment {
   return { id: String(r.id), scheduleId: String(r.schedule_id), authorName: String(r.author_name), content: String(r.content), createdAt: String(r.created_at) };
 }
 function mapRole(role: string): User["role"] {
-  if (role === "admin") return "ceo";
+  // admin 은 이제 독립 역할로 유지 (대표와 별도)
   if (role === "manager") return "field";
   return role as User["role"];
 }
