@@ -90,27 +90,34 @@ export default function SalesTab({ userName, onCreated }: SalesTabProps) {
   function updateConfirm(patch: Partial<ConfirmSession>) {
     setConfirmSessions(prev => prev.map(s => s.id === activeConfirmId ? { ...s, ...patch } : s));
   }
+  // 세션 이름을 현재 위치에 맞춰 재번호 (양식1, 양식2, ...)
+  function renumberForm(list: FormSession[]): FormSession[] {
+    return list.map((s, i) => ({ ...s, name: `양식${i + 1}` }));
+  }
+  function renumberConfirm(list: ConfirmSession[]): ConfirmSession[] {
+    return list.map((s, i) => ({ ...s, name: `확정${i + 1}` }));
+  }
   function addFormSession() {
     const n = makeFormSession(`양식${formSessions.length + 1}`);
-    setFormSessions(prev => [...prev, n]);
+    setFormSessions(prev => renumberForm([...prev, n]));
     setActiveFormId(n.id);
   }
   function removeFormSession(id: string) {
     if (formSessions.length <= 1) return;
     const idx = formSessions.findIndex(s => s.id === id);
-    const next = formSessions.filter(s => s.id !== id);
+    const next = renumberForm(formSessions.filter(s => s.id !== id));
     setFormSessions(next);
     if (activeFormId === id) setActiveFormId(next[Math.max(0, idx - 1)].id);
   }
   function addConfirmSession() {
     const n = makeConfirmSession(`확정${confirmSessions.length + 1}`);
-    setConfirmSessions(prev => [...prev, n]);
+    setConfirmSessions(prev => renumberConfirm([...prev, n]));
     setActiveConfirmId(n.id);
   }
   function removeConfirmSession(id: string) {
     if (confirmSessions.length <= 1) return;
     const idx = confirmSessions.findIndex(s => s.id === id);
-    const next = confirmSessions.filter(s => s.id !== id);
+    const next = renumberConfirm(confirmSessions.filter(s => s.id !== id));
     setConfirmSessions(next);
     if (activeConfirmId === id) setActiveConfirmId(next[Math.max(0, idx - 1)].id);
   }
