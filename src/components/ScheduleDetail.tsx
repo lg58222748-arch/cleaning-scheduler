@@ -65,6 +65,7 @@ export default function ScheduleDetail({
 
   // 탭 히스토리 (뒤로가기 지원)
   const tabHistoryRef = useRef<DetailTab[]>([]);
+  const dateInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const handler = (): boolean => {
@@ -353,21 +354,38 @@ export default function ScheduleDetail({
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                   </svg>
                   {isAdmin ? (
-                    <div className="flex items-center gap-2">
+                    <>
+                      <span
+                        onClick={() => {
+                          const el = dateInputRef.current;
+                          if (!el) return;
+                          // showPicker 지원 (Chrome/Edge/최신 Safari)
+                          if (typeof (el as HTMLInputElement & { showPicker?: () => void }).showPicker === "function") {
+                            (el as HTMLInputElement & { showPicker: () => void }).showPicker();
+                          } else {
+                            el.focus();
+                            el.click();
+                          }
+                        }}
+                        className="font-medium cursor-pointer text-blue-600 active:text-blue-800 underline underline-offset-2 decoration-dotted"
+                      >
+                        {dateDisplay}
+                      </span>
                       <input
+                        ref={dateInputRef}
                         type="date"
                         value={localDate}
                         onChange={(e) => {
                           const newDate = e.target.value;
                           if (!newDate || newDate === localDate) return;
-                          setLocalDate(newDate);         // 화면 즉시 갱신
-                          schedule.date = newDate;        // prop 동기화
+                          setLocalDate(newDate);
+                          schedule.date = newDate;
                           apiUpdateSchedule(schedule.id, { date: newDate }).then(() => onUpdated?.()).catch(() => {});
                         }}
-                        className="font-medium text-xs px-2 py-1 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-400 outline-none"
+                        className="absolute opacity-0 pointer-events-none w-0 h-0"
+                        aria-hidden="true"
                       />
-                      <span className="text-gray-500">({dayName})</span>
-                    </div>
+                    </>
                   ) : (
                     <span className="font-medium">{dateDisplay}</span>
                   )}
