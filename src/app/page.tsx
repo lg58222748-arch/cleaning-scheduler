@@ -172,8 +172,8 @@ export default function Home() {
           const localRead = localReadIdsRef.current;
           const myNotifs = allNotifs.filter(n => {
             if (deleted.has(n.id)) return false;
-            if (uRole === "sales") return false; // 영업: 모든 알림 제외
-            if (n.type === "system_notice") return true;
+            if (n.type === "system_notice") return true; // 전체공지는 모두(영업 포함)
+            if (uRole === "sales") return false; // 영업: 전체공지 외 모두 제외
             if (isReturn(n)) {
               if (isAdminOrScheduler) return true;
               if (uName && n.message.includes(uName)) return true;
@@ -395,8 +395,8 @@ export default function Home() {
         const localRead = localReadIdsRef.current;
         const myNotifs = allNotifs.filter(n => {
           if (deleted.has(n.id)) return false;
+          if (n.type === "system_notice") return true; // 전체공지는 모두(영업 포함)
           if (uRole === "sales") return false;
-          if (n.type === "system_notice") return true;
           if (isReturn(n)) {
             if (isAdminOrScheduler) return true;
             if (uName && n.message.includes(uName)) return true;
