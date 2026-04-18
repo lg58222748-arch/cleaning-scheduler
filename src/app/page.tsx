@@ -877,16 +877,18 @@ export default function Home() {
     .filter((s) => s.date === dateStr)
     .sort((a, b) => a.startTime.localeCompare(b.startTime));
 
-  // 반환 배너용 안정 계산: dismissed 제외 + 본인이 반환한 건 본인 배너에서 숨김
+  // 반환 배너: 본인 포함 모든 관리자에게 표시. 24시간 이내 반환만 노출.
+  // read 상태와 무관하게 유지 → 읽음/재동기화 경주로 인한 깜빡임 차단.
+  // 사용자가 X 로 명시적으로 닫은 것만 숨김.
   const returnBannerNotifs = (() => {
     const dismissed = dismissedReturnIdsRef.current;
-    const myName = currentUser?.name || "";
+    const cutoff = Date.now() - 24 * 60 * 60 * 1000;
     return notifications.filter(n => {
       const isRet = n.type === "schedule_returned" || n.title === "일정 반환";
       if (!isRet) return false;
-      if (n.read) return false;
       if (dismissed.has(n.id)) return false;
-      if (myName && n.message.startsWith(`${myName}님이`)) return false;
+      const ts = new Date(n.createdAt).getTime();
+      if (!isNaN(ts) && ts < cutoff) return false;
       return true;
     });
   })();
