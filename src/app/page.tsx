@@ -102,7 +102,7 @@ export default function Home() {
     try { const s = localStorage.getItem("userOrder"); return s ? JSON.parse(s) : []; } catch { return []; }
   });
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>(() => {
-    const defaults = { self: false, ceo: false, scheduler: false, sales: false, field: false, pending: false };
+    const defaults = { self: false, ceo: false, admin: false, scheduler: false, sales: false, field: false, pending: false };
     if (typeof window === "undefined") return defaults;
     try { const s = localStorage.getItem("userGroupsOpen"); return s ? JSON.parse(s) : defaults; } catch { return defaults; }
   });
@@ -1019,9 +1019,9 @@ export default function Home() {
         <div className="h-full overflow-y-auto" style={{ display: activeTab === "members" ? "block" : "none" }}>
           <div className="p-3 space-y-2 pb-20">
             {(() => {
-              const roleLabels: Record<string, string> = { ceo: "대표", scheduler: "일정관리자", sales: "영업팀", field: "현장팀", pending: "대기" };
-              const roleColors: Record<string, string> = { ceo: "bg-purple-100 text-purple-700", scheduler: "bg-blue-100 text-blue-700", sales: "bg-green-100 text-green-700", field: "bg-orange-100 text-orange-700", pending: "bg-gray-100 text-gray-500" };
-              const groupColors: Record<string, string> = { self: "border-blue-200 bg-blue-50/50", ceo: "border-purple-200 bg-purple-50/30", scheduler: "border-blue-200 bg-blue-50/30", sales: "border-green-200 bg-green-50/30", field: "border-orange-200 bg-orange-50/30", pending: "border-orange-300 bg-orange-50/40" };
+              const roleLabels: Record<string, string> = { ceo: "대표", admin: "관리자", scheduler: "일정관리자", sales: "영업팀", field: "현장팀", pending: "대기" };
+              const roleColors: Record<string, string> = { ceo: "bg-purple-100 text-purple-700", admin: "bg-purple-100 text-purple-700", scheduler: "bg-blue-100 text-blue-700", sales: "bg-green-100 text-green-700", field: "bg-orange-100 text-orange-700", pending: "bg-gray-100 text-gray-500" };
+              const groupColors: Record<string, string> = { self: "border-blue-200 bg-blue-50/50", ceo: "border-purple-200 bg-purple-50/30", admin: "border-purple-200 bg-purple-50/30", scheduler: "border-blue-200 bg-blue-50/30", sales: "border-green-200 bg-green-50/30", field: "border-orange-200 bg-orange-50/30", pending: "border-orange-300 bg-orange-50/40" };
 
               // 전체 사용자 → userOrder 로 정렬
               const sortedAll = [...allUsers].filter(u => u.username !== "admin").sort((a, b) => {
@@ -1040,6 +1040,8 @@ export default function Home() {
               if (me) groups.push({ key: "self", title: "본인", users: [me] });
               const ceoUsers = others.filter(u => u.role === "ceo");
               if (ceoUsers.length > 0) groups.push({ key: "ceo", title: "대표", users: ceoUsers });
+              const adminUsers = others.filter(u => u.role === "admin");
+              if (adminUsers.length > 0) groups.push({ key: "admin", title: "관리자", users: adminUsers });
               const schUsers = others.filter(u => u.role === "scheduler");
               if (schUsers.length > 0) groups.push({ key: "scheduler", title: "일정관리자", users: schUsers });
               const salesUsers = others.filter(u => u.role === "sales");
@@ -1138,6 +1140,7 @@ export default function Home() {
                           <option value="field">현장팀</option>
                           <option value="sales">영업팀</option>
                           <option value="scheduler">일정관리자</option>
+                          <option value="admin">관리자</option>
                           <option value="ceo">대표</option>
                         </select>
                         <button onClick={() => openProfileUser(u)} className="p-1.5 active:bg-gray-100 rounded-lg border border-gray-200">
