@@ -11,35 +11,125 @@ function init() {
   initialized = true;
 }
 
-export async function sendPushToAll(title: string, message: string, tag?: string) {
-  init();
-  if (!VAPID_PUBLIC || !VAPID_PRIVATE) { console.log("[SendPush] VAPID 키 없음"); return; }
+// ===== FCM HTTP v1 (Capacitor APK 푸시) =====
+let cachedFcmToken: { token: string; expiresAt: number } | null = null;
+let fcmCreds: { client_email: string; private_key: string; project_id: string } | null = null;
 
-  const { data: subs } = await supabase.from("push_subscriptions").select("*");
-  console.log("[SendPush] 구독자:", subs?.length || 0);
-  if (!subs || subs.length === 0) return;
+function getFcmCreds() {
+  if (fcmCreds) return fcmCreds;
+  const raw = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw);
+    if (!parsed.client_email || !parsed.private_key || !parsed.project_id) return null;
+    fcmCreds = parsed;
+    return fcmCreds;
+  } catch {
+    return null;
+  }
+}
 
+async function getFcmAccessToken(): Promise<string | null> {
+  const creds = getFcmCreds();
+  if (!creds) return null;
+  // 캐시된 토큰이 아직 유효하면 재사용 (50분 캐시)
+  if (cachedFcmToken && cachedFcmToken.expiresAt > Date.now()) {
+    return cachedFcmToken.token;
+  }
+  try {
+    const { JWT } = await import("google-auth-library");
+    const client = new JWT({
+      email: creds.client_email,
+      key: creds.private_key,
+      scopes: ["https://www.googleapis.com/auth/firebase.messaging"],
+    });
+    const token = await client.authorize();
+    if (!token.access_token) return null;
+    cachedFcmToken = { token: token.access_token, expiresAt: Date.now() + 50 * 60 * 1000 };
+    return token.access_token;
+  } catch (e) {
+    console.error("[FCM] access token 실패:", e);
+    return null;
+  }
+}
+
+async function sendFcmNotification(fcmToken: string, title: string, body: string, tag?: string): Promise<boolean> {
+  const creds = getFcmCreds();
+  if (!creds) return false;
+  const accessToken = await getFcmAccessToken();
+  if (!accessToken) return false;
+
+  try {
+    const res = await fetch(`https://fcm.googleapis.com/v1/projects/${creds.project_id}/messages:send`, {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        message: {
+          token: fcmToken,
+          notification: { title, body },
+          android: {
+            priority: "HIGH",
+            notification: {
+              tag: tag || "notification",
+              click_action: "FLUTTER_NOTIFICATION_CLICK",
+            },
+          },
+          data: { url: "/", tag: tag || "notification" },
+        },
+      }),
+    });
+    if (!res.ok) {
+      const err = await res.text();
+      console.error("[FCM] send failed:", res.status, err);
+      // 404 = token 만료/무효 → DB 에서 삭제
+      if (res.status === 404) {
+        await supabase.from("push_subscriptions").delete().eq("endpoint", `fcm:${fcmToken}`);
+      }
+      return false;
+    }
+    return true;
+  } catch (e) {
+    console.error("[FCM] exception:", e);
+    return false;
+  }
+}
+
+// 통합 발송: 웹푸시 엔드포인트 + FCM 엔드포인트 모두 처리
+async function sendToSubs(subs: Array<{ id: string; endpoint: string; p256dh: string; auth: string }>, title: string, message: string, tag?: string) {
   const payload = JSON.stringify({ title, body: message, tag: tag || "notification", url: "/" });
-
   for (const sub of subs) {
-    if (sub.endpoint?.startsWith("fcm:")) continue;
-    try {
-      await webpush.sendNotification(
-        { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
-        payload
-      );
-    } catch (err: unknown) {
-      if (err && typeof err === "object" && "statusCode" in err && (err as { statusCode: number }).statusCode === 410) {
-        await supabase.from("push_subscriptions").delete().eq("id", sub.id);
+    if (sub.endpoint?.startsWith("fcm:")) {
+      const fcmToken = sub.endpoint.slice(4);
+      await sendFcmNotification(fcmToken, title, message, tag);
+    } else {
+      try {
+        await webpush.sendNotification(
+          { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
+          payload
+        );
+      } catch (err: unknown) {
+        if (err && typeof err === "object" && "statusCode" in err && (err as { statusCode: number }).statusCode === 410) {
+          await supabase.from("push_subscriptions").delete().eq("id", sub.id);
+        }
       }
     }
   }
 }
 
+export async function sendPushToAll(title: string, message: string, tag?: string) {
+  init();
+  const { data: subs } = await supabase.from("push_subscriptions").select("*");
+  console.log("[SendPush] 구독자:", subs?.length || 0);
+  if (!subs || subs.length === 0) return;
+  await sendToSubs(subs, title, message, tag);
+}
+
 // 특정 사용자 이름들에게만 푸시 전송 (정확한 이름 매칭)
 export async function sendPushToNames(names: string[], title: string, message: string, tag?: string) {
   init();
-  if (!VAPID_PUBLIC || !VAPID_PRIVATE) return;
   const clean = names.filter(n => n && n.trim() && n !== "미배정").map(n => n.trim());
   if (clean.length === 0) return;
 
@@ -49,28 +139,12 @@ export async function sendPushToNames(names: string[], title: string, message: s
 
   const { data: subs } = await supabase.from("push_subscriptions").select("*").in("user_id", Array.from(targetIds));
   if (!subs || subs.length === 0) return;
-
-  const payload = JSON.stringify({ title, body: message, tag: tag || "notification", url: "/" });
-
-  for (const sub of subs) {
-    if (sub.endpoint?.startsWith("fcm:")) continue;
-    try {
-      await webpush.sendNotification(
-        { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
-        payload
-      );
-    } catch (err: unknown) {
-      if (err && typeof err === "object" && "statusCode" in err && (err as { statusCode: number }).statusCode === 410) {
-        await supabase.from("push_subscriptions").delete().eq("id", sub.id);
-      }
-    }
-  }
+  await sendToSubs(subs, title, message, tag);
 }
 
 // [Deprecated: 메시지 텍스트 내 이름 매칭 - 정확하지 않음]
 export async function sendPushToMentioned(title: string, message: string, tag?: string) {
   init();
-  if (!VAPID_PUBLIC || !VAPID_PRIVATE) return;
   const { data: users } = await supabase.from("users").select("id, name, role").eq("status", "approved");
   if (!users || users.length === 0) return;
   const combined = title + " " + message;
@@ -84,51 +158,19 @@ export async function sendPushToMentioned(title: string, message: string, tag?: 
 
   const { data: subs } = await supabase.from("push_subscriptions").select("*").in("user_id", Array.from(targetIds));
   if (!subs || subs.length === 0) return;
-
-  const payload = JSON.stringify({ title, body: message, tag: tag || "notification", url: "/" });
-
-  for (const sub of subs) {
-    if (sub.endpoint?.startsWith("fcm:")) continue;
-    try {
-      await webpush.sendNotification(
-        { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
-        payload
-      );
-    } catch (err: unknown) {
-      if (err && typeof err === "object" && "statusCode" in err && (err as { statusCode: number }).statusCode === 410) {
-        await supabase.from("push_subscriptions").delete().eq("id", sub.id);
-      }
-    }
-  }
+  await sendToSubs(subs, title, message, tag);
 }
 
 // 특정 역할(role) 의 사용자들에게만 푸시 전송
 export async function sendPushToRoles(roles: string[], title: string, message: string, tag?: string) {
   init();
-  if (!VAPID_PUBLIC || !VAPID_PRIVATE) return;
   if (roles.length === 0) return;
 
-  // 역할에 해당하는 사용자 ID 조회
   const { data: users } = await supabase.from("users").select("id").in("role", roles).eq("status", "approved");
   const userIds = (users || []).map(u => String(u.id));
   if (userIds.length === 0) return;
 
   const { data: subs } = await supabase.from("push_subscriptions").select("*").in("user_id", userIds);
   if (!subs || subs.length === 0) return;
-
-  const payload = JSON.stringify({ title, body: message, tag: tag || "notification", url: "/" });
-
-  for (const sub of subs) {
-    if (sub.endpoint?.startsWith("fcm:")) continue;
-    try {
-      await webpush.sendNotification(
-        { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
-        payload
-      );
-    } catch (err: unknown) {
-      if (err && typeof err === "object" && "statusCode" in err && (err as { statusCode: number }).statusCode === 410) {
-        await supabase.from("push_subscriptions").delete().eq("id", sub.id);
-      }
-    }
-  }
+  await sendToSubs(subs, title, message, tag);
 }

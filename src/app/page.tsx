@@ -249,10 +249,52 @@ export default function Home() {
   // 푸시 알림 등록
   useEffect(() => {
     if (!currentUser) return;
-    async function registerPush() {
-      // Web Push (브라우저/PWA/APK 모두)
+    if (localStorage.getItem("notificationsEnabled") === "false") { console.log("[Push] 알림 OFF - 등록 스킵"); return; }
+
+    async function registerNativePush() {
+      // Capacitor 네이티브 APK: FCM 기반 (백그라운드에서도 수신 가능)
       try {
-        if (localStorage.getItem("notificationsEnabled") === "false") { console.log("[Push] 알림 OFF 상태 - 등록 스킵"); return; }
+        const { Capacitor } = await import("@capacitor/core");
+        if (!Capacitor.isNativePlatform()) return false;
+        const { PushNotifications } = await import("@capacitor/push-notifications");
+        const status = await PushNotifications.checkPermissions();
+        let receive = status.receive;
+        if (receive === "prompt" || receive === "prompt-with-rationale") {
+          const res = await PushNotifications.requestPermissions();
+          receive = res.receive;
+        }
+        if (receive !== "granted") { console.log("[FCM] 권한 거절"); return true; }
+        await PushNotifications.removeAllListeners();
+        await PushNotifications.register();
+        PushNotifications.addListener("registration", async (token) => {
+          console.log("[FCM] 토큰 획득:", token.value.slice(0, 20) + "...");
+          try {
+            await fetch("/api/push", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ action: "subscribe-fcm", token: token.value, userId: currentUser?.id, userName: currentUser?.name }),
+            });
+          } catch (e) { console.error("[FCM] 서버 저장 실패:", e); }
+        });
+        PushNotifications.addListener("registrationError", (err) => {
+          console.error("[FCM] 등록 실패:", err);
+        });
+        PushNotifications.addListener("pushNotificationReceived", (notif) => {
+          console.log("[FCM] 수신 (앱 포그라운드):", notif);
+        });
+        PushNotifications.addListener("pushNotificationActionPerformed", (action) => {
+          console.log("[FCM] 탭 액션:", action);
+        });
+        return true;
+      } catch (e) {
+        console.log("[FCM] 플러그인 미사용 (웹 환경)", e);
+        return false;
+      }
+    }
+
+    async function registerWebPush() {
+      // 웹/PWA: Web Push API
+      try {
         if (!("serviceWorker" in navigator) || !("PushManager" in window)) { console.log("[Push] SW/PushManager 미지원"); return; }
         const permission = await Notification.requestPermission();
         console.log("[Push] 권한:", permission);
@@ -264,15 +306,19 @@ export default function Home() {
           sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: vapidKey });
         }
         console.log("[Push] 구독 완료:", sub.endpoint.slice(0, 50));
-        const res = await fetch("/api/push", {
+        await fetch("/api/push", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ action: "subscribe", subscription: sub.toJSON(), userId: currentUser?.id, userName: currentUser?.name }),
         });
-        console.log("[Push] 서버 저장:", await res.json());
       } catch (e) { console.error("[Push] 실패:", e); }
     }
-    registerPush();
+
+    (async () => {
+      const registeredNative = await registerNativePush();
+      if (!registeredNative) await registerWebPush();
+    })();
+
     // SW에 알림 ON/OFF 상태 전달
     navigator.serviceWorker?.ready.then(reg => {
       const enabled = localStorage.getItem("notificationsEnabled") !== "false";
