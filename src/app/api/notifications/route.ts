@@ -6,33 +6,18 @@ import {
   markAllNotificationsRead,
   deleteAllNotifications,
   deleteNotificationsByIds,
-  checkHappyCallReminders,
   createSystemNotice,
   getSystemNotices,
   deleteSystemNotice,
 } from "@/lib/store";
-
-// 해피콜 리마인더 체크 스로틀: 동시 GET 많아도 5분에 1회만 실행
-let lastHappyCallCheck = 0;
-let happyCallInFlight: Promise<unknown> | null = null;
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   if (searchParams.get("notices") === "true") {
     return Response.json({ notices: await getSystemNotices() });
   }
-  // 동시 실행 방지 + 5분 쿨다운 → 중복 해피콜 알림 방지
-  const now = Date.now();
-  if (now - lastHappyCallCheck > 5 * 60 * 1000) {
-    if (!happyCallInFlight) {
-      happyCallInFlight = checkHappyCallReminders().finally(() => {
-        lastHappyCallCheck = Date.now();
-        happyCallInFlight = null;
-      });
-    }
-    await happyCallInFlight;
-  }
-
+  // 해피콜 리마인더는 Vercel Cron 으로 매일 오전 9시 1회만 실행
+  // (이전엔 GET 마다 실행해서 중복 발송 문제 있었음)
   return Response.json({
     notifications: await getNotifications(),
     unreadCount: await getUnreadCount(),
