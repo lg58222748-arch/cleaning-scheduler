@@ -515,7 +515,7 @@ export default function SalesTab({ userName, onCreated, isAdmin = false }: Sales
       msg += `총 잔금 : ${totalBalance > 0 ? totalBalance.toLocaleString() + "원" : ""}\n`;
     }
 
-    if (activeConfirm.parsedSalesNote) msg += `11)상담사 특이사항 : ${activeConfirm.parsedSalesNote}\n`;
+    msg += `11)상담사 특이사항 : ${activeConfirm.parsedSalesNote || ""}\n`;
     msg += `\n*예약금은 본사 확정 비용, 잔금과 세금 증빙은 당일 관리점에서 작업 마무리 후 처리됩니다.\n`;
     msg += `*최종 정산은 현장 작업 완료 후 공급가액과 부가세를 구분하여 안내드립니다.`;
     setConfirmMsg(msg);
@@ -825,8 +825,12 @@ export default function SalesTab({ userName, onCreated, isAdmin = false }: Sales
                   <div className="flex-1"><label className="text-xs text-gray-400">7) 평수</label><input value={parsedPyeong} onChange={(e) => setParsedPyeong(e.target.value)} className="w-full px-2 py-1.5 border border-gray-200 rounded outline-none" style={{ fontSize: "12px" }} /></div>
                 </div>
                 <div>
-                  <label className="text-xs text-gray-400">5) 특이사항</label>
+                  <label className="text-xs text-gray-400">5) 고객님 특이사항</label>
                   <textarea value={parsedNote} onChange={(e) => setParsedNote(e.target.value)} rows={2} style={{ fontSize: "12px" }} className="w-full px-2 py-1.5 border border-gray-200 rounded outline-none resize-none" />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-400">11) 상담사 특이사항</label>
+                  <textarea value={parsedSalesNote} onChange={(e) => { setParsedSalesNote(e.target.value); generateConfirmMsg(); }} rows={2} placeholder="외부유리창, 에어컨, 세탁기, 곰팡이, 니코틴 등" style={{ fontSize: "12px" }} className="w-full px-2 py-1.5 border border-gray-200 rounded outline-none resize-none" />
                 </div>
               </div>
 
