@@ -243,6 +243,7 @@ export default function SalesTab({ userName, onCreated }: SalesTabProps) {
   }
 
   const [parsing, setParsing] = useState(false);
+  const [parseDone, setParseDone] = useState(false);
   const parsedResultRef = useRef<HTMLDivElement>(null);
 
   // 양식(6)서비스 종류·7)평수·► 항목) 에서 서비스/평수 추출
@@ -279,9 +280,17 @@ export default function SalesTab({ userName, onCreated }: SalesTabProps) {
   // AI 파싱 - Claude API 우선, 실패시 regex fallback
   async function parseCustomer() {
     setParsing(true);
+    setParseDone(false);
     // 양식 영역에서 서비스/평수 항상 추출 (AI 결과와 병합)
     const formData = extractFormData(customerText);
     const confirmServices = activeConfirm.services.length > 0 ? activeConfirm.services : formData.services;
+
+    const finish = () => {
+      setParsing(false);
+      setParseDone(true);
+      setTimeout(() => parsedResultRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 100);
+      setTimeout(() => setParseDone(false), 2500);
+    };
 
     // 1차: Claude API 시도
     try {
@@ -303,16 +312,14 @@ export default function SalesTab({ userName, onCreated }: SalesTabProps) {
           schedules: confirmServices.map((s) => ({ service: s.name, date: "", time: "선택" })),
         });
         generateConfirmMsg(data.name, data.addr, data.phone, data.date, data.note, confirmServices, formData.pyeong);
-        setParsing(false);
-        setTimeout(() => parsedResultRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 100);
+        finish();
         return;
       }
     } catch {}
 
     // 2차: regex fallback
     regexParse();
-    setParsing(false);
-    setTimeout(() => parsedResultRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 100);
+    finish();
   }
 
   function regexParse() {
@@ -743,8 +750,9 @@ export default function SalesTab({ userName, onCreated }: SalesTabProps) {
               placeholder="고객이 보낸 1~5번 내용을 그대로 복사해서 붙여넣기"
               style={{ fontSize: "12px" }} className="w-full px-3 py-2.5 border border-gray-200 rounded-lg outline-none focus:border-green-500 resize-y min-h-[300px]" />
             <button onClick={parseCustomer} disabled={parsing}
-              className="mt-2 w-full py-3.5 rounded-xl text-sm font-bold text-white disabled:opacity-70" style={{ background: "#1c1c1e" }}>
-              {parsing ? "🔄 AI 파싱 처리중..." : "🤖 AI 자동 파싱"}
+              className="mt-2 w-full py-3.5 rounded-xl text-sm font-bold text-white disabled:opacity-70 transition-colors"
+              style={{ background: parseDone ? "#00a35e" : "#1c1c1e" }}>
+              {parsing ? "🔄 AI 파싱 처리중..." : parseDone ? "✅ 자동파싱 완료!" : "🤖 AI 자동 파싱"}
             </button>
           </div>
 
