@@ -1009,8 +1009,8 @@ export default function Home() {
               if (salesUsers.length > 0) groups.push({ key: "sales", title: "영업팀", users: salesUsers });
               const fieldUsers = others.filter(u => u.role === "field");
               if (fieldUsers.length > 0) groups.push({ key: "field", title: "현장팀", users: fieldUsers });
-              const canSeePending = canManageAdvanced || role === "scheduler";
-              if (canSeePending) groups.push({ key: "pending", title: `가입 신청 대기${pendingUsers.length > 0 ? ` (${pendingUsers.length})` : ""}`, users: pendingUsers });
+              // 대표(ceo)만 가입 신청 대기 볼 수 있음 (admin DB 롤도 프론트에선 ceo로 매핑됨)
+              if (canManageAdvanced) groups.push({ key: "pending", title: `가입 신청 대기${pendingUsers.length > 0 ? ` (${pendingUsers.length})` : ""}`, users: pendingUsers });
 
               const allInSortedList = [...(me ? [me] : []), ...others, ...(canManageAdvanced ? pendingUsers : [])];
 
