@@ -1009,7 +1009,8 @@ export default function Home() {
               if (salesUsers.length > 0) groups.push({ key: "sales", title: "영업팀", users: salesUsers });
               const fieldUsers = others.filter(u => u.role === "field");
               if (fieldUsers.length > 0) groups.push({ key: "field", title: "현장팀", users: fieldUsers });
-              if (canManageAdvanced) groups.push({ key: "pending", title: `가입 신청 대기${pendingUsers.length > 0 ? ` (${pendingUsers.length})` : ""}`, users: pendingUsers });
+              const canSeePending = canManageAdvanced || role === "scheduler";
+              if (canSeePending) groups.push({ key: "pending", title: `가입 신청 대기${pendingUsers.length > 0 ? ` (${pendingUsers.length})` : ""}`, users: pendingUsers });
 
               const allInSortedList = [...(me ? [me] : []), ...others, ...(canManageAdvanced ? pendingUsers : [])];
 
@@ -1140,6 +1141,11 @@ export default function Home() {
                         {g.users.length === 0 ? (
                           <div className="py-4 text-center text-xs text-gray-400">
                             {g.key === "pending" ? "가입 신청 대기 중인 사용자가 없습니다" : "사용자가 없습니다"}
+                          </div>
+                        ) : g.key === "pending" && !canManageAdvanced ? (
+                          <div className="py-4 text-center text-xs text-gray-500 bg-white rounded-lg">
+                            <div className="text-base font-bold text-orange-600 mb-1">{g.users.length}명 대기 중</div>
+                            <div>상세 정보 및 승인은 대표만 가능합니다</div>
                           </div>
                         ) : (
                           g.users.map(u => renderCard(u))

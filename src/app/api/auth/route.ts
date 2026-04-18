@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import { loginUser, registerUser, getUserByUsername, findUserForLogin } from "@/lib/store";
+import { sendPushToRoles } from "@/lib/push";
 
 export async function POST(req: NextRequest) {
   const body = await req.json();
@@ -38,6 +39,8 @@ export async function POST(req: NextRequest) {
         businessLicenseFile: body.businessLicenseFile || "",
         branch: body.branch || "",
       });
+      // 대표 + 일정관리자에게 푸시 알림
+      sendPushToRoles(["ceo", "scheduler"], "새 가입 신청", `${body.name}님이 가입 신청했습니다. 승인 대기 중입니다.`, "signup").catch(() => {});
       return Response.json(user, { status: 201 });
     } catch (err) {
       const msg = err instanceof Error ? err.message : "알 수 없는 오류";
