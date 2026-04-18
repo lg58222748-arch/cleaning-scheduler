@@ -133,11 +133,14 @@ export async function sendPushToUsers(userIds: string[], title: string, message:
   const unique = Array.from(new Set(userIds.filter(Boolean)));
   if (unique.length === 0) { console.log("[Push] userIds 없음"); return; }
   const { data: subs } = await supabase.from("push_subscriptions").select("*").in("user_id", unique);
+  const subUserIds = new Set((subs || []).map(s => String(s.user_id)));
+  const missing = unique.filter(u => !subUserIds.has(u));
   console.log(`[Push] tag=${tag} 대상 user=${unique.length}명 구독=${subs?.length || 0}건`);
-  if (!subs || subs.length === 0) {
-    console.warn(`[Push] 구독 없음 - userIds:`, unique);
-    return;
+  if (missing.length > 0) {
+    const { data: miss } = await supabase.from("users").select("id, name, role").in("id", missing);
+    console.warn(`[Push] 구독 없는 유저:`, (miss || []).map(u => `${u.name}(${u.role})`));
   }
+  if (!subs || subs.length === 0) return;
   const endpoints = subs.map(s => (s.endpoint?.startsWith("fcm:") ? "FCM" : "WEB") + "/" + String(s.user_id).slice(0, 8));
   console.log(`[Push] 발송 시작:`, endpoints);
   await sendToSubs(subs, title, message, tag);
