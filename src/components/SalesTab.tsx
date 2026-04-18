@@ -216,6 +216,7 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
   }
   const [dragTplId, setDragTplId] = useState<string | null>(null);
   const [dragOverTplId, setDragOverTplId] = useState<string | null>(null);
+  const [selectedTplId, setSelectedTplId] = useState<string | null>(null); // PC 미리보기 선택
 
   // 렌더/복사 체크에 사용할 통합 copied (읽기 전용)
   const copied: { has: (label: string) => boolean } = { has: (label: string) => {
@@ -971,47 +972,86 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
 
       {/* ===== STEP 3 · 안내 양식 ===== */}
       {step === 3 && (
-        <div className="p-3 space-y-1.5">
-          <div className="flex items-center justify-between mb-1">
-            <div className="text-[11px] font-bold text-green-700">
-              안내 양식 모음{(isAdmin || canEditTemplates) ? "" : " (관리자만 수정 가능)"}
+        <div className="p-3 flex flex-col md:flex-row md:gap-4">
+          <div className="space-y-1.5 md:flex-1 md:max-w-md">
+            <div className="flex items-center justify-between mb-1">
+              <div className="text-[11px] font-bold text-green-700">
+                안내 양식 모음{(isAdmin || canEditTemplates) ? "" : " (관리자만 수정 가능)"}
+              </div>
+              {canEditTemplates && (
+                <button onClick={addTemplate} className="text-[11px] font-bold px-2 py-1 bg-green-700 text-white rounded-lg active:bg-green-800">+ 양식 추가</button>
+              )}
             </div>
-            {canEditTemplates && (
-              <button onClick={addTemplate} className="text-[11px] font-bold px-2 py-1 bg-green-700 text-white rounded-lg active:bg-green-800">+ 양식 추가</button>
-            )}
+            {templates.map((tpl, i) => (
+              <TemplateCard
+                key={tpl.id}
+                id={tpl.id}
+                title={tpl.title}
+                content={tpl.content}
+                onCopy={(text) => handleCopy(text, `tpl${i}`)}
+                copied={copied.has(`tpl${i}`)}
+                isAdmin={isAdmin}
+                canEdit={canEditTemplates}
+                isSelected={selectedTplId === tpl.id}
+                onSelect={() => setSelectedTplId(tpl.id)}
+                canMoveUp={i > 0}
+                canMoveDown={i < templates.length - 1}
+                onMoveUp={() => moveTemplate(i, -1)}
+                onMoveDown={() => moveTemplate(i, 1)}
+                onChangeTitle={(v) => updateTemplateField(tpl.id, "title", v)}
+                onChangeContent={(v) => updateTemplateField(tpl.id, "content", v)}
+                onDelete={() => deleteTemplate(tpl.id)}
+                isDragging={dragTplId === tpl.id}
+                isDragOver={dragOverTplId === tpl.id && dragTplId !== tpl.id}
+                onDragStart={() => setDragTplId(tpl.id)}
+                onDragEnd={() => { setDragTplId(null); setDragOverTplId(null); }}
+                onDragOver={() => { if (dragTplId && dragTplId !== tpl.id) setDragOverTplId(tpl.id); }}
+                onDrop={() => {
+                  if (!dragTplId || dragTplId === tpl.id) return;
+                  const fromIdx = templates.findIndex(t => t.id === dragTplId);
+                  const toIdx = templates.findIndex(t => t.id === tpl.id);
+                  moveTemplateToIdx(fromIdx, toIdx);
+                  setDragTplId(null);
+                  setDragOverTplId(null);
+                }}
+              />
+            ))}
           </div>
-          {templates.map((tpl, i) => (
-            <TemplateCard
-              key={tpl.id}
-              id={tpl.id}
-              title={tpl.title}
-              content={tpl.content}
-              onCopy={(text) => handleCopy(text, `tpl${i}`)}
-              copied={copied.has(`tpl${i}`)}
-              isAdmin={isAdmin}
-              canEdit={canEditTemplates}
-              canMoveUp={i > 0}
-              canMoveDown={i < templates.length - 1}
-              onMoveUp={() => moveTemplate(i, -1)}
-              onMoveDown={() => moveTemplate(i, 1)}
-              onChangeTitle={(v) => updateTemplateField(tpl.id, "title", v)}
-              onChangeContent={(v) => updateTemplateField(tpl.id, "content", v)}
-              onDelete={() => deleteTemplate(tpl.id)}
-              isDragging={dragTplId === tpl.id}
-              isDragOver={dragOverTplId === tpl.id && dragTplId !== tpl.id}
-              onDragStart={() => setDragTplId(tpl.id)}
-              onDragEnd={() => { setDragTplId(null); setDragOverTplId(null); }}
-              onDragOver={() => { if (dragTplId && dragTplId !== tpl.id) setDragOverTplId(tpl.id); }}
-              onDrop={() => {
-                if (!dragTplId || dragTplId === tpl.id) return;
-                const fromIdx = templates.findIndex(t => t.id === dragTplId);
-                const toIdx = templates.findIndex(t => t.id === tpl.id);
-                moveTemplateToIdx(fromIdx, toIdx);
-                setDragTplId(null);
-                setDragOverTplId(null);
-              }}
-            />
-          ))}
+
+          {/* PC 전용 오른쪽 미리보기 패널 */}
+          <div className="hidden md:block md:flex-1 md:sticky md:top-2 md:self-start">
+            {(() => {
+              const sel = templates.find(t => t.id === selectedTplId);
+              if (!sel) {
+                return (
+                  <div className="p-8 border border-dashed border-gray-200 rounded-xl text-center text-xs text-gray-400">
+                    왼쪽에서 양식을 선택하면 여기에 내용이 표시됩니다
+                  </div>
+                );
+              }
+              const selIdx = templates.findIndex(t => t.id === sel.id);
+              return (
+                <div className="border border-green-200 rounded-xl overflow-hidden bg-white">
+                  <div className="px-3 py-2 bg-green-50 border-b border-green-100">
+                    <span className="text-sm font-bold text-green-800">{sel.title}</span>
+                  </div>
+                  <div className="p-3">
+                    <textarea
+                      value={sel.content}
+                      readOnly={!isAdmin}
+                      onChange={(e) => isAdmin && updateTemplateField(sel.id, "content", e.target.value)}
+                      rows={20}
+                      style={{ fontSize: "13px" }}
+                      className={`w-full text-gray-700 leading-relaxed rounded-lg p-2 outline-none resize-y ${isAdmin ? "bg-white border border-gray-200 focus:border-green-500" : "bg-gray-50"}`}
+                    />
+                    <button onClick={() => handleCopy(sel.content, `tpl${selIdx}`)} className="mt-2 w-full py-2 bg-green-700 text-white rounded-lg text-sm font-bold active:bg-green-800">
+                      {copied.has(`tpl${selIdx}`) ? "복사됨!" : "복사"}
+                    </button>
+                  </div>
+                </div>
+              );
+            })()}
+          </div>
         </div>
       )}
       </div>{/* end scrollable content */}
@@ -1039,12 +1079,14 @@ const DEFAULT_TEMPLATES = [
 // ===== 안내 양식 카드 =====
 function TemplateCard({
   id, title, content, onCopy, copied, isAdmin, canEdit,
+  isSelected, onSelect,
   canMoveUp, canMoveDown, onMoveUp, onMoveDown,
   onChangeTitle, onChangeContent, onDelete,
   isDragging, isDragOver, onDragStart, onDragEnd, onDragOver, onDrop,
 }: {
   id: string; title: string; content: string; onCopy: (text: string) => void; copied: boolean;
   isAdmin: boolean; canEdit?: boolean;
+  isSelected?: boolean; onSelect?: () => void;
   canMoveUp?: boolean; canMoveDown?: boolean; onMoveUp?: () => void; onMoveDown?: () => void;
   onChangeTitle?: (v: string) => void; onChangeContent?: (v: string) => void; onDelete?: () => void;
   isDragging?: boolean; isDragOver?: boolean;
@@ -1057,7 +1099,7 @@ function TemplateCard({
   return (
     <div
       data-tplid={id}
-      className={`border rounded-xl overflow-hidden transition-all ${isDragOver ? "border-green-500 border-dashed bg-green-50/40" : isDragging ? "opacity-40 scale-95 border-gray-200" : "border-gray-200"}`}
+      className={`border rounded-xl overflow-hidden transition-all ${isDragOver ? "border-green-500 border-dashed bg-green-50/40" : isDragging ? "opacity-40 scale-95 border-gray-200" : isSelected ? "border-green-500 bg-green-50/30 md:ring-1 md:ring-green-300" : "border-gray-200"}`}
       onDragOver={(e) => { e.preventDefault(); onDragOver?.(); }}
       onDrop={(e) => { e.preventDefault(); onDrop?.(); }}
     >
@@ -1108,7 +1150,7 @@ function TemplateCard({
           />
         ) : (
           <button
-            onClick={() => setOpen(!open)}
+            onClick={() => { setOpen(!open); onSelect?.(); }}
             onDoubleClick={() => { if (isAdmin) { setTitleDraft(title); setEditingTitle(true); } }}
             className="flex-1 flex items-center justify-between text-left active:bg-gray-50 rounded px-1 py-0.5"
             title={isAdmin ? "더블클릭하여 제목 수정" : ""}
@@ -1126,7 +1168,7 @@ function TemplateCard({
         )}
       </div>
       {open && (
-        <div className="px-3 pb-2.5 border-t border-gray-100">
+        <div className="px-3 pb-2.5 border-t border-gray-100 md:hidden">
           <textarea
             value={content}
             readOnly={!isAdmin}
