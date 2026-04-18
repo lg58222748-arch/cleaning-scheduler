@@ -287,6 +287,8 @@ export default function Home() {
       // 알림 액션 중이면 reload 억제
       if (Date.now() < notifReloadSuppressRef.current) return;
       fetchNotifications().then(notif => {
+        // fetch 응답 도착 시점에도 재확인 (in-flight 중 액션 발생 케이스 방어)
+        if (Date.now() < notifReloadSuppressRef.current) return;
         const allNotifs = notif.notifications as Notification[];
         const deleted = deletedNotifIdsRef.current;
         const isReturn = (n: Notification) => n.title === "일정 반환";
