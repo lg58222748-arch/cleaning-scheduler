@@ -7,6 +7,7 @@ interface SalesTabProps {
   userName: string;
   onCreated: () => void;
   isAdmin?: boolean;
+  canEditTemplates?: boolean; // 영업팀 이상 (add/delete)
 }
 
 const ALL_SERVICES = ["입주청소", "거주청소", "인테리어청소", "사이청소", "새집증후군 시공", "줄눈시공", "탄성코트", "에어컨청소(완전분해)"];
@@ -72,7 +73,7 @@ function makeConfirmSession(name: string): ConfirmSession {
   };
 }
 
-export default function SalesTab({ userName, onCreated, isAdmin = false }: SalesTabProps) {
+export default function SalesTab({ userName, onCreated, isAdmin = false, canEditTemplates = false }: SalesTabProps) {
   const [step, setStep] = useState<1 | 2 | 3>(1);
 
   // 세션 목록
@@ -204,6 +205,14 @@ export default function SalesTab({ userName, onCreated, isAdmin = false }: Sales
   function updateTemplateField(id: string, field: "title" | "content", value: string) {
     const next = templates.map(t => t.id === id ? { ...t, [field]: value } : t);
     saveTemplates(next);
+  }
+  function addTemplate() {
+    const newTpl = { id: "tpl-" + Date.now(), title: "새 양식", content: "" };
+    saveTemplates([...templates, newTpl]);
+  }
+  function deleteTemplate(id: string) {
+    if (!confirm("이 양식을 삭제하시겠습니까?")) return;
+    saveTemplates(templates.filter(t => t.id !== id));
   }
   const [dragTplId, setDragTplId] = useState<string | null>(null);
   const [dragOverTplId, setDragOverTplId] = useState<string | null>(null);
@@ -962,10 +971,14 @@ export default function SalesTab({ userName, onCreated, isAdmin = false }: Sales
 
       {/* ===== STEP 3 · 안내 양식 ===== */}
       {step === 3 && (
-        <div className="p-4 space-y-3">
-          <div className="text-xs font-bold text-green-700 mb-2">
-            안내 양식 모음
-            {isAdmin ? " · 화살표/드래그로 순서 변경, 제목·내용 수정 가능" : " (관리자만 수정 가능)"}
+        <div className="p-3 space-y-1.5">
+          <div className="flex items-center justify-between mb-1">
+            <div className="text-[11px] font-bold text-green-700">
+              안내 양식 모음{(isAdmin || canEditTemplates) ? "" : " (관리자만 수정 가능)"}
+            </div>
+            {canEditTemplates && (
+              <button onClick={addTemplate} className="text-[11px] font-bold px-2 py-1 bg-green-700 text-white rounded-lg active:bg-green-800">+ 양식 추가</button>
+            )}
           </div>
           {templates.map((tpl, i) => (
             <TemplateCard
@@ -976,12 +989,14 @@ export default function SalesTab({ userName, onCreated, isAdmin = false }: Sales
               onCopy={(text) => handleCopy(text, `tpl${i}`)}
               copied={copied.has(`tpl${i}`)}
               isAdmin={isAdmin}
+              canEdit={canEditTemplates}
               canMoveUp={i > 0}
               canMoveDown={i < templates.length - 1}
               onMoveUp={() => moveTemplate(i, -1)}
               onMoveDown={() => moveTemplate(i, 1)}
               onChangeTitle={(v) => updateTemplateField(tpl.id, "title", v)}
               onChangeContent={(v) => updateTemplateField(tpl.id, "content", v)}
+              onDelete={() => deleteTemplate(tpl.id)}
               isDragging={dragTplId === tpl.id}
               isDragOver={dragOverTplId === tpl.id && dragTplId !== tpl.id}
               onDragStart={() => setDragTplId(tpl.id)}
@@ -1023,14 +1038,15 @@ const DEFAULT_TEMPLATES = [
 
 // ===== 안내 양식 카드 =====
 function TemplateCard({
-  id, title, content, onCopy, copied, isAdmin,
+  id, title, content, onCopy, copied, isAdmin, canEdit,
   canMoveUp, canMoveDown, onMoveUp, onMoveDown,
-  onChangeTitle, onChangeContent,
+  onChangeTitle, onChangeContent, onDelete,
   isDragging, isDragOver, onDragStart, onDragEnd, onDragOver, onDrop,
 }: {
-  id: string; title: string; content: string; onCopy: (text: string) => void; copied: boolean; isAdmin: boolean;
+  id: string; title: string; content: string; onCopy: (text: string) => void; copied: boolean;
+  isAdmin: boolean; canEdit?: boolean;
   canMoveUp?: boolean; canMoveDown?: boolean; onMoveUp?: () => void; onMoveDown?: () => void;
-  onChangeTitle?: (v: string) => void; onChangeContent?: (v: string) => void;
+  onChangeTitle?: (v: string) => void; onChangeContent?: (v: string) => void; onDelete?: () => void;
   isDragging?: boolean; isDragOver?: boolean;
   onDragStart?: () => void; onDragEnd?: () => void; onDragOver?: () => void; onDrop?: () => void;
 }) {
@@ -1045,41 +1061,41 @@ function TemplateCard({
       onDragOver={(e) => { e.preventDefault(); onDragOver?.(); }}
       onDrop={(e) => { e.preventDefault(); onDrop?.(); }}
     >
-      <div className="w-full px-3 py-1.5 flex items-center gap-2">
-        {isAdmin && (
-          <>
-            <div
-              draggable
-              onDragStart={() => onDragStart?.()}
-              onDragEnd={() => onDragEnd?.()}
-              onTouchStart={() => onDragStart?.()}
-              onTouchMove={(e) => {
-                const touch = e.touches[0];
-                const els = document.elementsFromPoint(touch.clientX, touch.clientY);
-                for (const el of els) {
-                  const card = (el as HTMLElement).closest("[data-tplid]");
-                  if (card) {
-                    const overId = card.getAttribute("data-tplid");
-                    if (overId && overId !== id) onDragOver?.();
-                    break;
-                  }
+      <div className="w-full px-2 py-1 flex items-center gap-1.5">
+        {(isAdmin || canEdit) && (
+          <div
+            draggable
+            onDragStart={() => onDragStart?.()}
+            onDragEnd={() => onDragEnd?.()}
+            onTouchStart={() => onDragStart?.()}
+            onTouchMove={(e) => {
+              const touch = e.touches[0];
+              const els = document.elementsFromPoint(touch.clientX, touch.clientY);
+              for (const el of els) {
+                const card = (el as HTMLElement).closest("[data-tplid]");
+                if (card) {
+                  const overId = card.getAttribute("data-tplid");
+                  if (overId && overId !== id) onDragOver?.();
+                  break;
                 }
-              }}
-              onTouchEnd={() => onDrop?.()}
-              className="flex items-center justify-center w-5 h-6 cursor-grab active:cursor-grabbing shrink-0 touch-none"
-              title="드래그로 순서 이동"
-            >
-              <svg className="w-3.5 h-4 text-gray-300" viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="6" r="1.5"/><circle cx="15" cy="6" r="1.5"/><circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="9" cy="18" r="1.5"/><circle cx="15" cy="18" r="1.5"/></svg>
-            </div>
-            <div className="flex flex-col gap-0 shrink-0 -my-0.5">
-              <button disabled={!canMoveUp} onClick={() => onMoveUp?.()} className="p-0 rounded active:bg-gray-200 disabled:opacity-20 leading-none">
-                <svg className="w-3 h-3 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" /></svg>
-              </button>
-              <button disabled={!canMoveDown} onClick={() => onMoveDown?.()} className="p-0 rounded active:bg-gray-200 disabled:opacity-20 leading-none">
-                <svg className="w-3 h-3 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
-              </button>
-            </div>
-          </>
+              }
+            }}
+            onTouchEnd={() => onDrop?.()}
+            className="flex items-center justify-center w-4 h-5 cursor-grab active:cursor-grabbing shrink-0 touch-none"
+            title="드래그로 순서 이동"
+          >
+            <svg className="w-3 h-3.5 text-gray-300" viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="6" r="1.5"/><circle cx="15" cy="6" r="1.5"/><circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="9" cy="18" r="1.5"/><circle cx="15" cy="18" r="1.5"/></svg>
+          </div>
+        )}
+        {(isAdmin || canEdit) && (
+          <div className="flex flex-col gap-0 shrink-0">
+            <button disabled={!canMoveUp} onClick={() => onMoveUp?.()} className="p-0 rounded active:bg-gray-200 disabled:opacity-20 leading-none">
+              <svg className="w-2.5 h-2.5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 15l7-7 7 7" /></svg>
+            </button>
+            <button disabled={!canMoveDown} onClick={() => onMoveDown?.()} className="p-0 rounded active:bg-gray-200 disabled:opacity-20 leading-none">
+              <svg className="w-2.5 h-2.5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" /></svg>
+            </button>
+          </div>
         )}
         {isAdmin && editingTitle ? (
           <input
@@ -1088,24 +1104,29 @@ function TemplateCard({
             onChange={(e) => setTitleDraft(e.target.value)}
             onBlur={() => { if (titleDraft.trim() && titleDraft !== title) onChangeTitle?.(titleDraft.trim()); setEditingTitle(false); }}
             onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); if (e.key === "Escape") { setTitleDraft(title); setEditingTitle(false); } }}
-            className="flex-1 text-sm font-medium text-gray-800 border-b-2 border-green-400 outline-none bg-transparent px-1 py-0.5"
+            className="flex-1 text-[12px] font-medium text-gray-800 border-b-2 border-green-400 outline-none bg-transparent px-1 py-0"
           />
         ) : (
           <button
             onClick={() => setOpen(!open)}
             onDoubleClick={() => { if (isAdmin) { setTitleDraft(title); setEditingTitle(true); } }}
-            className="flex-1 flex items-center justify-between text-left active:bg-gray-50 rounded px-1"
+            className="flex-1 flex items-center justify-between text-left active:bg-gray-50 rounded px-1 py-0.5"
             title={isAdmin ? "더블클릭하여 제목 수정" : ""}
           >
-            <span className="text-sm font-medium text-gray-800">{title}</span>
-            <svg className={`w-4 h-4 text-gray-400 transition-transform ${open ? "rotate-90" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <span className="text-[12px] font-medium text-gray-800 truncate">{title}</span>
+            <svg className={`w-3 h-3 text-gray-400 transition-transform shrink-0 ${open ? "rotate-90" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
             </svg>
           </button>
         )}
+        {canEdit && (
+          <button onClick={() => onDelete?.()} className="p-1 text-gray-300 active:text-red-500 shrink-0" title="삭제">
+            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+          </button>
+        )}
       </div>
       {open && (
-        <div className="px-3 pb-3 border-t border-gray-100">
+        <div className="px-3 pb-2.5 border-t border-gray-100">
           <textarea
             value={content}
             readOnly={!isAdmin}
@@ -1114,7 +1135,7 @@ function TemplateCard({
             style={{ fontSize: "12px" }}
             className={`w-full mt-2 text-gray-700 leading-relaxed rounded-lg p-2 outline-none resize-y ${isAdmin ? "bg-white border border-gray-200 focus:border-green-500" : "bg-gray-50"}`}
           />
-          <button onClick={() => onCopy(content)} className="mt-2 w-full py-2 bg-green-700 text-white rounded-lg text-xs font-bold active:bg-green-800">
+          <button onClick={() => onCopy(content)} className="mt-1.5 w-full py-1.5 bg-green-700 text-white rounded-lg text-xs font-bold active:bg-green-800">
             {copied ? "복사됨!" : "복사"}
           </button>
         </div>
