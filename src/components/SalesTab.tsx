@@ -244,6 +244,7 @@ export default function SalesTab({ userName, onCreated }: SalesTabProps) {
 
   const [parsing, setParsing] = useState(false);
   const [parseDone, setParseDone] = useState(false);
+  const [parseError, setParseError] = useState("");
   const parsedResultRef = useRef<HTMLDivElement>(null);
 
   // 양식(6)서비스 종류·7)평수·► 항목) 에서 서비스/평수 추출
@@ -279,17 +280,28 @@ export default function SalesTab({ userName, onCreated }: SalesTabProps) {
 
   // AI 파싱 - Claude API 우선, 실패시 regex fallback
   async function parseCustomer() {
+    if (!customerText.trim()) {
+      setParseError("고객 답장을 먼저 붙여넣어 주세요");
+      setTimeout(() => setParseError(""), 3000);
+      return;
+    }
     setParsing(true);
     setParseDone(false);
-    // 양식 영역에서 서비스/평수 항상 추출 (AI 결과와 병합)
+    setParseError("");
     const formData = extractFormData(customerText);
     const confirmServices = activeConfirm.services.length > 0 ? activeConfirm.services : formData.services;
 
-    const finish = () => {
+    const finishSuccess = () => {
       setParsing(false);
       setParseDone(true);
       setTimeout(() => parsedResultRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 100);
       setTimeout(() => setParseDone(false), 2500);
+    };
+    const finishError = (msg: string) => {
+      setParsing(false);
+      setParseDone(false);
+      setParseError(msg);
+      setTimeout(() => setParseError(""), 4000);
     };
 
     // 1차: Claude API 시도
@@ -301,6 +313,11 @@ export default function SalesTab({ userName, onCreated }: SalesTabProps) {
       });
       const data = await res.json();
       if (data.success) {
+        const hasInfo = !!(data.name || data.phone || data.addr || data.date);
+        if (!hasInfo) {
+          finishError("❌ 파싱 실패 - 이름/주소/연락처/날짜 중 아무것도 찾지 못했습니다");
+          return;
+        }
         updateConfirm({
           parsedName: data.name || "",
           parsedPhone: data.phone || "",
@@ -312,17 +329,21 @@ export default function SalesTab({ userName, onCreated }: SalesTabProps) {
           schedules: confirmServices.map((s) => ({ service: s.name, date: "", time: "선택" })),
         });
         generateConfirmMsg(data.name, data.addr, data.phone, data.date, data.note, confirmServices, formData.pyeong);
-        finish();
+        finishSuccess();
         return;
       }
     } catch {}
 
     // 2차: regex fallback
-    regexParse();
-    finish();
+    const ok = regexParse();
+    if (!ok) {
+      finishError("❌ 파싱 실패 - 고객 답장에서 정보를 찾지 못했습니다. 형식을 확인해주세요");
+    } else {
+      finishSuccess();
+    }
   }
 
-  function regexParse() {
+  function regexParse(): boolean {
     const t = customerText;
     const lines = t.split("\n").map((l) => l.trim()).filter(Boolean);
 
@@ -395,6 +416,9 @@ export default function SalesTab({ userName, onCreated }: SalesTabProps) {
       else if (c.type === "note" && !note) note = c.value;
     }
 
+    const hasInfo = !!(name || phone || addr || wish);
+    if (!hasInfo) return false;
+
     updateConfirm({
       parsedName: name,
       parsedPhone: phone,
@@ -408,6 +432,7 @@ export default function SalesTab({ userName, onCreated }: SalesTabProps) {
 
     // 확정 메시지 생성
     generateConfirmMsg(name, addr, phone, wish, note, svcList, pyeongToUse);
+    return true;
   }
 
   function generateConfirmMsg(name?: string, addr?: string, phone?: string, _wish?: string, note?: string, overrideServices?: ServiceEntry[], overridePyeong?: string) {
@@ -726,23 +751,6 @@ export default function SalesTab({ userName, onCreated }: SalesTabProps) {
         </div>
         <div className="p-3 flex flex-col md:flex-row md:gap-6">
         <div className="space-y-3 md:flex-1">
-          {/* 예약 보관함 */}
-          <SavedBookings onLoad={(data) => {
-            // 현재 활성 확정 세션에 불러오기
-            updateConfirm({
-              services: data.services || activeConfirm.services,
-              parsedName: data.parsedName || activeConfirm.parsedName,
-              parsedPhone: data.parsedPhone || activeConfirm.parsedPhone,
-              parsedAddr: data.parsedAddr || activeConfirm.parsedAddr,
-              parsedWishDate: data.parsedWishDate || activeConfirm.parsedWishDate,
-              parsedPyeong: data.pyeong || activeConfirm.parsedPyeong,
-              confirmMsg: data.confirmMsg || activeConfirm.confirmMsg,
-              customerText: data.customerText || activeConfirm.customerText,
-            });
-          }} onSave={() => ({
-            services: activeConfirm.services, parsedName, parsedPhone, parsedAddr, parsedWishDate, confirmMsg, userName, customerText, pyeong: parsedPyeong,
-          })} />
-
           {/* 고객 답장 붙여넣기 */}
           <div>
             <label className="text-xs font-bold text-green-700 mb-1 block">고객 답장 붙여넣기</label>
@@ -751,9 +759,14 @@ export default function SalesTab({ userName, onCreated }: SalesTabProps) {
               style={{ fontSize: "12px" }} className="w-full px-3 py-2.5 border border-gray-200 rounded-lg outline-none focus:border-green-500 resize-y min-h-[300px]" />
             <button onClick={parseCustomer} disabled={parsing}
               className="mt-2 w-full py-3.5 rounded-xl text-sm font-bold text-white disabled:opacity-70 transition-colors"
-              style={{ background: parseDone ? "#00a35e" : "#1c1c1e" }}>
-              {parsing ? "🔄 AI 파싱 처리중..." : parseDone ? "✅ 자동파싱 완료!" : "🤖 AI 자동 파싱"}
+              style={{ background: parseError ? "#dc2626" : parseDone ? "#00a35e" : "#1c1c1e" }}>
+              {parsing ? "🔄 AI 파싱 처리중..." : parseError ? "❌ 파싱 실패" : parseDone ? "✅ 자동파싱 완료!" : "🤖 AI 자동 파싱"}
             </button>
+            {parseError && (
+              <div className="mt-2 p-2.5 bg-red-50 border border-red-200 rounded-lg text-xs text-red-600 font-medium">
+                {parseError}
+              </div>
+            )}
           </div>
 
           {/* 파싱 결과 */}
