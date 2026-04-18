@@ -166,15 +166,19 @@ export default function Home() {
           const uRole = currentUser?.role || "";
           const deleted = deletedNotifIdsRef.current;
           const isReturn = (n: Notification) => n.type === "schedule_returned" || n.title === "일정 반환";
-          const isAdminRole = uRole === "ceo" || uRole === "admin" || uRole === "scheduler" || uRole === "sales";
+          const isAdminOrScheduler = uRole === "ceo" || uRole === "admin" || uRole === "scheduler";
           const myNotifs = allNotifs.filter(n => {
             if (deleted.has(n.id)) return false;
+            if (uRole === "sales") return false; // 영업: 모든 알림 제외
             if (n.type === "system_notice") return true;
             if (isReturn(n)) {
-              if (isAdminRole) return true;
+              if (isAdminOrScheduler) return true;
               if (uName && n.message.startsWith(`${uName}님이`)) return true;
               return false;
             }
+            if (n.type === "happy_call_reminder") return isAdminOrScheduler;
+            if (isAdminOrScheduler) return true; // 관리자는 모든 알림 수신
+            // 현장팀: 본인 일정 관련만
             return uName && (n.message.includes(uName) || n.title.includes(uName));
           });
           setNotifications(myNotifs);
@@ -360,17 +364,19 @@ export default function Home() {
         const allNotifs = notif.notifications as Notification[];
         const deleted = deletedNotifIdsRef.current;
         const isReturn = (n: Notification) => n.type === "schedule_returned" || n.title === "일정 반환";
-        const isAdminRole = uRole === "ceo" || uRole === "admin" || uRole === "scheduler" || uRole === "sales";
-        const isHappyCallAdmin = uRole === "ceo" || uRole === "admin" || uRole === "scheduler";
+        const isAdminOrScheduler = uRole === "ceo" || uRole === "admin" || uRole === "scheduler";
         const myNotifs = allNotifs.filter(n => {
           if (deleted.has(n.id)) return false;
+          if (uRole === "sales") return false; // 영업: 모든 알림 제외
           if (n.type === "system_notice") return true;
           if (isReturn(n)) {
-            if (isAdminRole) return true;
+            if (isAdminOrScheduler) return true;
             if (uName && n.message.startsWith(`${uName}님이`)) return true;
             return false;
           }
-          if (n.type === "happy_call_reminder") return isHappyCallAdmin;
+          if (n.type === "happy_call_reminder") return isAdminOrScheduler;
+          if (isAdminOrScheduler) return true; // 관리자는 모든 알림 수신
+          // 현장팀: 본인 일정 관련만
           return uName && (n.message.includes(uName) || n.title.includes(uName));
         });
         setNotifications(myNotifs);

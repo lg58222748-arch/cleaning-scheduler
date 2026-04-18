@@ -56,8 +56,8 @@ export async function POST(req: NextRequest) {
     const schedule = await assignSchedule(body.scheduleId, body.memberId, body.memberName);
     if (!schedule) return Response.json({ error: "Not found" }, { status: 404 });
     const msg = `"${schedule.title}" 일정이 ${schedule.memberName}님에게 배정되었습니다.`;
-    // 배정받은 본인에게만 푸시
-    await addNotification("schedule_created", "일정 배정", msg, schedule.id, [schedule.memberName]);
+    // 배정받은 본인 + 관리자(ceo/admin/scheduler)
+    await addNotification("schedule_created", "일정 배정", msg, schedule.id, [schedule.memberName], ["ceo", "admin", "scheduler"]);
     return Response.json(schedule);
   }
 
@@ -67,8 +67,8 @@ export async function POST(req: NextRequest) {
     const who = body.returnedBy || "";
     const reason = body.reason || "";
     const msg = `${who ? who + "님이 " : ""}"${schedule.title}" 일정을 반환했습니다.${reason ? " 사유: " + reason : ""}`;
-    // 관리자 전원 + 반환 실행자 본인 (현장팀이 본인 반환 시 확인 알림 수신)
-    await addNotification("schedule_returned", "일정 반환", msg, schedule.id, who ? [who] : undefined, ["ceo", "admin", "scheduler", "sales"]);
+    // 관리자(ceo/admin/scheduler) + 반환 실행자 본인. 영업팀 제외.
+    await addNotification("schedule_returned", "일정 반환", msg, schedule.id, who ? [who] : undefined, ["ceo", "admin", "scheduler"]);
     return Response.json(schedule);
   }
 
@@ -106,7 +106,8 @@ export async function POST(req: NextRequest) {
     "새 일정 등록",
     `${schedule.date} ${schedule.startTime} "${schedule.title}" 일정이 ${schedule.memberName}님에게 배정되었습니다.`,
     schedule.id,
-    schedule.memberName && schedule.memberName !== "미배정" ? [schedule.memberName] : undefined
+    schedule.memberName && schedule.memberName !== "미배정" ? [schedule.memberName] : undefined,
+    ["ceo", "admin", "scheduler"]
   );
 
   return Response.json(schedule, { status: 201 });

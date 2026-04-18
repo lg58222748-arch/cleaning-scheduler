@@ -23,7 +23,8 @@ export async function PUT(
     "일정 변경",
     `${schedule.date} ${schedule.startTime} "${schedule.title}" 일정이 변경되었습니다.${before?.memberName !== schedule.memberName ? ` (${before?.memberName} → ${schedule.memberName})` : ""}`,
     schedule.id,
-    targets.size > 0 ? Array.from(targets) : undefined
+    targets.size > 0 ? Array.from(targets) : undefined,
+    ["ceo", "admin", "scheduler"]
   );
 
   return Response.json(schedule);
@@ -46,7 +47,8 @@ export async function DELETE(
       "일정 취소",
       `${schedule.date} ${schedule.startTime} "${schedule.title}" 일정이 취소되었습니다. (담당: ${schedule.memberName})`,
       id,
-      schedule.memberName && schedule.memberName !== "미배정" ? [schedule.memberName] : undefined
+      schedule.memberName && schedule.memberName !== "미배정" ? [schedule.memberName] : undefined,
+      ["ceo", "admin", "scheduler"]
     );
   }
 
