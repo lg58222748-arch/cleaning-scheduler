@@ -244,25 +244,30 @@ export async function getUnreadCount(): Promise<number> {
 
 export async function addNotification(type: NotificationType, title: string, message: string, scheduleId?: string, targetNames?: string[], targetRoles?: string[]): Promise<Notification> {
   const { data } = await supabase.from("notifications").insert({ type, title, message, schedule_id: scheduleId, read: false }).select().single();
-  // 푸시 알림 - roles + names 둘 다 발송. 서버리스 환경에서 끊기지 않도록 반드시 await.
+  // 푸시 알림 - role/name 타겟을 user_id 로 합쳐 중복 제거 후 1회만 발송
+  // (FCM tag 가 같으면 2번째 푸시는 소리 없이 덮어쓰기 → 이중 발송 시 안 울리던 버그 차단)
   try {
-    const promises: Promise<unknown>[] = [];
+    const userIds = new Set<string>();
     if (targetRoles && targetRoles.length > 0) {
-      const { sendPushToRoles } = await import("./push");
-      promises.push(sendPushToRoles(targetRoles, title, message, type).catch((e) => { console.error("[Push] roles 실패:", e); }));
+      const { data: u } = await supabase.from("users").select("id").in("role", targetRoles).eq("status", "approved");
+      (u || []).forEach(r => userIds.add(String(r.id)));
     }
     if (targetNames && targetNames.length > 0) {
-      const { sendPushToNames } = await import("./push");
-      promises.push(sendPushToNames(targetNames, title, message, type).catch((e) => { console.error("[Push] names 실패:", e); }));
+      const clean = targetNames.filter(n => n && n.trim() && n !== "미배정").map(n => n.trim());
+      if (clean.length > 0) {
+        const { data: u } = await supabase.from("users").select("id").eq("status", "approved").in("name", clean);
+        (u || []).forEach(r => userIds.add(String(r.id)));
+      }
     }
-    if (promises.length === 0) {
+    if (userIds.size > 0) {
+      const { sendPushToUsers } = await import("./push");
+      await sendPushToUsers(Array.from(userIds), title, message, type);
+    } else if (!targetRoles?.length && !targetNames?.length) {
+      // 타겟 미지정 시 레거시 메시지 매칭
       const { sendPushToMentioned } = await import("./push");
-      promises.push(sendPushToMentioned(title, message, type).catch((e) => { console.error("[Push] mentioned 실패:", e); }));
+      await sendPushToMentioned(title, message, type);
     }
-    // Vercel serverless 가 handler 리턴 후 pending promise 를 끊어서
-    // assign 은 되고 return 은 안 되는 현상 발생 → 반드시 대기
-    await Promise.all(promises);
-  } catch (e) { console.error("[Push] 모듈 로드 실패:", e); }
+  } catch (e) { console.error("[Push] 발송 실패:", e); }
   return rowToNotification(data!);
 }
 

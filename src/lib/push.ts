@@ -127,6 +127,16 @@ export async function sendPushToAll(title: string, message: string, tag?: string
   await sendToSubs(subs, title, message, tag);
 }
 
+// 유저 ID 기반 발송 - addNotification 에서 role/name 타겟을 병합 후 호출
+export async function sendPushToUsers(userIds: string[], title: string, message: string, tag?: string) {
+  init();
+  const unique = Array.from(new Set(userIds.filter(Boolean)));
+  if (unique.length === 0) return;
+  const { data: subs } = await supabase.from("push_subscriptions").select("*").in("user_id", unique);
+  if (!subs || subs.length === 0) return;
+  await sendToSubs(subs, title, message, tag);
+}
+
 // 특정 사용자 이름들에게만 푸시 전송 (정확한 이름 매칭)
 export async function sendPushToNames(names: string[], title: string, message: string, tag?: string) {
   init();
