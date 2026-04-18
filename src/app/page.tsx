@@ -18,7 +18,6 @@ const AssignTab = dynamic(() => import("@/components/AssignTab"), { ssr: false }
 const SearchPanel = dynamic(() => import("@/components/SearchPanel"), { ssr: false });
 const ManageTab = dynamic(() => import("@/components/ManageTab"), { ssr: false });
 const SalesTab = dynamic(() => import("@/components/SalesTab"), { ssr: false });
-const NoticeTab = dynamic(() => import("@/components/NoticeTab"), { ssr: false });
 const BranchMapSection = dynamic(() => import("@/components/ManageTab").then(m => ({ default: m.BranchMap })), { ssr: false });
 import { sbClient } from "@/lib/supabase-client";
 import {
@@ -51,7 +50,7 @@ import {
 import { format, startOfMonth, endOfMonth, addMonths, subMonths } from "date-fns";
 import { ko } from "date-fns/locale";
 
-type TabMode = "calendar" | "manage" | "assign" | "members" | "sales" | "area" | "notice";
+type TabMode = "calendar" | "manage" | "assign" | "members" | "sales" | "area";
 
 export default function Home() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -119,14 +118,10 @@ export default function Home() {
   const [showDayPopup, setShowDayPopup] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
   const [showMemberFilter, setShowMemberFilter] = useState(false);
-  const [selectedMemberIds, setSelectedMemberIds] = useState<Set<string>>(() => {
-    if (typeof window === "undefined") return new Set<string>();
-    try { const saved = localStorage.getItem("filter_members"); return saved ? new Set(JSON.parse(saved)) : new Set<string>(); } catch { return new Set<string>(); }
-  });
-  const [filterActive, setFilterActive] = useState(() => {
-    if (typeof window === "undefined") return false;
-    return localStorage.getItem("filter_active") === "true";
-  });
+  // 필터 상태는 사용자별 분리 (localStorage 키에 username 포함) - 로그인 후 로드
+  const [selectedMemberIds, setSelectedMemberIds] = useState<Set<string>>(new Set<string>());
+  const [filterActive, setFilterActive] = useState(false);
+  const filterLoadedRef = useRef(false);
   const [returnAlerts, setReturnAlerts] = useState<{ id: string; title: string; date: string; reason: string }[]>([]);
 
   const loadData = useCallback(async (monthDate?: Date, fullRefresh = false) => {
@@ -172,11 +167,36 @@ export default function Home() {
     }
   }, [selectedDate]);
 
-  // 필터 상태 자동 저장
+  // 필터 상태: 로그인한 사용자별로 localStorage 분리
   useEffect(() => {
-    localStorage.setItem("filter_members", JSON.stringify([...selectedMemberIds]));
-    localStorage.setItem("filter_active", String(filterActive));
-  }, [selectedMemberIds, filterActive]);
+    if (!currentUser) return;
+    const key = `filter_v2_${currentUser.username}`;
+    try {
+      const saved = localStorage.getItem(key);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        setSelectedMemberIds(new Set(parsed.members || []));
+        setFilterActive(Boolean(parsed.active));
+      } else {
+        setSelectedMemberIds(new Set<string>());
+        setFilterActive(false);
+      }
+    } catch {
+      setSelectedMemberIds(new Set<string>());
+      setFilterActive(false);
+    }
+    filterLoadedRef.current = true;
+  }, [currentUser?.username]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // 필터 변경 시 사용자별 키로 저장 (초기 로드 전엔 저장 안 함)
+  useEffect(() => {
+    if (!currentUser || !filterLoadedRef.current) return;
+    const key = `filter_v2_${currentUser.username}`;
+    localStorage.setItem(key, JSON.stringify({
+      members: [...selectedMemberIds],
+      active: filterActive,
+    }));
+  }, [selectedMemberIds, filterActive, currentUser]);
 
   // 초기 로딩: 백그라운드로 최신 데이터 갱신 (캐시는 이미 위에서 복원됨)
   useEffect(() => {
@@ -720,19 +740,14 @@ export default function Home() {
     return [];
   })();
   // 팀원 필터 적용 (현장팀/영업팀은 이미 자기 일정만 보이므로 필터 무시)
+  // 순수 필터: 선택된 팀원의 일정만, 선택 없으면 빈 목록
   const calendarSchedules = (() => {
     if (!filterActive || role === "field" || role === "sales") return baseCalendarSchedules;
     const filterNames = new Set<string>();
     allUsers.filter(u => u.role === "field").forEach(u => {
       if (selectedMemberIds.has(u.id)) filterNames.add(u.name);
     });
-    // 본인이 만든/담당한 일정은 필터와 상관없이 항상 표시
-    const myName = currentUser.name;
-    const myId = currentUser.id;
     return baseCalendarSchedules.filter((s) =>
-      s.memberName === myName ||
-      s.assignedToName === myName ||
-      s.assignedTo === myId ||
       selectedMemberIds.has(s.assignedTo || "") ||
       selectedMemberIds.has(s.memberId) ||
       filterNames.has(s.assignedToName || "") ||
@@ -1230,13 +1245,6 @@ export default function Home() {
             <SalesTab userName={currentUser.name} onCreated={() => loadData(undefined, true)} isAdmin={canManageAdvanced} canEditTemplates={canSales} />
           </div>
         )}
-
-        {/* Notice tab - 대표/admin 전용 공지 발송 */}
-        {canManageAdvanced && (
-          <div className="h-full" style={{ display: activeTab === "notice" ? "block" : "none" }}>
-            <NoticeTab />
-          </div>
-        )}
       </main>
 
 
@@ -1312,21 +1320,6 @@ export default function Home() {
             </svg>
             <span className="text-[10px] font-medium">활동범위</span>
           </button>
-
-          {/* 공지 - 대표/admin 전용 */}
-          {canManageAdvanced && (
-          <button
-            onClick={() => switchTab("notice")}
-            className={`flex flex-col items-center justify-center gap-0.5 w-14 h-full ${
-              activeTab === "notice" ? "text-orange-500" : "text-gray-400"
-            }`}
-          >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={activeTab === "notice" ? 2.5 : 1.5} d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z" />
-            </svg>
-            <span className="text-[10px] font-medium">공지</span>
-          </button>
-          )}
 
           {/* 관리 */}
           {canManage && (
