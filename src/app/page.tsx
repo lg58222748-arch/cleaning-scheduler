@@ -723,12 +723,17 @@ export default function Home() {
   // 팀원 필터 적용 (현장팀/영업팀은 이미 자기 일정만 보이므로 필터 무시)
   const calendarSchedules = (() => {
     if (!filterActive || role === "field" || role === "sales") return baseCalendarSchedules;
-    if (selectedMemberIds.size === 0) return [];
     const filterNames = new Set<string>();
     allUsers.filter(u => u.role === "field").forEach(u => {
       if (selectedMemberIds.has(u.id)) filterNames.add(u.name);
     });
+    // 본인이 만든/담당한 일정은 필터와 상관없이 항상 표시
+    const myName = currentUser.name;
+    const myId = currentUser.id;
     return baseCalendarSchedules.filter((s) =>
+      s.memberName === myName ||
+      s.assignedToName === myName ||
+      s.assignedTo === myId ||
       selectedMemberIds.has(s.assignedTo || "") ||
       selectedMemberIds.has(s.memberId) ||
       filterNames.has(s.assignedToName || "") ||
