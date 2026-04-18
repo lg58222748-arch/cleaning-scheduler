@@ -18,6 +18,7 @@ const TYPE_CONFIG: Record<string, { icon: string; color: string; bg: string }> =
   swap_requested: { icon: "M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4", color: "text-purple-600", bg: "bg-purple-100" },
   swap_approved: { icon: "M5 13l4 4L19 7", color: "text-green-600", bg: "bg-green-100" },
   swap_rejected: { icon: "M6 18L18 6M6 6l12 12", color: "text-red-600", bg: "bg-red-100" },
+  system_notice: { icon: "M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z", color: "text-orange-600", bg: "bg-orange-100" },
 };
 
 function timeAgo(dateStr: string): string {

@@ -6,9 +6,16 @@ import {
   markAllNotificationsRead,
   deleteAllNotifications,
   checkHappyCallReminders,
+  createSystemNotice,
+  getSystemNotices,
+  deleteSystemNotice,
 } from "@/lib/store";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const { searchParams } = new URL(req.url);
+  if (searchParams.get("notices") === "true") {
+    return Response.json({ notices: await getSystemNotices() });
+  }
   await checkHappyCallReminders();
 
   return Response.json({
@@ -33,6 +40,16 @@ export async function POST(req: NextRequest) {
   if (body.action === "clearAll") {
     const count = await deleteAllNotifications();
     return Response.json({ success: true, deleted: count });
+  }
+
+  if (body.action === "systemNotice" && body.title && body.message) {
+    const notice = await createSystemNotice(String(body.title), String(body.message));
+    return Response.json(notice, { status: 201 });
+  }
+
+  if (body.action === "deleteNotice" && body.id) {
+    const ok = await deleteSystemNotice(String(body.id));
+    return Response.json({ success: ok });
   }
 
   return Response.json({ error: "Invalid action" }, { status: 400 });

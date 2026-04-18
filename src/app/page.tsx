@@ -18,6 +18,7 @@ const AssignTab = dynamic(() => import("@/components/AssignTab"), { ssr: false }
 const SearchPanel = dynamic(() => import("@/components/SearchPanel"), { ssr: false });
 const ManageTab = dynamic(() => import("@/components/ManageTab"), { ssr: false });
 const SalesTab = dynamic(() => import("@/components/SalesTab"), { ssr: false });
+const NoticeTab = dynamic(() => import("@/components/NoticeTab"), { ssr: false });
 const BranchMapSection = dynamic(() => import("@/components/ManageTab").then(m => ({ default: m.BranchMap })), { ssr: false });
 import { sbClient } from "@/lib/supabase-client";
 import {
@@ -50,7 +51,7 @@ import {
 import { format, startOfMonth, endOfMonth, addMonths, subMonths } from "date-fns";
 import { ko } from "date-fns/locale";
 
-type TabMode = "calendar" | "manage" | "assign" | "members" | "sales" | "area";
+type TabMode = "calendar" | "manage" | "assign" | "members" | "sales" | "area" | "notice";
 
 export default function Home() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -147,12 +148,12 @@ export default function Home() {
         setSchedules(rangeScheds);
         setUnassignedSchedules(unassignedScheds);
         setSwapRequests(sw);
-        // 알림: 역할 무관 본인 이름 포함된 것만 표시
+        // 알림: 본인 이름 포함된 것만 표시 + 전체 공지(system_notice)는 모두에게
         const allNotifs = notif.notifications as Notification[];
         const uName = currentUser?.name || "";
-        const myNotifs = uName
-          ? allNotifs.filter(n => n.message.includes(uName) || n.title.includes(uName))
-          : [];
+        const myNotifs = allNotifs.filter(n =>
+          n.type === "system_notice" || (uName && (n.message.includes(uName) || n.title.includes(uName)))
+        );
         setNotifications(myNotifs);
         setUnreadCount(myNotifs.filter(n => !n.read).length);
         setAllUsers(usersData.users);
@@ -247,9 +248,9 @@ export default function Home() {
     function reloadNotifications() {
       fetchNotifications().then(notif => {
         const allNotifs = notif.notifications as Notification[];
-        const myNotifs = uName
-          ? allNotifs.filter(n => n.message.includes(uName) || n.title.includes(uName))
-          : [];
+        const myNotifs = allNotifs.filter(n =>
+          n.type === "system_notice" || (uName && (n.message.includes(uName) || n.title.includes(uName)))
+        );
         setNotifications(myNotifs);
         setUnreadCount(myNotifs.filter(n => !n.read).length);
       }).catch(() => {});
@@ -1229,6 +1230,13 @@ export default function Home() {
             <SalesTab userName={currentUser.name} onCreated={() => loadData(undefined, true)} isAdmin={canManageAdvanced} canEditTemplates={canSales} />
           </div>
         )}
+
+        {/* Notice tab - 대표/admin 전용 공지 발송 */}
+        {canManageAdvanced && (
+          <div className="h-full" style={{ display: activeTab === "notice" ? "block" : "none" }}>
+            <NoticeTab />
+          </div>
+        )}
       </main>
 
 
@@ -1304,6 +1312,21 @@ export default function Home() {
             </svg>
             <span className="text-[10px] font-medium">활동범위</span>
           </button>
+
+          {/* 공지 - 대표/admin 전용 */}
+          {canManageAdvanced && (
+          <button
+            onClick={() => switchTab("notice")}
+            className={`flex flex-col items-center justify-center gap-0.5 w-14 h-full ${
+              activeTab === "notice" ? "text-orange-500" : "text-gray-400"
+            }`}
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={activeTab === "notice" ? 2.5 : 1.5} d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z" />
+            </svg>
+            <span className="text-[10px] font-medium">공지</span>
+          </button>
+          )}
 
           {/* 관리 */}
           {canManage && (

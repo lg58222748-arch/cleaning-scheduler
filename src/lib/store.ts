@@ -277,6 +277,26 @@ export async function deleteAllNotifications(): Promise<number> {
   return count;
 }
 
+// 전체 공지 (대표/admin 전용): 모든 사용자에게 in-app 알림 + 푸시 전송
+export async function createSystemNotice(title: string, message: string): Promise<Notification> {
+  const { data } = await supabase.from("notifications").insert({ type: "system_notice", title, message, read: false }).select().single();
+  try {
+    const { sendPushToAll } = await import("./push");
+    sendPushToAll(title, message, "system_notice").catch(() => {});
+  } catch { /* push 모듈 로드 실패 무시 */ }
+  return rowToNotification(data!);
+}
+
+export async function getSystemNotices(): Promise<Notification[]> {
+  const { data } = await supabase.from("notifications").select("*").eq("type", "system_notice").order("created_at", { ascending: false }).limit(50);
+  return (data || []).map(rowToNotification);
+}
+
+export async function deleteSystemNotice(id: string): Promise<boolean> {
+  const { error } = await supabase.from("notifications").delete().eq("id", id).eq("type", "system_notice");
+  return !error;
+}
+
 export async function checkHappyCallReminders(): Promise<Notification[]> {
   const tomorrow = new Date();
   tomorrow.setDate(tomorrow.getDate() + 1);

@@ -42,7 +42,8 @@ export type NotificationType =
   | "happy_call_reminder"
   | "swap_requested"
   | "swap_approved"
-  | "swap_rejected";
+  | "swap_rejected"
+  | "system_notice";
 
 export interface Notification {
   id: string;
