@@ -118,7 +118,11 @@ export default function ScheduleList({
                         </svg>
                       </button>
                       <button
-                        onClick={() => onDelete(s.id)}
+                        onClick={() => {
+                          if (confirm(`"${s.title}"\n\n정말 삭제하시겠습니까?\n(휴지통으로 이동되며 복원 가능합니다)`)) {
+                            onDelete(s.id);
+                          }
+                        }}
                         className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
                         title="삭제"
                       >

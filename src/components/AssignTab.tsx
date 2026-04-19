@@ -300,7 +300,15 @@ export default function AssignTab({ members, schedules, onAssigned, onDeleted, o
                     <button onClick={() => handleRestore(s.id)} className="p-1.5 active:bg-blue-50 rounded-lg" title="복원">
                       <svg className="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" /></svg>
                     </button>
-                    <button onClick={async () => { setTrashItems((prev) => prev.filter((t) => t.id !== s.id)); }} className="p-1.5 active:bg-red-50 rounded-lg" title="영구삭제">
+                    <button
+                      onClick={() => {
+                        if (confirm(`"${s.title}"\n\n정말 영구 삭제하시겠습니까?\n(복원 불가)`)) {
+                          setTrashItems((prev) => prev.filter((t) => t.id !== s.id));
+                        }
+                      }}
+                      className="p-1.5 active:bg-red-50 rounded-lg"
+                      title="영구삭제"
+                    >
                       <svg className="w-5 h-5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                     </button>
                   </div>
