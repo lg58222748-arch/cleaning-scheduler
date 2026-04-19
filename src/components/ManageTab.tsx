@@ -392,24 +392,49 @@ function CeoSection({ onRefresh, allUsers, members, schedules }: {
 
 
 /* ════════════ 현장팀 통계 섹션 ════════════ */
-function FieldStatsSection({ allUsers, schedules }: {
+function FieldStatsSection({ allUsers }: {
   allUsers: { id?: string; name: string; username?: string; role?: string; address?: string; branch?: string }[];
   schedules: Schedule[];
 }) {
-  const now = new Date();
-  const curMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-  const curMonthLabel = `${now.getFullYear()}년 ${now.getMonth() + 1}월`;
+  const [selectedMonth, setSelectedMonth] = useState(() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  });
+  const [loading, setLoading] = useState(false);
+  const [monthSchedules, setMonthSchedules] = useState<Schedule[]>([]);
 
-  // 이번달 배정된 일정 (미배정 제외)
-  const monthScheds = useMemo(
-    () => schedules.filter((s) => s.date.startsWith(curMonth) && s.status !== "unassigned"),
-    [schedules, curMonth]
+  const monthLabel = `${selectedMonth.slice(0, 4)}년 ${Number(selectedMonth.slice(5))}월`;
+
+  // 선택한 월의 일정 직접 조회 (props 의 ±1 달 한계 회피)
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const year = Number(selectedMonth.slice(0, 4));
+      const mon = Number(selectedMonth.slice(5));
+      const start = `${selectedMonth}-01`;
+      const lastDay = new Date(year, mon, 0).getDate();
+      const end = `${selectedMonth}-${String(lastDay).padStart(2, "0")}`;
+      const data = await fetchSchedules(start, end);
+      setMonthSchedules(data || []);
+    } catch {
+      setMonthSchedules([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [selectedMonth]);
+
+  useEffect(() => { load(); }, [load]);
+
+  // 달력에 있는 일정 (미배정 제외 = 배정 탭이 아닌 달력에 보이는 것)
+  const inCalendar = useMemo(
+    () => monthSchedules.filter((s) => s.status !== "unassigned"),
+    [monthSchedules]
   );
 
-  // 현장팀 팀원별 배정 건수
+  // 현장팀 팀원별 달력 건수
   const memberRows = useMemo(() => {
     const counts: Record<string, number> = {};
-    for (const s of monthScheds) {
+    for (const s of inCalendar) {
       if (!s.memberName) continue;
       counts[s.memberName] = (counts[s.memberName] || 0) + 1;
     }
@@ -420,22 +445,44 @@ function FieldStatsSection({ allUsers, schedules }: {
       count: counts[u.name] || 0,
     }));
     return rows.sort((a, b) => b.count - a.count);
-  }, [monthScheds, allUsers]);
+  }, [inCalendar, allUsers]);
 
-  const total = monthScheds.length;
+  const total = inCalendar.length;
 
   return (
     <div className="px-4 py-4 space-y-4">
-      {/* 헤더 */}
-      <div className="text-center">
-        <div className="text-xs text-gray-400">{curMonthLabel}</div>
-        <div className="text-2xl font-extrabold text-gray-800 mt-1">{total.toLocaleString("ko-KR")}건 배정</div>
+      {/* 월 선택 */}
+      <div className="flex items-center gap-2">
+        <input
+          type="month"
+          value={selectedMonth}
+          onChange={(e) => setSelectedMonth(e.target.value)}
+          className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-400"
+        />
+        <button
+          onClick={load}
+          disabled={loading}
+          className="px-3 py-2 text-xs font-bold text-blue-600 border border-blue-200 rounded-lg active:bg-blue-50 disabled:text-gray-300 disabled:border-gray-200"
+        >
+          {loading ? "..." : "새로고침"}
+        </button>
       </div>
 
-      {/* 팀원별 배정 건수 */}
+      {/* 헤더 */}
+      <div className="text-center">
+        <div className="text-xs text-gray-400">{monthLabel}</div>
+        <div className="text-2xl font-extrabold text-gray-800 mt-1">
+          {loading ? "..." : `${total.toLocaleString("ko-KR")}건`}
+        </div>
+        <div className="text-[11px] text-gray-400 mt-0.5">달력에 등록된 일정</div>
+      </div>
+
+      {/* 팀원별 건수 */}
       <div className="rounded-xl border border-gray-200 bg-white overflow-hidden">
-        <div className="px-3 py-2 border-b border-gray-100 text-xs font-bold text-gray-700">팀원별 배정 건수</div>
-        {memberRows.length === 0 ? (
+        <div className="px-3 py-2 border-b border-gray-100 text-xs font-bold text-gray-700">팀원별 건수</div>
+        {loading ? (
+          <div className="py-6 text-center text-gray-400 text-sm">불러오는 중...</div>
+        ) : memberRows.length === 0 ? (
           <div className="py-6 text-center text-gray-400 text-sm">현장팀 회원이 없습니다</div>
         ) : (
           <div className="divide-y divide-gray-100">
@@ -524,21 +571,13 @@ function SalesStatsSection({ userName, userRole, allUsers, schedules }: {
     return [{ name: userName, role: userRole }];
   }, [isCeo, allUsers, userName, userRole]);
 
-  // 각 영업사원의 미입금/입금확인 일정
+  // 각 영업사원의 미입금 일정
   const rows = useMemo(() => {
     return salesUsers
       .map((u) => {
         const mine = getUserSchedules(u.name, monthScheds);
         const unpaid = mine.filter((s) => isUnpaid(s.title));
-        const confirmed = mine.filter((s) => !isUnpaid(s.title));
-        return {
-          name: u.name,
-          role: u.role,
-          unpaidCount: unpaid.length,
-          confirmedCount: confirmed.length,
-          unpaid,
-          confirmed,
-        };
+        return { name: u.name, role: u.role, unpaidCount: unpaid.length, unpaid };
       })
       .sort((a, b) => b.unpaidCount - a.unpaidCount);
   }, [salesUsers, monthScheds, getUserSchedules]);
@@ -554,28 +593,21 @@ function SalesStatsSection({ userName, userRole, allUsers, schedules }: {
   };
 
   const totalUnpaid = rows.reduce((sum, r) => sum + r.unpaidCount, 0);
-  const totalConfirmed = rows.reduce((sum, r) => sum + r.confirmedCount, 0);
 
   return (
     <div className="px-4 py-4 space-y-3">
       {/* 헤더 */}
       <div className="text-center">
         <div className="text-xs text-gray-400">{curMonthLabel}</div>
-        <div className="mt-1 flex items-center justify-center gap-4">
-          <span className="text-base font-bold text-gray-700">
-            확인 <span className="text-green-600">{totalConfirmed}</span>
-          </span>
-          <span className="text-gray-300">·</span>
-          <span className="text-base font-bold text-gray-700">
-            미입금 <span className="text-red-500">{totalUnpaid}</span>
-          </span>
+        <div className="mt-1 text-2xl font-extrabold text-gray-800">
+          미입금 <span className="text-red-500">{totalUnpaid}</span>건
         </div>
       </div>
 
-      {/* 영업사원별 */}
+      {/* 영업사원별 미입금 */}
       <div className="rounded-xl border border-gray-200 bg-white overflow-hidden">
         <div className="px-3 py-2 border-b border-gray-100 text-xs font-bold text-gray-700">
-          {isCeo ? "영업사원별" : "내 영업 현황"}
+          {isCeo ? "영업사원별 미입금" : "내 미입금"}
         </div>
         {rows.length === 0 ? (
           <div className="py-6 text-center text-gray-400 text-sm">영업팀 사용자가 없습니다</div>
@@ -583,21 +615,18 @@ function SalesStatsSection({ userName, userRole, allUsers, schedules }: {
           <div className="divide-y divide-gray-100">
             {rows.map((r) => {
               const isOpen = expanded.has(r.name);
-              const hasAny = r.unpaidCount + r.confirmedCount > 0;
               return (
                 <div key={r.name}>
                   <button
                     onClick={() => toggle(r.name)}
                     className="w-full flex items-center justify-between px-3 py-2.5 active:bg-gray-50"
-                    disabled={!hasAny}
+                    disabled={r.unpaidCount === 0}
                   >
                     <span className="text-sm font-medium text-gray-800">{r.name}</span>
                     <span className="flex items-center gap-2 shrink-0">
-                      {hasAny ? (
+                      {r.unpaidCount > 0 ? (
                         <>
-                          <span className="text-xs font-bold text-green-600">확인 {r.confirmedCount}</span>
-                          <span className="text-gray-300">/</span>
-                          <span className="text-xs font-bold text-red-500">미입금 {r.unpaidCount}</span>
+                          <span className="text-sm font-bold text-red-500">미입금 {r.unpaidCount}건</span>
                           <svg
                             className={`w-3.5 h-3.5 text-gray-400 transition-transform ${isOpen ? "rotate-90" : ""}`}
                             fill="none"
@@ -612,46 +641,20 @@ function SalesStatsSection({ userName, userRole, allUsers, schedules }: {
                       )}
                     </span>
                   </button>
-                  {isOpen && hasAny && (
-                    <div className="px-3 py-2 space-y-2 bg-gray-50/50">
-                      {r.unpaidCount > 0 && (
-                        <div>
-                          <div className="text-[10px] font-bold text-red-500 mb-1">미입금 {r.unpaidCount}건</div>
-                          <div className="space-y-0.5">
-                            {r.unpaid
-                              .slice()
-                              .sort((a, b) => (a.date < b.date ? -1 : 1))
-                              .map((s) => (
-                                <div key={s.id} className="flex items-center justify-between text-xs py-0.5">
-                                  <div className="flex-1 min-w-0 flex items-center gap-1.5">
-                                    <span className="w-1.5 h-1.5 rounded-full bg-red-400 shrink-0" />
-                                    <span className="text-gray-800 truncate">{extractCustomer(s.title)}</span>
-                                  </div>
-                                  <span className="text-[10px] text-gray-500 shrink-0 ml-2">{s.date.slice(5)}</span>
-                                </div>
-                              ))}
+                  {isOpen && r.unpaidCount > 0 && (
+                    <div className="bg-red-50/50 px-3 py-2 space-y-1">
+                      {r.unpaid
+                        .slice()
+                        .sort((a, b) => (a.date < b.date ? -1 : 1))
+                        .map((s) => (
+                          <div key={s.id} className="flex items-center justify-between text-xs py-1">
+                            <div className="flex-1 min-w-0">
+                              <div className="text-gray-800 font-medium truncate">{extractCustomer(s.title)}</div>
+                              <div className="text-[10px] text-gray-400 truncate">{s.title}</div>
+                            </div>
+                            <span className="text-[10px] text-gray-500 shrink-0 ml-2">{s.date.slice(5)}</span>
                           </div>
-                        </div>
-                      )}
-                      {r.confirmedCount > 0 && (
-                        <div>
-                          <div className="text-[10px] font-bold text-green-600 mb-1">입금확인 {r.confirmedCount}건</div>
-                          <div className="space-y-0.5">
-                            {r.confirmed
-                              .slice()
-                              .sort((a, b) => (a.date < b.date ? -1 : 1))
-                              .map((s) => (
-                                <div key={s.id} className="flex items-center justify-between text-xs py-0.5">
-                                  <div className="flex-1 min-w-0 flex items-center gap-1.5">
-                                    <span className="w-1.5 h-1.5 rounded-full bg-green-500 shrink-0" />
-                                    <span className="text-gray-800 truncate">{extractCustomer(s.title)}</span>
-                                  </div>
-                                  <span className="text-[10px] text-gray-500 shrink-0 ml-2">{s.date.slice(5)}</span>
-                                </div>
-                              ))}
-                          </div>
-                        </div>
-                      )}
+                        ))}
                     </div>
                   )}
                 </div>
@@ -662,7 +665,7 @@ function SalesStatsSection({ userName, userRole, allUsers, schedules }: {
       </div>
 
       <div className="text-[10px] text-gray-400 text-center">
-        ℹ️ 미입금 판정: 일정 제목에 &quot;/미입금&quot; 포함 시 · 그 외는 입금확인
+        ℹ️ 미입금 판정: 일정 제목에 &quot;/미입금&quot; 포함 시
       </div>
     </div>
   );
