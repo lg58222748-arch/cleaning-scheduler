@@ -33,18 +33,29 @@ export async function GET(req: NextRequest) {
   }
 
   // settlements ↔ schedules 에 FK 가 없어 PostgREST 관계 조인을 못 쓰므로 2단계로 조회.
-  // 1) 날짜 범위의 모든 schedules (status 무관 — 배정탭/달력 둘 다 포함).
-  //    deleted 만 제외.
-  const { data: scheduleRows, error: schErr } = await supabase
-    .from("schedules")
-    .select("id, title, date, start_time, end_time, member_name, note, status")
-    .gte("date", from)
-    .lte("date", to)
-    .neq("status", "deleted");
-  if (schErr) {
-    return Response.json({ error: "db_error", message: schErr.message }, { status: 502 });
-  }
-  const schedules = scheduleRows || [];
+  // 1) 날짜 범위의 confirmed/pending 일정 + 미배정(unassigned) 일정 전체.
+  //    미배정 은 예약만 받은 상태로 보통 입금과 일정일 이 다를 수 있어 날짜 필터 제외.
+  const [rangeRes, unassignedRes] = await Promise.all([
+    supabase
+      .from("schedules")
+      .select("id, title, date, start_time, end_time, member_name, note, status")
+      .gte("date", from)
+      .lte("date", to)
+      .not("status", "in", '("deleted","unassigned")'),
+    supabase
+      .from("schedules")
+      .select("id, title, date, start_time, end_time, member_name, note, status")
+      .eq("status", "unassigned"),
+  ]);
+
+  if (rangeRes.error) return Response.json({ error: "db_error", message: rangeRes.error.message }, { status: 502 });
+  if (unassignedRes.error) return Response.json({ error: "db_error", message: unassignedRes.error.message }, { status: 502 });
+
+  // 중복 id 합치기 (이론상 겹칠 수 없지만 안전하게)
+  const byId = new Map<string, (typeof rangeRes.data)[number]>();
+  for (const s of rangeRes.data || []) byId.set(s.id, s);
+  for (const s of unassignedRes.data || []) byId.set(s.id, s);
+  const schedules = Array.from(byId.values());
   if (schedules.length === 0) {
     return Response.json({ range: { from, to }, count: 0, schedules: [] });
   }
