@@ -1197,8 +1197,17 @@ export default function Home() {
               if (target) {
                 // 배정탭에서 제거
                 setUnassignedSchedules((prev) => prev.filter((s) => s.id !== scheduleId));
-                // 달력에 추가 (제목 그대로 유지)
-                setSchedules((prev) => [...prev, { ...target, memberId, memberName, status: "confirmed" as const }]);
+                // 달력에 추가 — 같은 scheduleId 이미 있으면 덮어쓰기만, 없을 때만 추가 (중복 방지)
+                setSchedules((prev) => {
+                  const idx = prev.findIndex((s) => s.id === scheduleId);
+                  const assigned = { ...target, memberId, memberName, status: "confirmed" as const };
+                  if (idx >= 0) {
+                    const next = [...prev];
+                    next[idx] = assigned;
+                    return next;
+                  }
+                  return [...prev, assigned];
+                });
               }
               // API는 백그라운드 (안 기다림)
               assignScheduleApi(scheduleId, memberId, memberName);
@@ -1615,7 +1624,17 @@ export default function Home() {
             const target = unassignedSchedules.find((s) => s.id === scheduleId);
             if (target) {
               setUnassignedSchedules((prev) => prev.filter((s) => s.id !== scheduleId));
-              setSchedules((prev) => [...prev, { ...target, memberId, memberName, status: "confirmed" as const }]);
+              // 중복 방지: 같은 scheduleId 가 이미 있으면 덮어쓰고, 없을 때만 추가
+              setSchedules((prev) => {
+                const idx = prev.findIndex((s) => s.id === scheduleId);
+                const assigned = { ...target, memberId, memberName, status: "confirmed" as const };
+                if (idx >= 0) {
+                  const next = [...prev];
+                  next[idx] = assigned;
+                  return next;
+                }
+                return [...prev, assigned];
+              });
             }
             assignScheduleApi(scheduleId, memberId, memberName);
             setDetailSchedule(null);
