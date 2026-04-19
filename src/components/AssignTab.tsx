@@ -23,9 +23,10 @@ interface AssignTabProps {
   onAssigned: (scheduleId: string, memberId: string, memberName: string) => void;
   onDeleted?: (id: string) => void;
   onOpenDetail?: (schedule: Schedule) => void;
+  onAddSchedule?: (date: Date) => void;
 }
 
-export default function AssignTab({ members, schedules, onAssigned, onDeleted, onOpenDetail }: AssignTabProps) {
+export default function AssignTab({ members, schedules, onAssigned, onDeleted, onOpenDetail, onAddSchedule }: AssignTabProps) {
   const unassigned = schedules;
 
   const [currentMonth, setCurrentMonth] = useState(new Date());
@@ -191,7 +192,7 @@ export default function AssignTab({ members, schedules, onAssigned, onDeleted, o
                 return (
                   <button
                     key={dateStr}
-                    onClick={() => { setSelectedDate(d); if (dayScheds.length > 0) setShowDayPopup(true); }}
+                    onClick={() => { setSelectedDate(d); setShowDayPopup(true); }}
                     className={`px-0.5 pt-0.5 pb-0 relative flex flex-col items-center ${
                       isSelected ? "bg-orange-50 ring-2 ring-orange-400 ring-inset" : "active:bg-gray-50"
                     } ${!isCurrentMonth ? "opacity-40" : ""}`}
@@ -239,10 +240,37 @@ export default function AssignTab({ members, schedules, onAssigned, onDeleted, o
                 <span className="text-3xl font-bold text-gray-900">{format(selectedDate, "d")}</span>
                 <span className="text-sm text-gray-500">{format(selectedDate, "EEEE", { locale: ko })}</span>
               </div>
-              <span className="text-xs px-2.5 py-1 bg-orange-500 text-white rounded-full font-bold">미배정</span>
+              <div className="flex items-center gap-2">
+                {daySchedules.length > 0 && (
+                  <span className="text-xs px-2.5 py-1 bg-orange-500 text-white rounded-full font-bold">미배정 {daySchedules.length}</span>
+                )}
+                {onAddSchedule && (
+                  <button
+                    onClick={() => {
+                      const d = selectedDate;
+                      setShowDayPopup(false);
+                      setSelectedSchedule(null);
+                      setSelectedMemberId("");
+                      setTimeout(() => onAddSchedule(d), 150);
+                    }}
+                    className="w-9 h-9 bg-gray-100 rounded-full flex items-center justify-center active:bg-orange-100"
+                    aria-label="일정 추가"
+                  >
+                    <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                    </svg>
+                  </button>
+                )}
+              </div>
             </div>
 
             <div className="px-4 pb-5 pt-1 space-y-2 max-h-[380px] overflow-y-auto">
+              {daySchedules.length === 0 && (
+                <div className="py-6 text-center text-xs text-gray-400">
+                  이 날짜엔 미배정 일정이 없습니다.
+                  {onAddSchedule && <div className="mt-1 text-gray-500">우측 상단 + 로 일정 추가</div>}
+                </div>
+              )}
               {daySchedules.map((s) => {
                 const titleDisplay = s.title;
                 return (

@@ -1234,6 +1234,10 @@ export default function Home() {
             }} onOpenDetail={(s) => {
               setDetailMode("assign");
               openDetailSchedule(s);
+            }} onAddSchedule={(d) => {
+              setSelectedDate(d);
+              setEditingSchedule(null);
+              openModal(setShowScheduleForm);
             }} />
           </div>
         )}
