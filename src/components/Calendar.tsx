@@ -251,7 +251,7 @@ export default memo(function Calendar({
                       const fullName = s.title;
                       const schedColor = s.color || "#FDDCCC";
                       return (
-                        <div key={s.id} className="text-[8px] md:text-[11px] leading-[1.2] md:leading-[1.4] px-0.5 py-0.5 rounded font-medium overflow-hidden mb-0.5 md:cursor-pointer md:hover:opacity-80"
+                        <div key={s.id} className="text-[9px] md:text-[11px] leading-[1.2] md:leading-[1.4] px-0.5 py-0.5 rounded font-medium overflow-hidden mb-0.5 md:cursor-pointer md:hover:opacity-80"
                           style={{ backgroundColor: s.status === "completed" ? "#D1FAE5" : schedColor, color: "#555", maxHeight: "2.6em", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const }}
                           onClick={(e) => { if (onScheduleClick && window.innerWidth >= 768) { e.stopPropagation(); onScheduleClick(s); } }}>
                           {fullName}
