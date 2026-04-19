@@ -1060,8 +1060,9 @@ export default function Home() {
 
       {/* 팀원 필터 패널 - 달력에서만 */}
       {showMemberFilter && canAssign && activeTab === "calendar" && (
-        <div className="bg-white border-b border-gray-200 px-4 py-3 z-30 max-h-[50vh] overflow-y-auto">
-          <div className="flex items-center justify-between mb-2">
+        <div className="bg-white border-b border-gray-200 px-4 pb-3 z-30 max-h-[50vh] overflow-y-auto">
+          {/* 헤더(팀원 필터 라벨 + 닫기 버튼) 를 스크롤 시에도 고정되게 sticky */}
+          <div className="sticky top-0 bg-white pt-3 pb-2 -mx-4 px-4 mb-2 flex items-center justify-between border-b border-gray-100 z-10">
             <span className="text-xs font-bold text-gray-700">팀원 필터</span>
             <button
               onClick={() => { setShowMemberFilter(false); consumeHash(); }}
