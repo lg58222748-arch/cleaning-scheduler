@@ -989,6 +989,9 @@ export function BranchMap({ allUsers, isAdmin = false }: { allUsers: { id?: stri
   });
   const circlesRef = useRef<Record<string, unknown>>({});
   const markersRef = useRef<Record<string, unknown>>({});
+  // 마커/원 전체 추적 - 동명이인이나 렌더 누적으로 인한 잔존 마커 방지
+  const allMarkersRef = useRef<unknown[]>([]);
+  const allCirclesRef = useRef<unknown[]>([]);
 
   function saveCustomPosition(name: string, lat: number, lng: number) {
     setCustomPositions(prev => {
@@ -1017,10 +1020,17 @@ export function BranchMap({ allUsers, isAdmin = false }: { allUsers: { id?: stri
 
   // 팀원 목록 - 모든 사용자 표시 (관리점 없어도 기본 위치 + 관리자가 드래그 가능)
   const userList = useMemo(() => {
+    // 중복 이름 제거 (DB 에 동명이인 유저 있으면 첫 번째만 사용)
+    const seen = new Set<string>();
+    const uniqueUsers = allUsers.filter(u => {
+      if (seen.has(u.name)) return false;
+      seen.add(u.name);
+      return true;
+    });
     // 관리점별 그룹핑
     const branchUsers: Record<string, string[]> = {};
     const noBranchUsers: string[] = [];
-    for (const u of allUsers) {
+    for (const u of uniqueUsers) {
       if (hiddenPins.has(u.name)) continue; // 관리자가 숨긴 핀 제외
       const bname = u.branch ? u.branch.replace(/\[관리점\]/, "").trim() : "";
       if (bname && BRANCH_COORDS[bname]) {
@@ -1098,13 +1108,15 @@ export function BranchMap({ allUsers, isAdmin = false }: { allUsers: { id?: stri
     const N = window.naver.maps;
     const map = mapInstanceRef.current as { /* naver map */ };
 
-    // 기존 마커/원 제거
-    Object.values(markersRef.current).forEach(m => {
+    // 기존 마커/원 완전 제거 (동명이인이나 렌더 누적 대비 - 전체 배열 기준)
+    allMarkersRef.current.forEach(m => {
       try { (m as { setMap: (v: null) => void }).setMap(null); } catch { /* */ }
     });
-    Object.values(circlesRef.current).forEach(c => {
+    allCirclesRef.current.forEach(c => {
       try { (c as { setMap: (v: null) => void }).setMap(null); } catch { /* */ }
     });
+    allMarkersRef.current = [];
+    allCirclesRef.current = [];
     markersRef.current = {};
     circlesRef.current = {};
 
@@ -1120,6 +1132,7 @@ export function BranchMap({ allUsers, isAdmin = false }: { allUsers: { id?: stri
         },
       });
       markersRef.current[u.name] = marker;
+      allMarkersRef.current.push(marker);
 
       N.Event.addListener(marker, "click", () => {
         if (isAdmin) setSelectedUser(prev => prev === u.name ? null : u.name);
@@ -1137,6 +1150,7 @@ export function BranchMap({ allUsers, isAdmin = false }: { allUsers: { id?: stri
         visible: showCircles,
       });
       circlesRef.current[u.name] = circle;
+      allCirclesRef.current.push(circle);
 
       if (isAdmin) {
         N.Event.addListener(marker, "dragend", () => {
