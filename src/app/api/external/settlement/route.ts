@@ -75,6 +75,13 @@ export async function PATCH(req: NextRequest) {
   const update: Record<string, unknown> = {};
   if (typeof body.cashReceipt === "boolean") update.cash_receipt = body.cashReceipt;
   if (typeof body.accountantNote === "string") update.accountant_note = body.accountantNote;
+  if (typeof body.customerName === "string") update.customer_name = body.customerName;
+  if (typeof body.customerPhone === "string") update.customer_phone = body.customerPhone;
+  if (typeof body.deposit === "number" && Number.isFinite(body.deposit)) update.deposit = Math.max(0, Math.round(body.deposit));
+  if (typeof body.balance === "number" && Number.isFinite(body.balance)) update.balance = Math.max(0, Math.round(body.balance));
+  if (typeof body.quote === "number" && Number.isFinite(body.quote)) update.quote = Math.max(0, Math.round(body.quote));
+  if (typeof body.totalAmount === "number" && Number.isFinite(body.totalAmount)) update.total_amount = Math.max(0, Math.round(body.totalAmount));
+  if (typeof body.extraCharge === "number" && Number.isFinite(body.extraCharge)) update.extra_charge = Math.max(0, Math.round(body.extraCharge));
 
   if (Object.keys(update).length === 0) {
     return Response.json({ error: "no_fields_to_update" }, { status: 400 });
