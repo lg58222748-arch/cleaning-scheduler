@@ -306,7 +306,7 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
       text += `총 잔금 : ${totalBalance > 0 ? totalBalance.toLocaleString() + "원" : ""}\n`;
     }
 
-    if (salesNote) text += `11)상담사 특이사항 : ${salesNote}\n`;
+    text += `11)상담사 특이사항 : ${salesNote || ""}\n`;
     text += `\n확인 차원에서 1~5번까지\n체크사항 보내주시면\n예약 빠르게 도와 드리겠습니다.\n감사합니다.\n`;
     text += `\n*예약금은 본사 확정 비용, 잔금과 세금 증빙은 당일 관리점에서 작업 마무리 후 처리됩니다.\n`;
     text += `*최종 정산은 현장 작업 완료 후 공급가액과 부가세를 구분하여 안내드립니다.`;
