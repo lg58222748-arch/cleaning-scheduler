@@ -991,34 +991,7 @@ export default function Home() {
           </div>
         </div>
       )}
-      {/* 반환 알림 배너 - 배정탭에선 숨김 (사용자 요청 — 배정탭에서 반환 알림 노이즈 제거). 다른 탭에서만 노출. */}
-      {isAdmin && activeTab !== "assign" && returnBannerNotifs.length > 0 && (
-        <div className="bg-orange-500 text-white z-50">
-          {returnBannerNotifs.slice(0, 5).map((n) => (
-            <div key={n.id} className="px-3 py-2 flex items-center gap-2 border-b border-orange-400/30 last:border-0">
-              <span className="text-sm">↩</span>
-              <div className="flex-1 min-w-0">
-                <div className="text-xs font-medium">{n.message}</div>
-                <div className="text-xs opacity-70">{new Date(n.createdAt).toLocaleString("ko")}</div>
-              </div>
-              <button
-                onClick={() => {
-                  dismissedReturnIdsRef.current.add(n.id);
-                  handleMarkRead(n.id);
-                  // 즉시 재계산 트리거
-                  setNotifications((prev) => [...prev]);
-                }}
-                className="text-white/60 active:text-white shrink-0 p-1"
-              >
-                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" /></svg>
-              </button>
-            </div>
-          ))}
-          {returnBannerNotifs.length > 5 && (
-            <div className="px-3 py-1 text-xs opacity-80 text-center">+{returnBannerNotifs.length - 5}건 더</div>
-          )}
-        </div>
-      )}
+      {/* 반환 알림 배너 제거됨 (사용자 요청 — 노이즈로 인식). 알림 자체는 /notifications 에서 확인 가능. */}
       {/* Compact mobile header */}
       <header className="bg-white border-b border-gray-200 sticky top-0 z-40">
         <div className="px-4 flex items-center justify-between h-11">
