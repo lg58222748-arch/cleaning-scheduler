@@ -98,9 +98,11 @@ async function sendFcmNotification(fcmToken: string, title: string, body: string
 }
 
 // 통합 발송: 웹푸시 엔드포인트 + FCM 엔드포인트 모두 처리
-async function sendToSubs(subs: Array<{ id: string; endpoint: string; p256dh: string; auth: string }>, title: string, message: string, tag?: string) {
+// enabled=false 인 구독은 제외 (사용자가 알림 토글 OFF 한 경우)
+async function sendToSubs(subs: Array<{ id: string; endpoint: string; p256dh: string; auth: string; enabled?: boolean }>, title: string, message: string, tag?: string) {
   const payload = JSON.stringify({ title, body: message, tag: tag || "notification", url: "/" });
   for (const sub of subs) {
+    if (sub.enabled === false) continue;
     if (sub.endpoint?.startsWith("fcm:")) {
       const fcmToken = sub.endpoint.slice(4);
       await sendFcmNotification(fcmToken, title, message, tag);

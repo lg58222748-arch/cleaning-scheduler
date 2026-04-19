@@ -14,8 +14,9 @@ export async function POST(req: NextRequest) {
   const body = await req.json();
 
   if (body.action === "subscribe") {
-    const { subscription, userId, userName } = body;
+    const { subscription, userId, userName, enabled } = body;
     if (!subscription?.endpoint) return Response.json({ error: "Invalid subscription" }, { status: 400 });
+    const enabledVal = enabled !== false; // 기본 true
 
     // 같은 사용자의 다른(stale) 구독 제거 - 중복 푸시 방지
     if (userId) {
@@ -28,12 +29,14 @@ export async function POST(req: NextRequest) {
       await supabase.from("push_subscriptions").update({
         user_id: userId, user_name: userName,
         p256dh: subscription.keys.p256dh, auth: subscription.keys.auth,
+        enabled: enabledVal,
       }).eq("id", existing.id);
     } else {
       await supabase.from("push_subscriptions").insert({
         user_id: userId, user_name: userName,
         endpoint: subscription.endpoint,
         p256dh: subscription.keys.p256dh, auth: subscription.keys.auth,
+        enabled: enabledVal,
       });
     }
     return Response.json({ success: true });
@@ -41,9 +44,10 @@ export async function POST(req: NextRequest) {
 
   // FCM 토큰 저장 (Capacitor APK)
   if (body.action === "subscribe-fcm") {
-    const { token, userId, userName } = body;
+    const { token, userId, userName, enabled } = body;
     if (!token) return Response.json({ error: "Invalid token" }, { status: 400 });
     const endpoint = `fcm:${token}`;
+    const enabledVal = enabled !== false;
 
     // 같은 사용자의 다른 구독 제거
     if (userId) {
@@ -52,20 +56,34 @@ export async function POST(req: NextRequest) {
 
     const { data: existing } = await supabase.from("push_subscriptions").select("id").eq("endpoint", endpoint).single();
     if (existing) {
-      await supabase.from("push_subscriptions").update({ user_id: userId, user_name: userName }).eq("id", existing.id);
+      await supabase.from("push_subscriptions").update({ user_id: userId, user_name: userName, enabled: enabledVal }).eq("id", existing.id);
     } else {
       await supabase.from("push_subscriptions").insert({
-        user_id: userId, user_name: userName, endpoint, p256dh: "fcm", auth: "fcm",
+        user_id: userId, user_name: userName, endpoint, p256dh: "fcm", auth: "fcm", enabled: enabledVal,
       });
     }
     return Response.json({ success: true });
   }
 
+  // 사용자별 알림 on/off 토글 (구독은 유지, enabled 플래그만 변경)
+  if (body.action === "set-enabled") {
+    const { userId, enabled } = body;
+    if (!userId) return Response.json({ error: "userId required" }, { status: 400 });
+    const { data, error } = await supabase
+      .from("push_subscriptions")
+      .update({ enabled: enabled !== false })
+      .eq("user_id", userId)
+      .select("id");
+    if (error) return Response.json({ error: error.message }, { status: 500 });
+    return Response.json({ success: true, updated: data?.length || 0 });
+  }
+
   // 푸시 전송
   if (body.action === "send") {
     const { title, message, tag } = body;
-    const { data: subs } = await supabase.from("push_subscriptions").select("*");
-    if (!subs || subs.length === 0) return Response.json({ sent: 0 });
+    const { data: allSubs } = await supabase.from("push_subscriptions").select("*");
+    const subs = (allSubs || []).filter(s => s.enabled !== false);
+    if (subs.length === 0) return Response.json({ sent: 0 });
 
     let sent = 0;
     let failed = 0;

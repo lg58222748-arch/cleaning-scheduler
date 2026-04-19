@@ -37,13 +37,25 @@ export default function AdminPanel({ onClose, onRefresh }: AdminPanelProps) {
     setNotificationsEnabled(next);
     localStorage.setItem("notificationsEnabled", String(next));
 
-    // 토글은 SW 플래그만 제어. DB 구독은 그대로 유지 → 다른 사용자 영향 없음.
-    // (이전: DB 삭제/재구독 하다가 subscribe dedupe 로 타 유저 구독까지 지워지는 버그 발생)
+    // 1) SW 플래그 (웹 즉시 차단용, SW 재시작 시 초기화됨)
     try {
-      if (!("serviceWorker" in navigator)) return;
-      const reg = await navigator.serviceWorker.ready;
-      reg.active?.postMessage({ type: "SET_NOTIFICATIONS_ENABLED", enabled: next });
-    } catch (e) { console.error("[Push] toggle failed:", e); }
+      if ("serviceWorker" in navigator) {
+        const reg = await navigator.serviceWorker.ready;
+        reg.active?.postMessage({ type: "SET_NOTIFICATIONS_ENABLED", enabled: next });
+      }
+    } catch (e) { console.error("[Push] SW toggle failed:", e); }
+
+    // 2) 서버 DB 플래그 (FCM/APK 및 SW 재시작 이후에도 유지되는 실제 차단)
+    try {
+      const saved = localStorage.getItem("currentUser");
+      const user = saved ? JSON.parse(saved) : null;
+      if (!user?.id) return;
+      await fetch("/api/push", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "set-enabled", userId: user.id, enabled: next }),
+      });
+    } catch (e) { console.error("[Push] DB toggle failed:", e); }
   }
 
   async function registerPushAgain() {
@@ -79,7 +91,7 @@ export default function AdminPanel({ onClose, onRefresh }: AdminPanelProps) {
               await fetch("/api/push", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ action: "subscribe-fcm", token: token.value, userId: user.id, userName: user.name }),
+                body: JSON.stringify({ action: "subscribe-fcm", token: token.value, userId: user.id, userName: user.name, enabled: notificationsEnabled }),
               });
               resolve(true);
             } catch { resolve(false); }
@@ -116,7 +128,7 @@ export default function AdminPanel({ onClose, onRefresh }: AdminPanelProps) {
       await fetch("/api/push", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "subscribe", subscription: sub.toJSON(), userId: user.id, userName: user.name }),
+        body: JSON.stringify({ action: "subscribe", subscription: sub.toJSON(), userId: user.id, userName: user.name, enabled: notificationsEnabled }),
       });
       setPushRegisterMsg("✅ 웹 푸시 등록 완료! 알림 받을 수 있습니다");
     } catch (e) {

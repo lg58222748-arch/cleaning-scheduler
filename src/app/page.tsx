@@ -291,7 +291,8 @@ export default function Home() {
   // 푸시 알림 등록
   useEffect(() => {
     if (!currentUser) return;
-    if (localStorage.getItem("notificationsEnabled") === "false") { console.log("[Push] 알림 OFF - 등록 스킵"); return; }
+    // 토글 OFF 여도 구독은 등록하되 enabled=false 로 저장 → 서버가 발송 대상에서 제외
+    const notificationsEnabled = localStorage.getItem("notificationsEnabled") !== "false";
 
     async function registerNativePush() {
       // Capacitor 네이티브 APK: FCM 기반 (백그라운드에서도 수신 가능)
@@ -314,7 +315,7 @@ export default function Home() {
             await fetch("/api/push", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ action: "subscribe-fcm", token: token.value, userId: currentUser?.id, userName: currentUser?.name }),
+              body: JSON.stringify({ action: "subscribe-fcm", token: token.value, userId: currentUser?.id, userName: currentUser?.name, enabled: notificationsEnabled }),
             });
           } catch (e) { console.error("[FCM] 서버 저장 실패:", e); }
         });
@@ -351,7 +352,7 @@ export default function Home() {
         await fetch("/api/push", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ action: "subscribe", subscription: sub.toJSON(), userId: currentUser?.id, userName: currentUser?.name }),
+          body: JSON.stringify({ action: "subscribe", subscription: sub.toJSON(), userId: currentUser?.id, userName: currentUser?.name, enabled: notificationsEnabled }),
         });
       } catch (e) { console.error("[Push] 실패:", e); }
     }
