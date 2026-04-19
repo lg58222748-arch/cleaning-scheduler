@@ -398,278 +398,271 @@ function FieldStatsSection({ allUsers, schedules }: {
 }) {
   const now = new Date();
   const curMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  const curMonthLabel = `${now.getFullYear()}년 ${now.getMonth() + 1}월`;
 
-  // 이번달 일정만
-  const monthScheds = useMemo(() => schedules.filter(s => s.date.startsWith(curMonth) && s.status !== "unassigned"), [schedules, curMonth]);
+  // 이번달 배정된 일정 (미배정 제외)
+  const monthScheds = useMemo(
+    () => schedules.filter((s) => s.date.startsWith(curMonth) && s.status !== "unassigned"),
+    [schedules, curMonth]
+  );
 
-  // AS 판정: 제목에 "AS", "A/S", "재방문" 포함
-  const isAS = (title: string) => /AS|A\/S|재방문/i.test(title);
-
-  // 팀원별 통계 (현장팀 기준)
-  const memberStats = useMemo(() => {
-    const stats: Record<string, { name: string; total: number; as: number; completed: number; branch: string }> = {};
-    const fieldUsers = allUsers.filter(u => u.role === "field");
-    for (const u of fieldUsers) {
-      const branch = (u.branch || "").replace(/\[관리점\]/, "").trim() || "미지정";
-      stats[u.name] = { name: u.name, total: 0, as: 0, completed: 0, branch };
-    }
+  // 현장팀 팀원별 배정 건수
+  const memberRows = useMemo(() => {
+    const counts: Record<string, number> = {};
     for (const s of monthScheds) {
-      const name = s.memberName;
-      if (!stats[name]) continue;
-      stats[name].total++;
-      if (isAS(s.title)) stats[name].as++;
-      if (s.status === "completed") stats[name].completed++;
+      if (!s.memberName) continue;
+      counts[s.memberName] = (counts[s.memberName] || 0) + 1;
     }
-    return Object.values(stats).filter(s => s.total > 0).sort((a, b) => b.total - a.total);
+    const fieldUsers = allUsers.filter((u) => u.role === "field");
+    const rows = fieldUsers.map((u) => ({
+      name: u.name,
+      branch: (u.branch || "").replace(/\[관리점\]/, "").trim() || "미지정",
+      count: counts[u.name] || 0,
+    }));
+    return rows.sort((a, b) => b.count - a.count);
   }, [monthScheds, allUsers]);
 
-  // 우수팀 TOP 3 (AS 발생률 낮고 + 작업 많은 순)
-  const topTeam = useMemo(() => {
-    return [...memberStats]
-      .filter(s => s.total >= 1)
-      .sort((a, b) => {
-        const rateA = a.as / a.total;
-        const rateB = b.as / b.total;
-        if (rateA !== rateB) return rateA - rateB;
-        return b.total - a.total;
-      })
-      .slice(0, 3);
-  }, [memberStats]);
-
-  // 관리점별 AS 집계
-  const branchStats = useMemo(() => {
-    const map: Record<string, { name: string; total: number; as: number }> = {};
-    for (const m of memberStats) {
-      if (!map[m.branch]) map[m.branch] = { name: m.branch, total: 0, as: 0 };
-      map[m.branch].total += m.total;
-      map[m.branch].as += m.as;
-    }
-    return Object.values(map).sort((a, b) => b.total - a.total);
-  }, [memberStats]);
+  const total = monthScheds.length;
 
   return (
-    <div className="px-4 py-4 space-y-5">
-      {/* 이번달 헤더 */}
+    <div className="px-4 py-4 space-y-4">
+      {/* 헤더 */}
       <div className="text-center">
-        <div className="text-xs text-gray-400">{curMonth.replace("-", "년 ")}월</div>
-        <div className="text-lg font-extrabold text-gray-800">현장팀 실적</div>
+        <div className="text-xs text-gray-400">{curMonthLabel}</div>
+        <div className="text-2xl font-extrabold text-gray-800 mt-1">{total.toLocaleString("ko-KR")}건 배정</div>
       </div>
 
-      {/* 우수팀 TOP 3 */}
-      <div>
-        <div className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">🏆 이번달 우수팀</div>
-        {topTeam.length === 0 ? (
-          <div className="py-6 text-center text-gray-400 text-sm bg-gray-50 rounded-xl">아직 집계된 실적이 없습니다</div>
+      {/* 팀원별 배정 건수 */}
+      <div className="rounded-xl border border-gray-200 bg-white overflow-hidden">
+        <div className="px-3 py-2 border-b border-gray-100 text-xs font-bold text-gray-700">팀원별 배정 건수</div>
+        {memberRows.length === 0 ? (
+          <div className="py-6 text-center text-gray-400 text-sm">현장팀 회원이 없습니다</div>
         ) : (
-          <div className="space-y-2">
-            {topTeam.map((m, i) => {
-              const medals = ["🥇", "🥈", "🥉"];
-              const bgs = ["bg-gradient-to-r from-yellow-50 to-amber-50 border-yellow-300", "bg-gradient-to-r from-gray-50 to-slate-50 border-gray-300", "bg-gradient-to-r from-orange-50 to-red-50 border-orange-300"];
-              const asRate = m.total > 0 ? Math.round((m.as / m.total) * 100) : 0;
-              return (
-                <div key={m.name} className={`border rounded-xl p-3 ${bgs[i]}`}>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xl">{medals[i]}</span>
-                      <div>
-                        <div className="text-sm font-bold text-gray-800">{m.name}</div>
-                        <div className="text-[10px] text-gray-500">{m.branch}[관리점]</div>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-base font-extrabold text-gray-800">{m.total}건</div>
-                      <div className="text-[10px] text-gray-500">AS {asRate}% ({m.as}건)</div>
-                    </div>
-                  </div>
+          <div className="divide-y divide-gray-100">
+            {memberRows.map((m) => (
+              <div key={m.name} className="flex items-center justify-between px-3 py-2.5">
+                <div className="flex items-center gap-2 flex-1 min-w-0">
+                  <span className="text-sm font-medium text-gray-800 truncate">{m.name}</span>
+                  <span className="text-[10px] text-gray-400 shrink-0">{m.branch}</span>
                 </div>
-              );
-            })}
+                <span className={`text-sm font-bold shrink-0 ${m.count > 0 ? "text-blue-600" : "text-gray-300"}`}>
+                  {m.count}건
+                </span>
+              </div>
+            ))}
           </div>
         )}
-      </div>
-
-      {/* 관리점별 AS 발생률 */}
-      <div>
-        <div className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">📍 관리점별 AS 발생률</div>
-        {branchStats.length === 0 ? (
-          <div className="py-6 text-center text-gray-400 text-sm bg-gray-50 rounded-xl">데이터 없음</div>
-        ) : (
-          <div className="space-y-2">
-            {branchStats.map(b => {
-              const rate = b.total > 0 ? (b.as / b.total) * 100 : 0;
-              const rateStr = rate.toFixed(1);
-              const rateColor = rate < 5 ? "bg-green-500" : rate < 10 ? "bg-yellow-500" : rate < 20 ? "bg-orange-500" : "bg-red-500";
-              const rateText = rate < 5 ? "text-green-600" : rate < 10 ? "text-yellow-600" : rate < 20 ? "text-orange-600" : "text-red-600";
-              return (
-                <div key={b.name} className="border border-gray-200 rounded-xl p-3">
-                  <div className="flex items-center justify-between mb-1.5">
-                    <span className="text-sm font-bold text-gray-800">{b.name}</span>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs text-gray-500">{b.total}건</span>
-                      <span className={`text-xs font-bold ${rateText}`}>AS {rateStr}%</span>
-                    </div>
-                  </div>
-                  <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-                    <div className={`h-full ${rateColor} rounded-full transition-all`} style={{ width: `${Math.min(rate, 100)}%` }} />
-                  </div>
-                  <div className="text-[10px] text-gray-400 mt-1">
-                    전체 {b.total}건 중 AS {b.as}건
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
-
-      {/* 팀원별 상세 */}
-      <div>
-        <div className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">👥 팀원별 현황</div>
-        {memberStats.length === 0 ? (
-          <div className="py-6 text-center text-gray-400 text-sm bg-gray-50 rounded-xl">데이터 없음</div>
-        ) : (
-          <div className="space-y-1.5">
-            {memberStats.map(m => {
-              const rate = m.total > 0 ? (m.as / m.total) * 100 : 0;
-              return (
-                <div key={m.name} className="flex items-center justify-between border border-gray-200 rounded-lg px-3 py-2">
-                  <div className="flex items-center gap-2 flex-1 min-w-0">
-                    <span className="text-sm font-medium text-gray-800 truncate">{m.name}</span>
-                    <span className="text-[10px] text-gray-400">{m.branch}</span>
-                  </div>
-                  <div className="flex items-center gap-3 text-xs shrink-0">
-                    <span className="text-blue-600 font-medium">{m.total}건</span>
-                    {m.as > 0 && <span className="text-red-500">AS {m.as}</span>}
-                    <span className="text-gray-400">{rate.toFixed(0)}%</span>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
-
-      <div className="p-2 bg-blue-50 rounded-lg text-[10px] text-blue-600 text-center">
-        ℹ️ AS 판정: 제목에 &quot;AS&quot;, &quot;A/S&quot;, &quot;재방문&quot; 포함 시
       </div>
     </div>
   );
 }
 
 
-/* ════════════ 영업팀 통계 섹션 ════════════ */
+/* ════════════ 영업팀 미입금 섹션 ════════════ */
 function SalesStatsSection({ userName, userRole, allUsers, schedules }: {
   userName: string;
   userRole: string;
   allUsers: { id?: string; name: string; username?: string; role?: string; address?: string; branch?: string }[];
   schedules: Schedule[];
 }) {
-  const [filterMode, setFilterMode] = useState<"month" | "date">("month");
-  const [selectedMonth, setSelectedMonth] = useState(() => {
-    const now = new Date();
-    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-  });
-  const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().slice(0, 10));
-
-  // 필터링된 일정
-  const filteredSchedules = filterMode === "month"
-    ? schedules.filter(s => s.date.startsWith(selectedMonth))
-    : schedules.filter(s => s.date === selectedDate);
+  const now = new Date();
+  const curMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  const curMonthLabel = `${now.getFullYear()}년 ${now.getMonth() + 1}월`;
 
   const isCeo = userRole === "ceo" || userRole === "admin";
 
-  // 본인 일정만 필터 (대표는 전체)
-  function getUserSchedules(name: string, source: Schedule[]) {
-    return source.filter(s => {
+  // 이번달 일정만
+  const monthScheds = useMemo(
+    () => schedules.filter((s) => s.date.startsWith(curMonth)),
+    [schedules, curMonth]
+  );
+
+  // 영업사원 이름으로 본인 일정 추출
+  const getUserSchedules = useCallback((name: string, source: Schedule[]) => {
+    return source.filter((s) => {
       const title = s.title.replace(/^\[.+?\]\s*/, "");
-      return title.includes(`/${name}/`) || title.includes(`/${name}[`) || title.endsWith(`/${name}`) || title.startsWith(`u${name}/`);
+      return (
+        title.includes(`/${name}/`) ||
+        title.includes(`/${name}[`) ||
+        title.endsWith(`/${name}`) ||
+        title.startsWith(`u${name}/`)
+      );
     });
-  }
+  }, []);
+
+  // 미입금 = 제목에 "/미입금" 포함
+  const isUnpaid = (title: string) => title.includes("/미입금");
+
+  // 제목에서 고객명 추출 (간단 휴리스틱 — 실패시 전체 제목)
+  // 예: "U오전/미입금/예완/손경순/마포구/김은미/인테리어청소" → "손경순"
+  const extractCustomer = (title: string): string => {
+    const clean = title.replace(/^\[.+?\]\s*/, "");
+    const parts = clean.split("/").map((p) => p.trim()).filter(Boolean);
+    // 앞쪽 마커(시간대, 미입금, 팀장)를 건너뛰고 첫 "고객 같은" 토큰 찾기
+    const skipTokens = new Set([
+      "A", "U", "A오전", "A오후", "U오전", "U오후",
+      "오전", "오후", "미입금", "휴무",
+    ]);
+    for (const p of parts) {
+      if (skipTokens.has(p)) continue;
+      if (/^[AU]$/.test(p)) continue;
+      // 숫자만 / 특수기호만 인 경우 skip
+      if (!/[가-힣]/.test(p) && !/[a-zA-Z]{3,}/.test(p)) continue;
+      // 너무 짧은 (1글자) 팀장 이름도 skip (하지만 한글 1자는 이름일 수 있어 유지)
+      return p;
+    }
+    return clean.slice(0, 30);
+  };
 
   // 대표: 전체 영업사원 / 그 외: 본인만
-  const salesUsers = isCeo
-    ? allUsers.filter(u => u.role === "sales" || u.role === "ceo")
-    : [{ name: userName, role: userRole }];
+  const salesUsers = useMemo(() => {
+    if (isCeo) {
+      return allUsers
+        .filter((u) => u.role === "sales" || u.role === "ceo")
+        .map((u) => ({ name: u.name, role: u.role || "" }));
+    }
+    return [{ name: userName, role: userRole }];
+  }, [isCeo, allUsers, userName, userRole]);
 
-  // 본인 기준 요약 (대표가 아닌 경우)
-  const mySchedules = isCeo ? filteredSchedules : getUserSchedules(userName, filteredSchedules);
-  const myConfirmed = mySchedules.filter(s => !s.title.includes("/미입금")).length;
-  const myPending = mySchedules.filter(s => s.title.includes("/미입금")).length;
+  // 각 영업사원의 미입금/입금확인 일정
+  const rows = useMemo(() => {
+    return salesUsers
+      .map((u) => {
+        const mine = getUserSchedules(u.name, monthScheds);
+        const unpaid = mine.filter((s) => isUnpaid(s.title));
+        const confirmed = mine.filter((s) => !isUnpaid(s.title));
+        return {
+          name: u.name,
+          role: u.role,
+          unpaidCount: unpaid.length,
+          confirmedCount: confirmed.length,
+          unpaid,
+          confirmed,
+        };
+      })
+      .sort((a, b) => b.unpaidCount - a.unpaidCount);
+  }, [salesUsers, monthScheds, getUserSchedules]);
+
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const toggle = (name: string) => {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(name)) next.delete(name);
+      else next.add(name);
+      return next;
+    });
+  };
+
+  const totalUnpaid = rows.reduce((sum, r) => sum + r.unpaidCount, 0);
+  const totalConfirmed = rows.reduce((sum, r) => sum + r.confirmedCount, 0);
 
   return (
-    <div className="px-4 py-4 space-y-4">
-      {/* 필터 모드 전환 */}
-      <div className="flex rounded-xl overflow-hidden border border-gray-200">
-        <button onClick={() => setFilterMode("month")}
-          className={`flex-1 py-2 text-xs font-bold ${filterMode === "month" ? "bg-blue-500 text-white" : "bg-white text-gray-500"}`}>
-          월별 조회
-        </button>
-        <button onClick={() => setFilterMode("date")}
-          className={`flex-1 py-2 text-xs font-bold ${filterMode === "date" ? "bg-blue-500 text-white" : "bg-white text-gray-500"}`}>
-          날짜별 조회
-        </button>
+    <div className="px-4 py-4 space-y-3">
+      {/* 헤더 */}
+      <div className="text-center">
+        <div className="text-xs text-gray-400">{curMonthLabel}</div>
+        <div className="mt-1 flex items-center justify-center gap-4">
+          <span className="text-base font-bold text-gray-700">
+            확인 <span className="text-green-600">{totalConfirmed}</span>
+          </span>
+          <span className="text-gray-300">·</span>
+          <span className="text-base font-bold text-gray-700">
+            미입금 <span className="text-red-500">{totalUnpaid}</span>
+          </span>
+        </div>
       </div>
 
-      {/* 월/날짜 선택 */}
-      <div className="flex items-center gap-2">
-        {filterMode === "month" ? (
-          <input type="month" value={selectedMonth} onChange={(e) => setSelectedMonth(e.target.value)}
-            className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-400" />
+      {/* 영업사원별 */}
+      <div className="rounded-xl border border-gray-200 bg-white overflow-hidden">
+        <div className="px-3 py-2 border-b border-gray-100 text-xs font-bold text-gray-700">
+          {isCeo ? "영업사원별" : "내 영업 현황"}
+        </div>
+        {rows.length === 0 ? (
+          <div className="py-6 text-center text-gray-400 text-sm">영업팀 사용자가 없습니다</div>
         ) : (
-          <input type="date" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)}
-            className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-400" />
-        )}
-      </div>
-
-      {/* 요약 카드 */}
-      <div className="grid grid-cols-3 gap-2">
-        <div className="bg-blue-50 rounded-xl p-3 text-center">
-          <div className="text-lg font-extrabold text-blue-700">{mySchedules.length}</div>
-          <div className="text-xs text-blue-500">{isCeo ? "전체" : "내"} 건수</div>
-        </div>
-        <div className="bg-green-50 rounded-xl p-3 text-center">
-          <div className="text-lg font-extrabold text-green-700">{myConfirmed}</div>
-          <div className="text-xs text-green-500">입금확인</div>
-        </div>
-        <div className="bg-red-50 rounded-xl p-3 text-center">
-          <div className="text-lg font-extrabold text-red-700">{myPending}</div>
-          <div className="text-xs text-red-500">미입금</div>
-        </div>
-      </div>
-
-      {/* 영업사원별 상세 (대표만 전체, 나머진 본인만) */}
-      <div className="space-y-2">
-        <div className="text-xs font-bold text-gray-500 uppercase tracking-wider">
-          {isCeo ? "영업사원별 현황" : "내 영업 현황"}
-        </div>
-        {salesUsers.map((user) => {
-          const userScheds = getUserSchedules(user.name, filteredSchedules);
-          const confirmed = userScheds.filter(s => !s.title.includes("/미입금")).length;
-          const pending = userScheds.filter(s => s.title.includes("/미입금")).length;
-          const total = userScheds.length;
-
-          return (
-            <div key={user.name} className="border border-gray-200 rounded-xl p-3">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-sm font-bold text-gray-800">{user.name}</span>
-                <span className="text-xs px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full font-medium">{total}건</span>
-              </div>
-              <div className="flex gap-3 text-xs">
-                <span className="text-green-600">✅ 입금확인 {confirmed}건</span>
-                <span className="text-red-500">⏳ 미입금 {pending}건</span>
-              </div>
-              {total > 0 && (
-                <div className="mt-2 h-2 bg-gray-100 rounded-full overflow-hidden">
-                  <div className="h-full bg-green-500 rounded-full transition-all"
-                    style={{ width: `${Math.round((confirmed / total) * 100)}%` }} />
+          <div className="divide-y divide-gray-100">
+            {rows.map((r) => {
+              const isOpen = expanded.has(r.name);
+              const hasAny = r.unpaidCount + r.confirmedCount > 0;
+              return (
+                <div key={r.name}>
+                  <button
+                    onClick={() => toggle(r.name)}
+                    className="w-full flex items-center justify-between px-3 py-2.5 active:bg-gray-50"
+                    disabled={!hasAny}
+                  >
+                    <span className="text-sm font-medium text-gray-800">{r.name}</span>
+                    <span className="flex items-center gap-2 shrink-0">
+                      {hasAny ? (
+                        <>
+                          <span className="text-xs font-bold text-green-600">확인 {r.confirmedCount}</span>
+                          <span className="text-gray-300">/</span>
+                          <span className="text-xs font-bold text-red-500">미입금 {r.unpaidCount}</span>
+                          <svg
+                            className={`w-3.5 h-3.5 text-gray-400 transition-transform ${isOpen ? "rotate-90" : ""}`}
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                          </svg>
+                        </>
+                      ) : (
+                        <span className="text-xs text-gray-300">-</span>
+                      )}
+                    </span>
+                  </button>
+                  {isOpen && hasAny && (
+                    <div className="px-3 py-2 space-y-2 bg-gray-50/50">
+                      {r.unpaidCount > 0 && (
+                        <div>
+                          <div className="text-[10px] font-bold text-red-500 mb-1">미입금 {r.unpaidCount}건</div>
+                          <div className="space-y-0.5">
+                            {r.unpaid
+                              .slice()
+                              .sort((a, b) => (a.date < b.date ? -1 : 1))
+                              .map((s) => (
+                                <div key={s.id} className="flex items-center justify-between text-xs py-0.5">
+                                  <div className="flex-1 min-w-0 flex items-center gap-1.5">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-red-400 shrink-0" />
+                                    <span className="text-gray-800 truncate">{extractCustomer(s.title)}</span>
+                                  </div>
+                                  <span className="text-[10px] text-gray-500 shrink-0 ml-2">{s.date.slice(5)}</span>
+                                </div>
+                              ))}
+                          </div>
+                        </div>
+                      )}
+                      {r.confirmedCount > 0 && (
+                        <div>
+                          <div className="text-[10px] font-bold text-green-600 mb-1">입금확인 {r.confirmedCount}건</div>
+                          <div className="space-y-0.5">
+                            {r.confirmed
+                              .slice()
+                              .sort((a, b) => (a.date < b.date ? -1 : 1))
+                              .map((s) => (
+                                <div key={s.id} className="flex items-center justify-between text-xs py-0.5">
+                                  <div className="flex-1 min-w-0 flex items-center gap-1.5">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-green-500 shrink-0" />
+                                    <span className="text-gray-800 truncate">{extractCustomer(s.title)}</span>
+                                  </div>
+                                  <span className="text-[10px] text-gray-500 shrink-0 ml-2">{s.date.slice(5)}</span>
+                                </div>
+                              ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
-          );
-        })}
-        {salesUsers.length === 0 && (
-          <div className="py-4 text-center text-gray-400 text-sm">영업팀 사용자가 없습니다</div>
+              );
+            })}
+          </div>
         )}
+      </div>
+
+      <div className="text-[10px] text-gray-400 text-center">
+        ℹ️ 미입금 판정: 일정 제목에 &quot;/미입금&quot; 포함 시 · 그 외는 입금확인
       </div>
     </div>
   );
