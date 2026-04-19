@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import dynamic from "next/dynamic";
 import { Schedule } from "@/types";
 import { fetchDeletedSchedules, restoreScheduleApi, emptyTrashApi, deleteAllSchedules, fetchSchedules, addUnassignedSchedule, assignScheduleApi, createSchedule } from "@/lib/api";
+import { showAlert, showConfirm } from "@/lib/dialog";
 
 const NoticeTab = dynamic(() => import("./NoticeTab"), { ssr: false });
 
@@ -174,7 +175,7 @@ function CeoSection({ onRefresh, allUsers, members, schedules }: {
   async function handleDeleteAll() {
     const result = await deleteAllSchedules();
     onRefresh();
-    alert(`${result.deleted}건 삭제 완료`);
+    showAlert(`${result.deleted}건 삭제 완료`);
   }
 
   async function handleBackup() {
@@ -280,7 +281,7 @@ function CeoSection({ onRefresh, allUsers, members, schedules }: {
 
       {/* 전체 삭제 */}
       <button
-        onClick={() => { if (confirm(`전체 ${totalCount}건 일정을 모두 삭제합니다. 정말 삭제하시겠습니까?`)) handleDeleteAll(); }}
+        onClick={() => { showConfirm(`전체 ${totalCount}건 일정을 모두 삭제합니다. 정말 삭제하시겠습니까?`).then((ok) => { if (ok) handleDeleteAll(); }); }}
         className="w-full px-4 py-3.5 flex items-center gap-3 active:bg-red-50"
       >
         <div className="w-9 h-9 bg-red-50 rounded-xl flex items-center justify-center">

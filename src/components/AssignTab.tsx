@@ -3,6 +3,7 @@
 import { useState, useMemo, useRef, useCallback } from "react";
 import { Schedule, Member } from "@/types";
 import { assignScheduleApi, softDeleteSchedule, fetchDeletedSchedules, restoreScheduleApi, emptyTrashApi } from "@/lib/api";
+import { showConfirm } from "@/lib/dialog";
 import {
   format,
   startOfMonth,
@@ -303,9 +304,9 @@ export default function AssignTab({ members, schedules, onAssigned, onDeleted, o
                     </button>
                     <button
                       onClick={() => {
-                        if (confirm(`"${s.title}"\n\n정말 영구 삭제하시겠습니까?\n(복원 불가)`)) {
-                          setTrashItems((prev) => prev.filter((t) => t.id !== s.id));
-                        }
+                        showConfirm(`"${s.title}"\n\n정말 영구 삭제하시겠습니까?\n(복원 불가)`).then((ok) => {
+                          if (ok) setTrashItems((prev) => prev.filter((t) => t.id !== s.id));
+                        });
                       }}
                       className="p-1.5 active:bg-red-50 rounded-lg"
                       title="영구삭제"

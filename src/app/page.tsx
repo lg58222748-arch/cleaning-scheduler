@@ -46,6 +46,7 @@ import {
   updateUserInfoApi,
 } from "@/lib/api";
 import { format, startOfMonth, endOfMonth, addMonths, subMonths } from "date-fns";
+import { showAlert, showConfirm } from "@/lib/dialog";
 import { ko } from "date-fns/locale";
 
 type TabMode = "calendar" | "manage" | "assign" | "members" | "sales" | "area";
@@ -774,12 +775,12 @@ export default function Home() {
         } else if (ns?.error) {
           setSchedules(prev => prev.filter(s => s.id !== tempId));
           setDetailSchedule(null);
-          alert("일정 저장 실패: " + (ns.detail || ns.error));
+          showAlert("일정 저장 실패: " + (ns.detail || ns.error));
         }
       }).catch((err) => {
         setSchedules(prev => prev.filter(s => s.id !== tempId));
         setDetailSchedule(null);
-        alert("일정 저장에 실패했습니다: " + (err?.message || "네트워크 오류"));
+        showAlert("일정 저장에 실패했습니다: " + (err?.message || "네트워크 오류"));
       });
     } else {
       // 배정탭에서 생성
@@ -955,7 +956,7 @@ export default function Home() {
                 window.location.href = "intent://" + url.replace(/https?:\/\//, "") + "#Intent;scheme=https;package=com.android.chrome;end";
               } else {
                 navigator.clipboard?.writeText(url);
-                alert("주소가 복사되었습니다!\n사파리에 붙여넣기 해주세요.");
+                showAlert("주소가 복사되었습니다!\n사파리에 붙여넣기 해주세요.");
               }
             }} className="w-full py-3 bg-blue-600 text-white rounded-xl font-bold text-sm mb-2">
               크롬/사파리로 열기
@@ -1373,8 +1374,8 @@ export default function Home() {
                         <button onClick={() => openProfileUser(u)} className="p-1.5 active:bg-gray-100 rounded-lg border border-gray-200">
                           <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                         </button>
-                        <button onClick={() => {
-                          if (!confirm(u.name + "님을 탈퇴시키겠습니까?")) return;
+                        <button onClick={async () => {
+                          if (!(await showConfirm(u.name + "님을 탈퇴시키겠습니까?"))) return;
                           setAllUsers(prev => prev.filter(x => x.id !== u.id));
                           deleteUserApi(u.id).then(() => loadData(undefined, true));
                         }} className="p-1.5 active:bg-red-50 rounded-lg border border-gray-200">

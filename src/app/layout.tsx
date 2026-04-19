@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Geist } from "next/font/google";
 import Script from "next/script";
 import "./globals.css";
+import { DialogHost } from "@/lib/dialog";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -43,6 +44,7 @@ export default function RootLayout({
     <html lang="ko" className={`${geistSans.variable} h-full`}>
       <body className="min-h-full font-sans antialiased" style={{ overscrollBehavior: "none" }}>
         {children}
+        <DialogHost />
         <Script
           src={`https://oapi.map.naver.com/openapi/v3/maps.js?ncpKeyId=${process.env.NEXT_PUBLIC_NAVER_MAP_CLIENT_ID}`}
           strategy="lazyOnload"

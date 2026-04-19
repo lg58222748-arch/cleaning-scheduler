@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Schedule, Member, Comment } from "@/types";
 import { fetchComments, createComment, deleteCommentApi, updateSchedule as apiUpdateSchedule } from "@/lib/api";
+import { showConfirm } from "@/lib/dialog";
 import ScheduleChecklist from "./ScheduleChecklist";
 import ScheduleSettlement from "./ScheduleSettlement";
 
@@ -249,10 +250,9 @@ export default function ScheduleDetail({
           )}
           <button
             onClick={() => {
-              if (confirm(`"${schedule.title}"\n\n정말 삭제하시겠습니까?\n(휴지통으로 이동되며 복원 가능합니다)`)) {
-                onDelete(schedule.id);
-                onClose();
-              }
+              showConfirm(`"${schedule.title}"\n\n정말 삭제하시겠습니까?\n(휴지통으로 이동되며 복원 가능합니다)`).then((ok) => {
+                if (ok) { onDelete(schedule.id); onClose(); }
+              });
             }}
             className="p-1.5 active:bg-red-50 rounded-lg"
           >

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import { showAlert, showConfirm } from "@/lib/dialog";
 import { addUnassignedSchedule } from "@/lib/api";
 
 interface SalesTabProps {
@@ -237,8 +238,8 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
     const newTpl = { id: "tpl-" + Date.now(), title: "새 양식", content: "" };
     saveTemplates([...templates, newTpl]);
   }
-  function deleteTemplate(id: string) {
-    if (!confirm("이 양식을 삭제하시겠습니까?")) return;
+  async function deleteTemplate(id: string) {
+    if (!(await showConfirm("이 양식을 삭제하시겠습니까?"))) return;
     saveTemplates(templates.filter(t => t.id !== id));
   }
   const [dragTplId, setDragTplId] = useState<string | null>(null);
@@ -614,7 +615,7 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
     // 날짜 검증: 일정별 날짜가 비어있는지 확인
     for (let i = 0; i < schedules.length; i++) {
       if (!schedules[i].date) {
-        alert(`${i + 1}번째 일정의 날짜가 설정되지 않았습니다.`);
+        showAlert(`${i + 1}번째 일정의 날짜가 설정되지 않았습니다.`);
         return;
       }
     }
@@ -625,7 +626,7 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
       const schedDates = schedules.map(s => s.date.replace(/-/g, ""));
       const hasMatch = schedDates.some(d => d.includes(wishNums.slice(-4)) || wishNums.includes(d.slice(-4)));
       if (!hasMatch && wishNums.length >= 4) {
-        const ok = confirm(`청소희망날짜(${parsedWishDate})와 일정 날짜(${schedules.map(s => s.date).join(", ")})가 다릅니다.\n\n그래도 저장하시겠습니까?`);
+        const ok = await showConfirm(`청소희망날짜(${parsedWishDate})와 일정 날짜(${schedules.map(s => s.date).join(", ")})가 다릅니다.\n\n그래도 저장하시겠습니까?`);
         if (!ok) return;
       }
     }
@@ -1267,7 +1268,7 @@ function SavedBookings({ onLoad, onSave }: {
   function saveCurrentBooking() {
     const currentData = onSave();
     if (!currentData.parsedName && !currentData.confirmMsg) {
-      alert("저장할 예약 내용이 없습니다. 파싱 후 저장해주세요.");
+      showAlert("저장할 예약 내용이 없습니다. 파싱 후 저장해주세요.");
       return;
     }
     const newItem: BookingData = { ...currentData, savedAt: new Date().toISOString() };
@@ -1275,7 +1276,7 @@ function SavedBookings({ onLoad, onSave }: {
     const updated = [newItem, ...items].slice(0, 50);
     setItems(updated);
     localStorage.setItem("savedBookings", JSON.stringify(updated));
-    alert("임시 저장 완료!");
+    showAlert("임시 저장 완료!");
   }
 
   function deleteItem(idx: number) {

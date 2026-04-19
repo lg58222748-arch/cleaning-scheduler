@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { Schedule } from "@/types";
 import { fetchDeletedSchedules, restoreScheduleApi, emptyTrashApi, deleteAllSchedules, softDeleteSchedule } from "@/lib/api";
+import { showConfirm } from "@/lib/dialog";
 
 interface AdminPanelProps {
   onClose: () => void;
@@ -125,7 +126,7 @@ export default function AdminPanel({ onClose, onRefresh }: AdminPanelProps) {
   }
 
   async function handleMoveAllToTrash() {
-    if (!confirm("모든 일정을 휴지통으로 이동하시겠습니까?\n(영구 삭제가 아닙니다. 휴지통에서 복원 가능합니다)")) return;
+    if (!(await showConfirm("모든 일정을 휴지통으로 이동하시겠습니까?\n(영구 삭제가 아닙니다. 휴지통에서 복원 가능합니다)"))) return;
     await deleteAllSchedules();
     onRefresh?.();
   }
@@ -137,8 +138,7 @@ export default function AdminPanel({ onClose, onRefresh }: AdminPanelProps) {
   }
 
   async function handlePermanentDelete(id: string) {
-    if (!confirm("이 일정을 영구 삭제하시겠습니까?\n복원할 수 없습니다.")) return;
-    // soft delete된 것을 영구 삭제하는 API 호출
+    if (!(await showConfirm("이 일정을 영구 삭제하시겠습니까?\n복원할 수 없습니다."))) return;
     const res = await fetch(`/api/schedules/${id}`, { method: "DELETE" });
     if (res.ok) {
       setDeletedSchedules(prev => prev.filter(s => s.id !== id));
@@ -146,7 +146,7 @@ export default function AdminPanel({ onClose, onRefresh }: AdminPanelProps) {
   }
 
   async function handleEmptyTrash() {
-    if (!confirm("휴지통을 비우시겠습니까?\n모든 삭제된 일정이 영구 삭제됩니다.")) return;
+    if (!(await showConfirm("휴지통을 비우시겠습니까?\n모든 삭제된 일정이 영구 삭제됩니다."))) return;
     await emptyTrashApi();
     setDeletedSchedules([]);
   }
