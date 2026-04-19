@@ -1,8 +1,27 @@
 import { NextRequest } from "next/server";
-import { supabase } from "@/lib/supabase";
+
+export const maxDuration = 60;
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
-const MAX_RANGE_DAYS = 92;
+const MAX_RANGE_DAYS = 730; // 2년 — 은행 입금 ~ 일정일 사이가 길 수 있어 넓게 허용
+
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
+const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
+
+async function supaGet<T>(path: string): Promise<T> {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
+    headers: {
+      apikey: SUPABASE_KEY,
+      Authorization: `Bearer ${SUPABASE_KEY}`,
+      Accept: "application/json",
+    },
+    cache: "no-store",
+  });
+  if (!res.ok) {
+    throw new Error(`Supabase ${res.status}: ${await res.text().then((t) => t.slice(0, 200))}`);
+  }
+  return res.json() as Promise<T>;
+}
 
 export async function GET(req: NextRequest) {
   const expectedKey = process.env.EXTERNAL_API_KEY;
@@ -32,42 +51,65 @@ export async function GET(req: NextRequest) {
     return Response.json({ error: "range_too_wide", maxDays: MAX_RANGE_DAYS }, { status: 400 });
   }
 
-  // settlements ↔ schedules 에 FK 가 없어 PostgREST 관계 조인을 못 쓰므로 2단계로 조회.
-  // 1) 날짜 범위의 confirmed/pending 일정 + 미배정(unassigned) 일정 전체.
-  //    미배정 은 예약만 받은 상태로 보통 입금과 일정일 이 다를 수 있어 날짜 필터 제외.
-  const [rangeRes, unassignedRes] = await Promise.all([
-    supabase
-      .from("schedules")
-      .select("id, title, date, start_time, end_time, member_name, note, status")
-      .gte("date", from)
-      .lte("date", to)
-      .not("status", "in", '("deleted","unassigned")'),
-    supabase
-      .from("schedules")
-      .select("id, title, date, start_time, end_time, member_name, note, status")
-      .eq("status", "unassigned"),
-  ]);
+  if (!SUPABASE_URL || !SUPABASE_KEY) {
+    return Response.json({ error: "server_misconfigured" }, { status: 500 });
+  }
 
-  if (rangeRes.error) return Response.json({ error: "db_error", message: rangeRes.error.message }, { status: 502 });
-  if (unassignedRes.error) return Response.json({ error: "db_error", message: unassignedRes.error.message }, { status: 502 });
+  // 공통 select
+  const selectCols = "id,title,date,start_time,end_time,member_name,note,status";
+
+  type ScheduleRow = {
+    id: string; title: string; date: string; start_time: string; end_time: string;
+    member_name: string; note: string; status: string;
+  };
+
+  // 1) 날짜 범위의 confirmed/pending + 미배정 전체 (날짜 필터 제외)
+  let rangeRows: ScheduleRow[] = [];
+  let unassignedRows: ScheduleRow[] = [];
+  try {
+    [rangeRows, unassignedRows] = await Promise.all([
+      supaGet<ScheduleRow[]>(
+        `schedules?date=gte.${from}&date=lte.${to}&status=not.in.(deleted,unassigned)&order=date&limit=20000&select=${selectCols}`
+      ),
+      supaGet<ScheduleRow[]>(
+        `schedules?status=eq.unassigned&order=date&limit=20000&select=${selectCols}`
+      ),
+    ]);
+  } catch (e) {
+    return Response.json({ error: "db_error", message: e instanceof Error ? e.message : String(e) }, { status: 502 });
+  }
 
   // 중복 id 합치기 (이론상 겹칠 수 없지만 안전하게)
-  const byId = new Map<string, (typeof rangeRes.data)[number]>();
-  for (const s of rangeRes.data || []) byId.set(s.id, s);
-  for (const s of unassignedRes.data || []) byId.set(s.id, s);
+  const byId = new Map<string, ScheduleRow>();
+  for (const s of rangeRows) byId.set(s.id, s);
+  for (const s of unassignedRows) byId.set(s.id, s);
   const schedules = Array.from(byId.values());
   if (schedules.length === 0) {
     return Response.json({ range: { from, to }, count: 0, schedules: [] });
   }
 
-  // 2) 그 일정들의 settlements (있으면) — deposit 0 도 허용, settlement 없는 일정도 허용
+  // 2) 그 일정들의 settlements — IN 절이 URL 길이 제한에 걸리지 않도록 200개씩 청크.
+  type SettlementRow = {
+    id: string; schedule_id: string; status: string; quote: number; deposit: number;
+    balance: number; customer_name: string; customer_phone: string;
+  };
   const ids = schedules.map((s) => s.id);
-  const { data: settlementRows, error: stErr } = await supabase
-    .from("settlements")
-    .select("id, schedule_id, status, quote, deposit, balance, customer_name, customer_phone")
-    .in("schedule_id", ids);
-  if (stErr) {
-    return Response.json({ error: "db_error", message: stErr.message }, { status: 502 });
+  const CHUNK = 200;
+  const settlementRows: SettlementRow[] = [];
+  try {
+    const chunks: string[][] = [];
+    for (let i = 0; i < ids.length; i += CHUNK) chunks.push(ids.slice(i, i + CHUNK));
+    const results = await Promise.all(
+      chunks.map((slice) => {
+        const list = slice.map((id) => `"${id}"`).join(",");
+        return supaGet<SettlementRow[]>(
+          `settlements?schedule_id=in.(${list})&select=id,schedule_id,status,quote,deposit,balance,customer_name,customer_phone&limit=${CHUNK}`
+        );
+      })
+    );
+    for (const r of results) settlementRows.push(...r);
+  } catch (e) {
+    return Response.json({ error: "db_error", message: e instanceof Error ? e.message : String(e) }, { status: 502 });
   }
 
   const settlementMap = new Map<string, typeof settlementRows[number]>();
