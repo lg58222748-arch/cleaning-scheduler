@@ -66,6 +66,16 @@ export default function ScheduleDetail({
   // 탭 히스토리 (뒤로가기 지원)
   const tabHistoryRef = useRef<DetailTab[]>([]);
   const dateInputRef = useRef<HTMLInputElement>(null);
+  const noteTextareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // 본문 textarea 높이 조정 - noteText 실제로 바뀔 때만 실행
+  // (이전엔 ref callback 이 매 렌더마다 실행돼서 스크롤이 위로 튕기는 버그 있었음)
+  useEffect(() => {
+    const el = noteTextareaRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = el.scrollHeight + "px";
+  }, [noteText]);
 
   useEffect(() => {
     const handler = (): boolean => {
@@ -431,9 +441,9 @@ export default function ScheduleDetail({
                   </svg>
                   <div className="flex-1 flex flex-col">
                     <textarea
-                      ref={(el) => { if (el) { el.style.height = "auto"; el.style.height = el.scrollHeight + "px"; } }}
+                      ref={noteTextareaRef}
                       value={noteText}
-                      onChange={(e) => { setNoteText(e.target.value); setNoteChanged(true); const t = e.target; t.style.height = "auto"; t.style.height = t.scrollHeight + "px"; }}
+                      onChange={(e) => { setNoteText(e.target.value); setNoteChanged(true); }}
                       style={{ fontSize: "14px" }}
                       className="w-full text-gray-700 leading-relaxed bg-transparent outline-none resize-none min-h-[60px]"
                       placeholder="내용을 입력하세요..."
