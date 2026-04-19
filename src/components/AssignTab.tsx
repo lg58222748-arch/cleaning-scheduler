@@ -41,11 +41,15 @@ export default function AssignTab({ members, schedules, onAssigned, onDeleted, o
   const [animating, setAnimating] = useState(false);
   const touchStartX = useRef(0);
   const touchStartY = useRef(0);
+  // 같은 schedule 을 1-2 프레임 안에 더블탭했을 때 onAssigned 2회 호출 방지
+  const assigningRef = useRef<string | null>(null);
 
   function handleAssign(schedule: Schedule) {
     if (!selectedMemberId) return;
+    if (assigningRef.current === schedule.id) return;
     const member = members.find((m) => m.id === selectedMemberId);
     if (!member) return;
+    assigningRef.current = schedule.id;
     // 팝업 즉시 닫기
     setShowDayPopup(false);
     setSelectedSchedule(null);
@@ -53,6 +57,7 @@ export default function AssignTab({ members, schedules, onAssigned, onDeleted, o
     // 다음 프레임에서 상태 업데이트 (UI가 먼저 반응)
     requestAnimationFrame(() => {
       onAssigned(schedule.id, member.id, member.name);
+      requestAnimationFrame(() => { assigningRef.current = null; });
     });
   }
 

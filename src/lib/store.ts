@@ -107,20 +107,30 @@ export async function addSchedule(input: Omit<Schedule, "id" | "status">): Promi
   return { schedule: rowToSchedule(data) };
 }
 
+// 같은 탭에서 동시 insert 되는 TOCTOU 방어 — key 는 googleEventId 또는 title|date
+const pendingInserts = new Set<string>();
+
 export async function addUnassignedSchedule(input: Omit<Schedule, "id" | "status" | "memberId" | "memberName">): Promise<Schedule | null> {
-  // 중복 체크 1: googleEventId
-  if (input.googleEventId) {
-    const { data: existing } = await supabase.from("schedules").select("id").eq("google_event_id", input.googleEventId).limit(1);
-    if (existing && existing.length > 0) return null;
+  const key = input.googleEventId || `${input.title}|${input.date}`;
+  if (pendingInserts.has(key)) return null;
+  pendingInserts.add(key);
+  try {
+    // 중복 체크 1: googleEventId
+    if (input.googleEventId) {
+      const { data: existing } = await supabase.from("schedules").select("id").eq("google_event_id", input.googleEventId).limit(1);
+      if (existing && existing.length > 0) return null;
+    }
+    // 중복 체크 2: 같은 제목+날짜
+    const { data: dup } = await supabase.from("schedules").select("id").eq("title", input.title).eq("date", input.date).limit(1);
+    if (dup && dup.length > 0) return null;
+    const { data, error } = await supabase.from("schedules").insert({
+      member_id: "", member_name: "미배정", title: input.title, location: input.location || "", date: input.date, start_time: input.startTime, end_time: input.endTime, status: "unassigned", google_event_id: input.googleEventId || null, note: input.note || "",
+    }).select().single();
+    if (error || !data) return null;
+    return rowToSchedule(data);
+  } finally {
+    pendingInserts.delete(key);
   }
-  // 중복 체크 2: 같은 제목+날짜
-  const { data: dup } = await supabase.from("schedules").select("id").eq("title", input.title).eq("date", input.date).limit(1);
-  if (dup && dup.length > 0) return null;
-  const { data, error } = await supabase.from("schedules").insert({
-    member_id: "", member_name: "미배정", title: input.title, location: input.location || "", date: input.date, start_time: input.startTime, end_time: input.endTime, status: "unassigned", google_event_id: input.googleEventId || null, note: input.note || "",
-  }).select().single();
-  if (error || !data) return null;
-  return rowToSchedule(data);
 }
 
 // 전체 일정 삭제 (관리자용)

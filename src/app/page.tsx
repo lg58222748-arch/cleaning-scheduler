@@ -471,15 +471,22 @@ export default function Home() {
 
     // 앱이 백그라운드 → 포그라운드로 돌아올 때 강제 전체 갱신
     // (Chrome/WebView 는 백그라운드에서 Realtime 연결을 끊음 → 복귀 시 스냅샷 동기화 필요)
+    // 단, 직전 낙관적 업데이트(배정/해제/삭제) 보호 구간이면 schedules reload 는 스킵.
     const onVisible = () => {
-      if (document.visibilityState === "visible") {
+      if (document.visibilityState !== "visible") return;
+      if (Date.now() < scheduleReloadSuppressRef.current) {
+        console.log("[VIS] 포그라운드 복귀 → schedules 보호중, 그 외만 갱신");
+        reloadNotifications();
+        reloadUsers();
+        reloadMembers();
+      } else {
         console.log("[VIS] 포그라운드 복귀 → 전체 갱신");
         reloadAll();
-        // Realtime 채널도 재구독 유도
-        try {
-          (channel as unknown as { state?: string }).state !== "joined" && sbClient.channel("all-db-changes");
-        } catch {}
       }
+      // Realtime 채널도 재구독 유도
+      try {
+        (channel as unknown as { state?: string }).state !== "joined" && sbClient.channel("all-db-changes");
+      } catch {}
     };
     document.addEventListener("visibilitychange", onVisible);
     window.addEventListener("focus", onVisible);
@@ -779,7 +786,12 @@ export default function Home() {
       pushHash("d");
       createSchedule(calData).then(ns => {
         if (ns?.id) {
-          setSchedules(prev => prev.map(s => s.id === tempId ? ns : s));
+          // temp 제거 후 realtime 이 이미 real row 를 추가했으면 중복 insert 하지 않음
+          setSchedules(prev => {
+            const withoutTemp = prev.filter(s => s.id !== tempId);
+            if (withoutTemp.findIndex(s => s.id === ns.id) >= 0) return withoutTemp;
+            return [...withoutTemp, ns];
+          });
           setDetailSchedule(ns);
         } else if (ns?.error) {
           setSchedules(prev => prev.filter(s => s.id !== tempId));
@@ -797,7 +809,18 @@ export default function Home() {
       const temp: Schedule = { id: tempId, memberId: "", memberName: "미배정", title: data.title, location: "", date: data.date, startTime: data.startTime || "09:00", endTime: data.endTime || "18:00", status: "unassigned", note: data.note || "" };
       setUnassignedSchedules((prev) => [...prev, temp]);
       addUnassignedSchedule({ title: data.title, date: data.date, startTime: data.startTime, endTime: data.endTime, note: data.note || "", color: data.color })
-        .then(ns => { if (ns?.id) setUnassignedSchedules(prev => prev.map(s => s.id === tempId ? ns : s)); })
+        .then(ns => {
+          if (!ns?.id) {
+            // DB 중복으로 null 리턴된 경우: temp 만 제거 (real 은 realtime 이 이미 추가했을 수 있음)
+            setUnassignedSchedules(prev => prev.filter(s => s.id !== tempId));
+            return;
+          }
+          setUnassignedSchedules(prev => {
+            const withoutTemp = prev.filter(s => s.id !== tempId);
+            if (withoutTemp.findIndex(s => s.id === ns.id) >= 0) return withoutTemp;
+            return [...withoutTemp, ns];
+          });
+        })
         .catch(() => {});
     }
   }
@@ -812,11 +835,16 @@ export default function Home() {
     // 낙관적 업데이트 보호: 4초간 reload 무시 (stale fetch 가 이미 제거한 스케줄을 되돌리는 것 방지)
     scheduleReloadSuppressRef.current = Date.now() + 4000;
     const target = schedules.find((s) => s.id === id);
+    if (!target) return;
+    const unassigned = { ...target, memberId: "", memberName: "미배정", status: "unassigned" as const };
     setSchedules((prev) => prev.filter((s) => s.id !== id));
-    if (target) {
-      setUnassignedSchedules((prev) => [...prev, { ...target, memberId: "", memberName: "미배정", status: "unassigned" as const }]);
-    }
-    unassignScheduleApi(id, currentUser?.name || "", reason).catch(() => {});
+    setUnassignedSchedules((prev) => [...prev, unassigned]);
+    unassignScheduleApi(id, currentUser?.name || "", reason).catch((err) => {
+      console.error("[unassign] 실패, 롤백:", err);
+      setSchedules((prev) => prev.find((s) => s.id === id) ? prev : [...prev, target]);
+      setUnassignedSchedules((prev) => prev.filter((s) => s.id !== id));
+      showAlert("배정 해제 실패. 다시 시도해주세요.");
+    });
   }
   function handleEditSchedule(schedule: Schedule) {
     setEditingSchedule(schedule);
@@ -1202,23 +1230,29 @@ export default function Home() {
               scheduleReloadSuppressRef.current = Date.now() + 4000;
               // 낙관적 업데이트: 즉시 UI 반영
               const target = unassignedSchedules.find((s) => s.id === scheduleId);
-              if (target) {
-                // 배정탭에서 제거
-                setUnassignedSchedules((prev) => prev.filter((s) => s.id !== scheduleId));
-                // 달력에 추가 — 같은 scheduleId 이미 있으면 덮어쓰기만, 없을 때만 추가 (중복 방지)
-                setSchedules((prev) => {
-                  const idx = prev.findIndex((s) => s.id === scheduleId);
-                  const assigned = { ...target, memberId, memberName, status: "confirmed" as const };
-                  if (idx >= 0) {
-                    const next = [...prev];
-                    next[idx] = assigned;
-                    return next;
-                  }
-                  return [...prev, assigned];
-                });
-              }
-              // API는 백그라운드 (안 기다림)
-              assignScheduleApi(scheduleId, memberId, memberName);
+              if (!target) return;
+              // 배정탭에서 제거
+              setUnassignedSchedules((prev) => prev.filter((s) => s.id !== scheduleId));
+              // 달력에 추가 — 같은 scheduleId 이미 있으면 덮어쓰기만, 없을 때만 추가 (중복 방지)
+              setSchedules((prev) => {
+                const idx = prev.findIndex((s) => s.id === scheduleId);
+                const assigned = { ...target, memberId, memberName, status: "confirmed" as const };
+                if (idx >= 0) {
+                  const next = [...prev];
+                  next[idx] = assigned;
+                  return next;
+                }
+                return [...prev, assigned];
+              });
+              // API 호출 + 실패 시 롤백
+              assignScheduleApi(scheduleId, memberId, memberName).catch((err) => {
+                console.error("[assign] 실패, 롤백:", err);
+                setSchedules((prev) => prev.filter((s) => s.id !== scheduleId));
+                setUnassignedSchedules((prev) =>
+                  prev.find((s) => s.id === scheduleId) ? prev : [...prev, target]
+                );
+                showAlert("배정 실패. 다시 시도해주세요.");
+              });
             }} onDeleted={(id) => {
               scheduleReloadSuppressRef.current = Date.now() + 4000;
               setUnassignedSchedules((prev) => prev.filter((s) => s.id !== id));
@@ -1643,8 +1677,20 @@ export default function Home() {
                 }
                 return [...prev, assigned];
               });
+              assignScheduleApi(scheduleId, memberId, memberName).catch((err) => {
+                console.error("[assign] 실패, 롤백:", err);
+                setSchedules((prev) => prev.filter((s) => s.id !== scheduleId));
+                setUnassignedSchedules((prev) =>
+                  prev.find((s) => s.id === scheduleId) ? prev : [...prev, target]
+                );
+                showAlert("배정 실패. 다시 시도해주세요.");
+              });
+            } else {
+              assignScheduleApi(scheduleId, memberId, memberName).catch((err) => {
+                console.error("[assign] 실패:", err);
+                showAlert("배정 실패. 다시 시도해주세요.");
+              });
             }
-            assignScheduleApi(scheduleId, memberId, memberName);
             setDetailSchedule(null);
             consumeHash();
           }}
