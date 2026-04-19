@@ -1018,57 +1018,66 @@ export function BranchMap({ allUsers, isAdmin = false }: { allUsers: { id?: stri
     setTimeout(() => setReady(true), 50);
   }
 
-  // 팀원 목록 - 모든 사용자 표시 (관리점 없어도 기본 위치 + 관리자가 드래그 가능)
+  // 팀원 목록 - 모든 사용자 표시 (동명이인 포함, id 기반 구분)
+  // 관리점 없어도 기본 위치 + 관리자가 드래그 가능
   const userList = useMemo(() => {
-    // 중복 이름 제거 (DB 에 동명이인 유저 있으면 첫 번째만 사용)
-    const seen = new Set<string>();
-    const uniqueUsers = allUsers.filter(u => {
-      if (seen.has(u.name)) return false;
-      seen.add(u.name);
-      return true;
-    });
-    // 관리점별 그룹핑
-    const branchUsers: Record<string, string[]> = {};
-    const noBranchUsers: string[] = [];
-    for (const u of uniqueUsers) {
-      if (hiddenPins.has(u.name)) continue; // 관리자가 숨긴 핀 제외
+    // 동명이인 감지: 같은 이름 2회 이상이면 라벨에 구분자 붙임
+    const nameCount: Record<string, number> = {};
+    for (const u of allUsers) { nameCount[u.name] = (nameCount[u.name] || 0) + 1; }
+
+    type Entry = { key: string; name: string; label: string; branch: string; lat: number; lng: number; color: string };
+    const result: Entry[] = [];
+
+    // 관리점별 그룹핑 (key = id || name)
+    const branchGroups: Record<string, { key: string; name: string; label: string }[]> = {};
+    const noBranchGroup: { key: string; name: string; label: string }[] = [];
+
+    for (const u of allUsers) {
+      const key = u.id || u.name;
+      if (hiddenPins.has(key) || hiddenPins.has(u.name)) continue;
       const bname = u.branch ? u.branch.replace(/\[관리점\]/, "").trim() : "";
-      if (bname && BRANCH_COORDS[bname]) {
-        if (!branchUsers[bname]) branchUsers[bname] = [];
-        branchUsers[bname].push(u.name);
+      const hasValidBranch = !!(bname && BRANCH_COORDS[bname]);
+      // 동명이인이면 라벨에 관리점 표시 (ex. 김기수[천안], 김기수[평택])
+      const label = nameCount[u.name] > 1
+        ? `${u.name}[${bname || u.role || "?"}]`
+        : u.name;
+      if (hasValidBranch) {
+        if (!branchGroups[bname]) branchGroups[bname] = [];
+        branchGroups[bname].push({ key, name: u.name, label });
       } else {
-        noBranchUsers.push(u.name);
+        noBranchGroup.push({ key, name: u.name, label });
       }
     }
-    const result: { name: string; branch: string; lat: number; lng: number; color: string }[] = [];
-    const branches = Object.keys(branchUsers);
+
+    const branches = Object.keys(branchGroups);
     branches.forEach((bname, bi) => {
       const coord = BRANCH_COORDS[bname];
-      const users = branchUsers[bname];
+      const users = branchGroups[bname];
       const color = BRANCH_COLORS[bi % BRANCH_COLORS.length];
-      users.forEach((uname, ui) => {
-        const custom = customPositions[uname];
+      users.forEach((u, ui) => {
+        const custom = customPositions[u.key] || customPositions[u.name];
         if (custom) {
-          result.push({ name: uname, branch: bname, lat: custom.lat, lng: custom.lng, color });
+          result.push({ key: u.key, name: u.name, label: u.label, branch: bname, lat: custom.lat, lng: custom.lng, color });
         } else {
           const angle = (2 * Math.PI * ui) / Math.max(users.length, 1) - Math.PI / 2;
           const spread = 0.025 + (ui % 3) * 0.01;
-          result.push({ name: uname, branch: bname, lat: coord.lat + Math.cos(angle) * spread, lng: coord.lng + Math.sin(angle) * spread * 1.3, color });
+          result.push({ key: u.key, name: u.name, label: u.label, branch: bname, lat: coord.lat + Math.cos(angle) * spread, lng: coord.lng + Math.sin(angle) * spread * 1.3, color });
         }
       });
     });
-    // 관리점 없는 팀원: 서울 중심 주변 배치 (드래그 가능)
     const defaultCoord = { lat: 37.5665, lng: 126.9780 };
     const defaultColor = "#6B7280";
-    noBranchUsers.forEach((uname, ui) => {
-      const custom = customPositions[uname];
+    noBranchGroup.forEach((u, ui) => {
+      const custom = customPositions[u.key] || customPositions[u.name];
       if (custom) {
-        result.push({ name: uname, branch: "미지정", lat: custom.lat, lng: custom.lng, color: defaultColor });
+        result.push({ key: u.key, name: u.name, label: u.label, branch: "미지정", lat: custom.lat, lng: custom.lng, color: defaultColor });
       } else {
-        const angle = (2 * Math.PI * ui) / Math.max(noBranchUsers.length, 1);
+        const angle = (2 * Math.PI * ui) / Math.max(noBranchGroup.length, 1);
         const spread = 0.03 + (ui % 4) * 0.01;
         result.push({
-          name: uname,
+          key: u.key,
+          name: u.name,
+          label: u.label,
           branch: "미지정",
           lat: defaultCoord.lat + Math.cos(angle) * spread,
           lng: defaultCoord.lng + Math.sin(angle) * spread * 1.3,
@@ -1127,21 +1136,21 @@ export function BranchMap({ allUsers, isAdmin = false }: { allUsers: { id?: stri
         map,
         draggable: isAdmin,
         icon: {
-          content: `<div class="map-pin" data-name="${u.name}" style="background:#fff;color:${u.color};padding:3px 8px;border-radius:10px;font-size:10px;font-weight:700;white-space:nowrap;box-shadow:0 1px 4px rgba(0,0,0,0.15);border:1.5px solid ${u.color};${isAdmin ? "cursor:grab;" : "cursor:pointer;"}user-select:none">${u.name}</div>`,
+          content: `<div class="map-pin" data-key="${u.key}" style="background:#fff;color:${u.color};padding:3px 8px;border-radius:10px;font-size:10px;font-weight:700;white-space:nowrap;box-shadow:0 1px 4px rgba(0,0,0,0.15);border:1.5px solid ${u.color};${isAdmin ? "cursor:grab;" : "cursor:pointer;"}user-select:none">${u.label}</div>`,
           anchor: { x: 20, y: 10 },
         },
       });
-      markersRef.current[u.name] = marker;
+      markersRef.current[u.key] = marker;
       allMarkersRef.current.push(marker);
 
       N.Event.addListener(marker, "click", () => {
-        if (isAdmin) setSelectedUser(prev => prev === u.name ? null : u.name);
+        if (isAdmin) setSelectedUser(prev => prev === u.key ? null : u.key);
       });
 
       const circle = new N.Circle({
         map,
         center: pos,
-        radius: (userRadii[u.name] || 15) * 1000,
+        radius: ((userRadii[u.key] ?? userRadii[u.name]) || 15) * 1000,
         strokeColor: u.color,
         strokeWeight: 2,
         strokeOpacity: 0.5,
@@ -1149,13 +1158,13 @@ export function BranchMap({ allUsers, isAdmin = false }: { allUsers: { id?: stri
         fillOpacity: 0.08,
         visible: showCircles,
       });
-      circlesRef.current[u.name] = circle;
+      circlesRef.current[u.key] = circle;
       allCirclesRef.current.push(circle);
 
       if (isAdmin) {
         N.Event.addListener(marker, "dragend", () => {
           const p = (marker as unknown as { getPosition: () => NaverLatLng }).getPosition();
-          saveCustomPosition(u.name, p.lat(), p.lng());
+          saveCustomPosition(u.key, p.lat(), p.lng());
           (circle as unknown as { setCenter: (c: NaverLatLng) => void }).setCenter(p);
         });
       }
