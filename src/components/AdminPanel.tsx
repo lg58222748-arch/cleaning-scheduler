@@ -17,6 +17,8 @@ export default function AdminPanel({ onClose, onRefresh }: AdminPanelProps) {
     if (typeof window === "undefined") return true;
     return localStorage.getItem("notificationsEnabled") !== "false";
   });
+  const [pushRegistering, setPushRegistering] = useState(false);
+  const [pushRegisterMsg, setPushRegisterMsg] = useState<string>("");
 
   useEffect(() => {
     if (tab === "trash") loadTrash();
@@ -41,6 +43,85 @@ export default function AdminPanel({ onClose, onRefresh }: AdminPanelProps) {
       const reg = await navigator.serviceWorker.ready;
       reg.active?.postMessage({ type: "SET_NOTIFICATIONS_ENABLED", enabled: next });
     } catch (e) { console.error("[Push] toggle failed:", e); }
+  }
+
+  async function registerPushAgain() {
+    if (pushRegistering) return;
+    setPushRegistering(true);
+    setPushRegisterMsg("");
+    const saved = localStorage.getItem("currentUser");
+    const user = saved ? JSON.parse(saved) : null;
+    if (!user) { setPushRegisterMsg("로그인 후 다시 시도하세요"); setPushRegistering(false); return; }
+
+    // 1) Capacitor 네이티브 (APK) → FCM
+    try {
+      const { Capacitor } = await import("@capacitor/core");
+      if (Capacitor.isNativePlatform()) {
+        const { PushNotifications } = await import("@capacitor/push-notifications");
+        const status = await PushNotifications.checkPermissions();
+        let receive = status.receive;
+        if (receive === "prompt" || receive === "prompt-with-rationale") {
+          const res = await PushNotifications.requestPermissions();
+          receive = res.receive;
+        }
+        if (receive !== "granted") {
+          setPushRegisterMsg("알림 권한이 거부됨. 설정 → 앱 → 새집느낌 파트너 → 알림 허용 후 재시도");
+          setPushRegistering(false);
+          return;
+        }
+        await PushNotifications.removeAllListeners();
+        const donePromise = new Promise<boolean>((resolve) => {
+          const timer = setTimeout(() => resolve(false), 10000);
+          PushNotifications.addListener("registration", async (token) => {
+            clearTimeout(timer);
+            try {
+              await fetch("/api/push", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ action: "subscribe-fcm", token: token.value, userId: user.id, userName: user.name }),
+              });
+              resolve(true);
+            } catch { resolve(false); }
+          });
+          PushNotifications.addListener("registrationError", () => { clearTimeout(timer); resolve(false); });
+        });
+        await PushNotifications.register();
+        const ok = await donePromise;
+        setPushRegisterMsg(ok ? "✅ FCM 등록 완료! 알림 받을 수 있습니다" : "❌ FCM 등록 실패. 폰 재시작 후 다시 시도");
+        setPushRegistering(false);
+        return;
+      }
+    } catch { /* Capacitor 없음 → 웹으로 */ }
+
+    // 2) 웹/PWA → Web Push
+    try {
+      if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
+        setPushRegisterMsg("이 브라우저는 푸시 알림을 지원하지 않습니다");
+        setPushRegistering(false);
+        return;
+      }
+      const permission = await Notification.requestPermission();
+      if (permission !== "granted") {
+        setPushRegisterMsg("알림 권한이 거부됨. 브라우저 주소창 옆 🔒 → 알림 허용");
+        setPushRegistering(false);
+        return;
+      }
+      const reg = await navigator.serviceWorker.ready;
+      const vapidKey = "BIFAj9bQTWPRvMdMvDc5RTF4Qyof08lZR2SkI3vHwmhmUZwWbVJt7_SKEczBy_9ul88kmvfmqzr14-TecTwRBwc";
+      let sub = await reg.pushManager.getSubscription();
+      if (!sub) {
+        sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: vapidKey });
+      }
+      await fetch("/api/push", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "subscribe", subscription: sub.toJSON(), userId: user.id, userName: user.name }),
+      });
+      setPushRegisterMsg("✅ 웹 푸시 등록 완료! 알림 받을 수 있습니다");
+    } catch (e) {
+      setPushRegisterMsg("❌ 등록 실패: " + (e instanceof Error ? e.message : "알 수 없는 오류"));
+    }
+    setPushRegistering(false);
   }
 
   async function handleMoveAllToTrash() {
@@ -115,6 +196,28 @@ export default function AdminPanel({ onClose, onRefresh }: AdminPanelProps) {
                     <div className={`absolute top-0.5 w-6 h-6 bg-white rounded-full shadow transition-transform ${notificationsEnabled ? "left-[22px]" : "left-0.5"}`} />
                   </button>
                 </div>
+              </div>
+
+              {/* 푸시 재등록 (알림 안 올 때 눌러보세요) */}
+              <div className="border border-gray-200 rounded-xl p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-medium text-gray-800">푸시 알림 재등록</div>
+                    <div className="text-xs text-gray-400 mt-0.5">알림이 안 오면 눌러서 다시 등록</div>
+                  </div>
+                  <button
+                    onClick={registerPushAgain}
+                    disabled={pushRegistering}
+                    className="shrink-0 px-3 py-2 bg-orange-500 text-white rounded-lg text-xs font-bold active:bg-orange-600 disabled:bg-gray-300"
+                  >
+                    {pushRegistering ? "등록 중..." : "재등록"}
+                  </button>
+                </div>
+                {pushRegisterMsg && (
+                  <div className="mt-3 text-xs bg-gray-50 text-gray-700 px-3 py-2 rounded-lg whitespace-pre-wrap">
+                    {pushRegisterMsg}
+                  </div>
+                )}
               </div>
 
               {/* 휴지통 바로가기 */}
