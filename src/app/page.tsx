@@ -125,6 +125,9 @@ export default function Home() {
   const notifReloadSuppressRef = useRef(0);
   // 일정 액션(생성/수정/반환/삭제) 중엔 schedule reload 억제 (낙관적 업데이트 보호)
   const scheduleReloadSuppressRef = useRef(0);
+  // 현재 달력에서 보고 있는 월 (selectedDate 와 별개, 스크롤 시 변경)
+  // Realtime reload 가 이 달 기준으로 ±1 달 범위 fetch → 먼 달로 스크롤해도 안 깜빡임
+  const viewingMonthRef = useRef<Date>(new Date());
   // 로컬에서 삭제한 알림 ID - 재동기화 시 다시 나타나지 않게
   // 사용자별 localStorage 로 영구 보존 (DB 공용이라 공유되는 것 방지)
   const deletedNotifIdsRef = useRef<Set<string>>(new Set<string>());
@@ -137,7 +140,10 @@ export default function Home() {
 
   const loadData = useCallback(async (monthDate?: Date, fullRefresh = false) => {
     try {
-      const d = monthDate || selectedDate;
+      // 우선순위: 명시적 monthDate > 현재 보고 있는 달력 월 > selectedDate
+      const d = monthDate || viewingMonthRef.current || selectedDate;
+      // 다음 reload 들도 동일 월 기준으로 찾게 ref 업데이트
+      viewingMonthRef.current = d;
       const start = format(startOfMonth(subMonths(d, 1)), "yyyy-MM-dd");
       const end = format(endOfMonth(addMonths(d, 1)), "yyyy-MM-dd");
 
@@ -370,7 +376,8 @@ export default function Home() {
     function reloadSchedules() {
       // 일정 액션(반환/배정/생성/수정/삭제) 중엔 억제 - 낙관적 업데이트가 stale fetch 에 덮이는 것 방지
       if (Date.now() < scheduleReloadSuppressRef.current) return;
-      const d = selectedDate;
+      // 현재 보고 있는 달력 월 기준 (스크롤해서 먼 달 보고 있어도 해당 월 데이터 유지)
+      const d = viewingMonthRef.current || selectedDate;
       const start = format(startOfMonth(subMonths(d, 1)), "yyyy-MM-dd");
       const end = format(endOfMonth(addMonths(d, 1)), "yyyy-MM-dd");
       fetchSchedules(start, end).then(s => {
@@ -1188,7 +1195,7 @@ export default function Home() {
             selectedDate={selectedDate}
             onSelectDate={(d) => { setSelectedDate(d); pushHash("day"); setShowDayPopup(true); }}
             onScheduleClick={(s) => { setDetailSchedule(s); setDetailMode("calendar"); pushHash("detail"); }}
-            onMonthChange={(d) => loadData(d)}
+            onMonthChange={(d) => { viewingMonthRef.current = d; loadData(d); }}
           />
         </div>
 
