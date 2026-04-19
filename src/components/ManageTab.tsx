@@ -685,14 +685,16 @@ function GoogleCalendarImport({ allUsers, members, onImported }: {
     if (typeof window === "undefined") return [];
     try { return JSON.parse(localStorage.getItem("google_calendars") || "[]"); } catch { return []; }
   });
-  const [events, setEvents] = useState<{ id: string; summary: string; date: string; description?: string; selected: boolean; assignTo: string; calName?: string }[]>([]);
+  const [events, setEvents] = useState<{ id: string; googleEventId: string; summary: string; date: string; description?: string; selected: boolean; assignTo: string; calName?: string }[]>([]);
   const [checkedCals, setCheckedCals] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
   const [importing, setImporting] = useState(false);
   const [importDone, setImportDone] = useState(false);
   const [importCount, setImportCount] = useState(0);
+  const [skippedCount, setSkippedCount] = useState(0);
   const [importProgress, setImportProgress] = useState(0);
   const [error, setError] = useState("");
+  const [fetchDays, setFetchDays] = useState(365);
 
   function saveCalendarId(id: string, name: string) {
     const existing = savedCalendars.find(c => c.id === id);
@@ -713,7 +715,7 @@ function GoogleCalendarImport({ allUsers, members, onImported }: {
   }
 
   async function fetchFromCalendar(cid: string) {
-    const url = `${GAS_URL}?action=fetchEvents&calendarId=${encodeURIComponent(cid)}&days=60`;
+    const url = `${GAS_URL}?action=fetchEvents&calendarId=${encodeURIComponent(cid)}&days=${fetchDays}`;
     const res = await fetch(url);
     return res.json();
   }
@@ -730,7 +732,7 @@ function GoogleCalendarImport({ allUsers, members, onImported }: {
       const calName = data.calendarName || calendarId.trim();
       saveCalendarId(calendarId.trim(), calName);
       const items = (data.items || []).map((ev: { id: string; summary: string; date: string; description?: string }) => ({
-        id: ev.id, summary: ev.summary || "(제목 없음)", date: ev.date || "", description: ev.description || "", selected: true, assignTo: "", calName,
+        id: ev.id, googleEventId: ev.id, summary: ev.summary || "(제목 없음)", date: ev.date || "", description: ev.description || "", selected: true, assignTo: "", calName,
       }));
       setEvents(items);
       if (items.length === 0) setError("가져올 일정이 없습니다 (향후 60일)");
@@ -749,7 +751,7 @@ function GoogleCalendarImport({ allUsers, members, onImported }: {
         const data = await fetchFromCalendar(cal.id);
         if (data.status === "ok" && data.items) {
           data.items.forEach((ev: { id: string; summary: string; date: string; description?: string }) => {
-            allItems.push({ id: ev.id + cal.id, summary: ev.summary || "(제목 없음)", date: ev.date || "", description: ev.description || "", selected: true, assignTo: cal.assignTo || "", calName: cal.name });
+            allItems.push({ id: ev.id + cal.id, googleEventId: ev.id, summary: ev.summary || "(제목 없음)", date: ev.date || "", description: ev.description || "", selected: true, assignTo: cal.assignTo || "", calName: cal.name });
           });
         }
       } catch { /* 개별 캘린더 실패 무시 */ }
@@ -766,43 +768,39 @@ function GoogleCalendarImport({ allUsers, members, onImported }: {
     setImportProgress(0);
 
     let count = 0;
+    let skipped = 0;
     for (let i = 0; i < toImport.length; i++) {
       const ev = toImport[i];
       try {
-        if (ev.assignTo) {
-          // 담당자 선택 → 달력에 직접 등록
-          const member = members.find(m => m.id === ev.assignTo);
-          const fieldUser = allUsers.find(u => (u.id === ev.assignTo || u.name === ev.assignTo) && u.role === "field");
-          const assignId = member?.id || fieldUser?.id || ev.assignTo;
-          const assignName = member?.name || fieldUser?.name || ev.assignTo;
-          // 먼저 미배정으로 등록 후 배정 (createSchedule이 실패할 수 있어서)
-          const created = await addUnassignedSchedule({
-            title: ev.summary,
-            date: ev.date,
-            startTime: "09:00",
-            endTime: "18:00",
-            note: ev.description || "",
-          });
-          if (created?.id) {
+        const googleEventId = ev.googleEventId;
+        const created = await addUnassignedSchedule({
+          title: ev.summary,
+          date: ev.date,
+          startTime: "09:00",
+          endTime: "18:00",
+          note: ev.description || "",
+          googleEventId,
+        });
+        // created.id 없으면 중복(서버 dedup) 이거나 실패 → skip 처리
+        if (!created?.id) {
+          skipped++;
+        } else {
+          if (ev.assignTo) {
+            const member = members.find(m => m.id === ev.assignTo);
+            const fieldUser = allUsers.find(u => (u.id === ev.assignTo || u.name === ev.assignTo) && u.role === "field");
+            const assignId = member?.id || fieldUser?.id || ev.assignTo;
+            const assignName = member?.name || fieldUser?.name || ev.assignTo;
             await assignScheduleApi(created.id, assignId, assignName);
           }
-        } else {
-          // 미선택 → 배정탭
-          await addUnassignedSchedule({
-            title: ev.summary,
-            date: ev.date,
-            startTime: "09:00",
-            endTime: "18:00",
-            note: ev.description || "",
-          });
+          count++;
         }
-        count++;
-      } catch { /* 개별 실패 무시 */ }
+      } catch { skipped++; /* 개별 실패는 skip 으로 집계 */ }
       setImportProgress(Math.round(((i + 1) / toImport.length) * 100));
     }
 
     setImporting(false);
     setImportCount(count);
+    setSkippedCount(skipped);
     setImportDone(true);
     setEvents([]);
     onImported();
@@ -835,14 +833,33 @@ function GoogleCalendarImport({ allUsers, members, onImported }: {
       {/* 완료 메시지 */}
       {importDone && (
         <div className="p-3 bg-green-50 border border-green-200 rounded-xl text-center">
-          <div className="text-sm font-bold text-green-700">✅ {importCount}건 가져오기 완료!</div>
-          <button onClick={() => setImportDone(false)} className="mt-2 text-xs text-blue-500 font-medium">다시 가져오기</button>
+          <div className="text-sm font-bold text-green-700">
+            ✅ {importCount}건 가져오기 완료
+            {skippedCount > 0 && <span className="text-gray-500 font-medium"> · 중복 {skippedCount}건 건너뜀</span>}
+          </div>
+          <button onClick={() => { setImportDone(false); setSkippedCount(0); }} className="mt-2 text-xs text-blue-500 font-medium">다시 가져오기</button>
         </div>
       )}
 
       {/* 캘린더 ID 입력 */}
       {!importDone && (
         <>
+          {/* 조회 기간 선택 */}
+          <div className="flex items-center gap-2">
+            <label className="text-xs font-bold text-gray-500 shrink-0">조회 기간</label>
+            <select
+              value={fetchDays}
+              onChange={(e) => setFetchDays(Number(e.target.value))}
+              className="flex-1 px-3 py-1.5 border border-gray-200 rounded-lg text-xs outline-none focus:ring-2 focus:ring-blue-400 bg-white"
+            >
+              <option value={60}>향후 2개월 (60일)</option>
+              <option value={90}>향후 3개월 (90일)</option>
+              <option value={180}>향후 6개월 (180일)</option>
+              <option value={365}>향후 1년 (365일)</option>
+              <option value={730}>향후 2년 (730일)</option>
+            </select>
+          </div>
+
           <div className="space-y-1">
             <label className="text-xs font-bold text-gray-500">구글 캘린더 ID</label>
             <div className="flex gap-2">
@@ -883,7 +900,7 @@ function GoogleCalendarImport({ allUsers, members, onImported }: {
                             const data = await fetchFromCalendar(cal.id);
                             if (data.status === "ok" && data.items) {
                               data.items.forEach((ev: { id: string; summary: string; date: string; description?: string }) => {
-                                allItems.push({ id: ev.id + cal.id, summary: ev.summary || "(제목 없음)", date: ev.date || "", description: ev.description || "", selected: true, assignTo: cal.assignTo || "", calName: cal.name });
+                                allItems.push({ id: ev.id + cal.id, googleEventId: ev.id, summary: ev.summary || "(제목 없음)", date: ev.date || "", description: ev.description || "", selected: true, assignTo: cal.assignTo || "", calName: cal.name });
                               });
                             }
                           } catch {}
