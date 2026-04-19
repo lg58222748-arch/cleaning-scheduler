@@ -10,6 +10,7 @@ interface ScheduleDetailProps {
   schedule: Schedule;
   members: Member[];
   isAdmin?: boolean;
+  canAssignMember?: boolean; // 배정 버튼 노출 여부 (영업은 false, 관리자/대표/일정관리자는 true)
   mode?: "calendar" | "assign";
   currentUserName?: string;
   allUsers?: { id?: string; name: string; username?: string; role?: string }[];
@@ -29,6 +30,7 @@ export default function ScheduleDetail({
   schedule,
   members,
   isAdmin,
+  canAssignMember = true,
   mode = "calendar",
   currentUserName = "",
   allUsers = [],
@@ -514,7 +516,7 @@ export default function ScheduleDetail({
           <input value={newComment} onChange={(e) => setNewComment(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handleAddComment()} placeholder="댓글 입력..." className="flex-1 px-3 py-1.5 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-400" />
           <button onClick={handleAddComment} disabled={loading || !newComment.trim()} className="px-3 py-1.5 bg-blue-500 text-white rounded-lg text-xs font-medium active:bg-blue-600 disabled:opacity-50 shrink-0">등록</button>
         </div>
-        {mode === "assign" && (
+        {mode === "assign" && canAssignMember && (
           <div className="flex items-center gap-2 px-4 pb-1">
             <select
               value={assignMemberId}
@@ -537,7 +539,7 @@ export default function ScheduleDetail({
               반환
             </button>
           )}
-          {mode === "assign" && (
+          {mode === "assign" && canAssignMember && (
             <button
               onClick={() => {
                 if (!assignMemberId || !onAssign) return;

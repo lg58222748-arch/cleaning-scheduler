@@ -75,6 +75,7 @@ function makeConfirmSession(name: string): ConfirmSession {
 
 export default function SalesTab({ userName, onCreated, isAdmin = false, canEditTemplates = false }: SalesTabProps) {
   const [step, setStep] = useState<1 | 2 | 3>(1);
+  const [confirmedToast, setConfirmedToast] = useState(false);
 
   // 세션 목록
   const [formSessions, setFormSessions] = useState<FormSession[]>(() => [makeFormSession("양식1")]);
@@ -651,12 +652,19 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
     setSaving(false);
     setConfirmed(true);
     setPostDone([]);
-    alert("예약 확정되었습니다!");
+    setConfirmedToast(true);
+    setTimeout(() => setConfirmedToast(false), 2000);
     onCreated();
   }
 
   return (
     <div className="h-full flex flex-col bg-white">
+      {/* 예약 확정 토스트 */}
+      {confirmedToast && (
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[100] bg-green-600 text-white px-5 py-3 rounded-xl shadow-xl text-sm font-bold animate-[fadeIn_0.2s_ease-out]">
+          ✅ 예약 확정되었습니다!
+        </div>
+      )}
       {/* 탭 */}
       <div className="flex border-b border-gray-200 bg-white z-10 shrink-0">
         <button onClick={() => setStep(1)} className={`flex-1 py-2.5 text-xs font-bold text-center ${step === 1 ? "text-green-700 border-b-2 border-green-700 bg-green-50" : "text-gray-400"}`}>

@@ -1622,6 +1622,7 @@ export default function Home() {
           schedule={detailSchedule}
           members={members}
           isAdmin={canAssign}
+          canAssignMember={role === "ceo" || role === "admin" || role === "scheduler"}
           mode={detailMode}
           currentUserName={currentUser.name}
           allUsers={allUsers.map(u => ({ id: u.id, name: u.name, username: u.username, role: u.role }))}
