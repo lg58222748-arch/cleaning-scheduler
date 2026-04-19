@@ -111,14 +111,15 @@ function SchedulerStats() {
     setLoading(true);
     setError("");
     try {
-      // /api/schedules (range 없음) = 전체 배정된 일정
-      // /api/schedules?unassigned=true = 미배정 전체
+      // /api/schedules (range 없음) = status≠deleted 인 전체 (미배정 포함)
+      // /api/schedules?unassigned=true = 미배정(status=unassigned)만
       const [all, un] = await Promise.all([
         fetchSchedules(),
         fetch("/api/schedules?unassigned=true").then((r) => r.json()).catch(() => []),
       ]);
-      // fetchSchedules()은 배정된 일정만 — 중복 방지용으로 unassigned 로 구분
-      setAssignedAll(Array.isArray(all) ? all : []);
+      // 이중 계산 방지: 달력 카운트에서 unassigned 제외
+      const assignedOnly = (Array.isArray(all) ? all : []).filter((s) => s.status !== "unassigned");
+      setAssignedAll(assignedOnly);
       setUnassignedAll(Array.isArray(un) ? un : []);
     } catch (e) {
       setError(e instanceof Error ? e.message : "로딩 실패");
