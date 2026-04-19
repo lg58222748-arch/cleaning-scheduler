@@ -98,6 +98,21 @@ export async function POST(req: NextRequest) {
     return Response.json({ success: true });
   }
 
+  // 특정 사용자 구독 전체 삭제 (관리자가 다른 기기에서 실수로 등록한 구독 정리용)
+  if (body.action === "clearUser") {
+    const { userName } = body;
+    if (!userName) return Response.json({ error: "userName required" }, { status: 400 });
+    const { data: users } = await supabase.from("users").select("id").eq("name", userName);
+    const ids = (users || []).map(u => String(u.id));
+    if (ids.length === 0) return Response.json({ deleted: 0, note: "user not found" });
+    const { data: before } = await supabase.from("push_subscriptions").select("id").in("user_id", ids);
+    const count = before?.length || 0;
+    if (count > 0) {
+      await supabase.from("push_subscriptions").delete().in("user_id", ids);
+    }
+    return Response.json({ deleted: count, userIds: ids });
+  }
+
   // 기존 중복 구독 정리 - 사용자별 최신 엔드포인트 1개만 남김
   if (body.action === "dedupe") {
     const { data: subs } = await supabase.from("push_subscriptions").select("*").order("id", { ascending: false });
