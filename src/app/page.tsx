@@ -991,8 +991,8 @@ export default function Home() {
           </div>
         </div>
       )}
-      {/* 반환 알림 배너 - 대표/일정관리자: DB 알림 기반, dismiss 처리 후 안정 */}
-      {isAdmin && returnBannerNotifs.length > 0 && (
+      {/* 반환 알림 배너 - 배정탭에선 숨김 (사용자 요청 — 배정탭에서 반환 알림 노이즈 제거). 다른 탭에서만 노출. */}
+      {isAdmin && activeTab !== "assign" && returnBannerNotifs.length > 0 && (
         <div className="bg-orange-500 text-white z-50">
           {returnBannerNotifs.slice(0, 5).map((n) => (
             <div key={n.id} className="px-3 py-2 flex items-center gap-2 border-b border-orange-400/30 last:border-0">
