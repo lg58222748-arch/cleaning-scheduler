@@ -434,8 +434,11 @@ export default function Home() {
 
     // 폴링 인터벌 (Realtime 실패 시에만 활성화)
     let pollInterval: ReturnType<typeof setInterval> | null = null;
+    // Realtime 성공 여부 — fallback 에서 "구독된 상태면 폴링 금지" 판정용
+    let realtimeConnected = false;
     function startPolling() {
       if (pollInterval) return;
+      if (realtimeConnected) return; // 리얼타임 멀쩡한데 폴링 돌리지 말기 (중복 갱신 방지)
       console.log("[RT] 폴링 시작 (Realtime 실패)");
       pollInterval = setInterval(reloadAll, 8000);
     }
@@ -452,14 +455,19 @@ export default function Home() {
       .subscribe((status: string) => {
         console.log("[RT] status:", status);
         if (status === "SUBSCRIBED") {
+          realtimeConnected = true;
           stopPolling();
         } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
+          realtimeConnected = false;
           startPolling();
         }
       });
 
-    // Realtime 이 오래 안 켜지면(10초 후) 폴링 강제 시작
-    const fallbackTimer = setTimeout(() => { if (!pollInterval) startPolling(); }, 10000);
+    // Realtime 이 오래 안 켜지면(10초 후) 폴링 강제 시작 — 이미 성공했으면 skip.
+    const fallbackTimer = setTimeout(() => {
+      if (realtimeConnected) return;
+      if (!pollInterval) startPolling();
+    }, 10000);
 
     // 앱이 백그라운드 → 포그라운드로 돌아올 때 강제 전체 갱신
     // (Chrome/WebView 는 백그라운드에서 Realtime 연결을 끊음 → 복귀 시 스냅샷 동기화 필요)
@@ -897,10 +905,9 @@ export default function Home() {
   })();
   // 팀원 필터 적용 (현장팀/영업팀은 이미 자기 일정만 보이므로 필터 무시)
   // 본인 일정은 항상 표시, 필터에 선택된 팀원 일정도 추가 표시
-  // 필터 ON + 선택 0명이면 필터 OFF 로 간주 (실수로 숨기는 것 방지)
+  // 선택 0명이면 본인 일정만 표시 — "전체" 체크박스 해제 시 일정 다 사라지는 게 의도된 동작.
   const calendarSchedules = (() => {
     if (!filterActive || role === "field" || role === "sales") return baseCalendarSchedules;
-    if (selectedMemberIds.size === 0) return baseCalendarSchedules;
     const filterNames = new Set<string>();
     allUsers.filter(u => u.role === "field").forEach(u => {
       if (selectedMemberIds.has(u.id)) filterNames.add(u.name);
