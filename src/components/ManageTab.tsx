@@ -105,7 +105,7 @@ function SchedulerStats() {
   const [error, setError] = useState<string>("");
   const [unassignedAll, setUnassignedAll] = useState<Schedule[]>([]);
   const [assignedAll, setAssignedAll] = useState<Schedule[]>([]);
-  const [monthsToShow, setMonthsToShow] = useState(6);
+  const [monthsToShow, setMonthsToShow] = useState(12);
 
   const load = useCallback(async () => {
     setLoading(true);
