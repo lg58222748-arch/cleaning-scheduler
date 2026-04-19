@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { addUnassignedSchedule } from "@/lib/api";
 
 interface SalesTabProps {
@@ -99,29 +99,55 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
   function renumberConfirm(list: ConfirmSession[]): ConfirmSession[] {
     return list.map((s, i) => ({ ...s, name: `확정${i + 1}` }));
   }
+  // 양식/확정 활성 탭을 인덱스 기준으로 동기화 (한쪽 누르면 다른 쪽도 자동 전환)
+  useEffect(() => {
+    const fIdx = formSessions.findIndex(s => s.id === activeFormId);
+    if (fIdx < 0) return;
+    const matching = confirmSessions[fIdx];
+    if (matching && matching.id !== activeConfirmId) setActiveConfirmId(matching.id);
+  }, [activeFormId]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    const cIdx = confirmSessions.findIndex(s => s.id === activeConfirmId);
+    if (cIdx < 0) return;
+    const matching = formSessions[cIdx];
+    if (matching && matching.id !== activeFormId) setActiveFormId(matching.id);
+  }, [activeConfirmId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // 양식과 확정은 1:1 세트로 함께 생성/삭제 (양식N 생기면 확정N 같이, 삭제도 같이)
   function addFormSession() {
-    const n = makeFormSession(`양식${formSessions.length + 1}`);
-    setFormSessions(prev => renumberForm([...prev, n]));
-    setActiveFormId(n.id);
+    const idx = formSessions.length;
+    const f = makeFormSession(`양식${idx + 1}`);
+    const c = makeConfirmSession(`확정${idx + 1}`);
+    setFormSessions(prev => renumberForm([...prev, f]));
+    setConfirmSessions(prev => renumberConfirm([...prev, c]));
+    setActiveFormId(f.id);
+    setActiveConfirmId(c.id);
   }
   function removeFormSession(id: string) {
     if (formSessions.length <= 1) return;
     const idx = formSessions.findIndex(s => s.id === id);
-    const next = renumberForm(formSessions.filter(s => s.id !== id));
-    setFormSessions(next);
-    if (activeFormId === id) setActiveFormId(next[Math.max(0, idx - 1)].id);
+    if (idx < 0) return;
+    const confirmAtIdx = confirmSessions[idx];
+
+    const nextForm = renumberForm(formSessions.filter(s => s.id !== id));
+    const nextConfirm = confirmAtIdx
+      ? renumberConfirm(confirmSessions.filter(s => s.id !== confirmAtIdx.id))
+      : confirmSessions;
+
+    setFormSessions(nextForm);
+    setConfirmSessions(nextConfirm);
+    const newIdx = Math.max(0, idx - 1);
+    if (activeFormId === id) setActiveFormId(nextForm[newIdx]?.id || nextForm[0].id);
+    if (confirmAtIdx && activeConfirmId === confirmAtIdx.id) {
+      setActiveConfirmId(nextConfirm[newIdx]?.id || nextConfirm[0]?.id);
+    }
   }
-  function addConfirmSession() {
-    const n = makeConfirmSession(`확정${confirmSessions.length + 1}`);
-    setConfirmSessions(prev => renumberConfirm([...prev, n]));
-    setActiveConfirmId(n.id);
-  }
+  // 확정 탭 삭제는 양식 삭제로 위임 (세트 유지)
   function removeConfirmSession(id: string) {
-    if (confirmSessions.length <= 1) return;
     const idx = confirmSessions.findIndex(s => s.id === id);
-    const next = renumberConfirm(confirmSessions.filter(s => s.id !== id));
-    setConfirmSessions(next);
-    if (activeConfirmId === id) setActiveConfirmId(next[Math.max(0, idx - 1)].id);
+    if (idx < 0) return;
+    const formAtIdx = formSessions[idx];
+    if (formAtIdx) removeFormSession(formAtIdx.id);
   }
 
   // 활성 세션 필드 접근용 별칭 (렌더/함수에서 사용)
@@ -800,7 +826,7 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
         <>
         {/* 세션 탭 바 */}
         <div className="flex items-center gap-1 px-2 py-2 border-b border-gray-100 overflow-x-auto bg-gray-50">
-          <button onClick={addConfirmSession} className="px-3 py-1.5 rounded-lg text-xs font-bold bg-white border border-dashed border-green-400 text-green-700 shrink-0 active:bg-green-50 sticky left-0 z-10">+</button>
+          <button onClick={addFormSession} className="px-3 py-1.5 rounded-lg text-xs font-bold bg-white border border-dashed border-green-400 text-green-700 shrink-0 active:bg-green-50 sticky left-0 z-10" title="양식+확정 세트 추가">+</button>
           {confirmSessions.map(s => {
             const displayName = s.parsedName ? `${s.name} · ${s.parsedName}` : s.name;
             return (
