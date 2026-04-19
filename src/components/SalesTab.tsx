@@ -401,6 +401,7 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
           parsedAddr: data.addr || "",
           parsedWishDate: data.date || "",
           parsedNote: data.note || "",
+          parsedSalesNote: data.salesNote || "",
           parsedPyeong: formData.pyeong || activeConfirm.parsedPyeong,
           services: confirmServices,
           schedules: confirmServices.map((s) => ({ service: s.name, date: "", time: "선택" })),
@@ -424,15 +425,18 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
     const t = customerText;
     const lines = t.split("\n").map((l) => l.trim()).filter(Boolean);
 
-    let name = "", phone = "", addr = "", wish = "", note = "";
+    let name = "", phone = "", addr = "", wish = "", note = "", salesNote = "";
 
-    // 양식 번호(1~5)로 파싱
+    // 양식 번호(1~5, 11)로 파싱
     for (const line of lines) {
       const m1 = line.match(/1\)\s*성함\s*[:：]\s*(.+)/); if (m1 && m1[1].trim()) name = m1[1].trim();
       const m2 = line.match(/2\)\s*주소\s*[:：]\s*(.+)/); if (m2 && m2[1].trim()) addr = m2[1].trim();
       const m3 = line.match(/3\)\s*연락처\s*[:：]\s*(.+)/); if (m3 && m3[1].trim()) phone = m3[1].trim();
       const m4 = line.match(/4\)\s*.*날짜\s*[:：]?\s*(.+)/); if (m4 && m4[1].trim()) wish = m4[1].trim();
       const m5 = line.match(/5\)\s*.*특이사항\s*[:：]?\s*(.+)/); if (m5 && m5[1].trim()) note = m5[1].trim();
+      // 상담사 특이사항은 "11)" 또는 "상담사 특이사항" 로 시작
+      const m11 = line.match(/(?:11\)\s*)?상담사\s*특이사항\s*[:：]?\s*(.+)/);
+      if (m11 && m11[1].trim()) salesNote = m11[1].trim();
     }
 
     // 서비스/평수 추출 (공통 헬퍼 사용)
@@ -502,6 +506,7 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
       parsedAddr: addr,
       parsedWishDate: wish,
       parsedNote: note,
+      parsedSalesNote: salesNote,
       parsedPyeong: pyeongToUse,
       services: svcList,
       schedules: svcList.map((s) => ({ service: s.name, date: "", time: "선택" })),
