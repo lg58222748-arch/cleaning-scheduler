@@ -33,12 +33,14 @@ export async function GET(req: NextRequest) {
   }
 
   // settlements ↔ schedules 에 FK 가 없어 PostgREST 관계 조인을 못 쓰므로 2단계로 조회.
-  // 1) 날짜 범위의 schedules 조회
+  // 1) 날짜 범위의 모든 schedules (status 무관 — 배정탭/달력 둘 다 포함).
+  //    deleted 만 제외.
   const { data: scheduleRows, error: schErr } = await supabase
     .from("schedules")
-    .select("id, title, date, start_time, end_time, member_name, note")
+    .select("id, title, date, start_time, end_time, member_name, note, status")
     .gte("date", from)
-    .lte("date", to);
+    .lte("date", to)
+    .neq("status", "deleted");
   if (schErr) {
     return Response.json({ error: "db_error", message: schErr.message }, { status: 502 });
   }
@@ -47,13 +49,12 @@ export async function GET(req: NextRequest) {
     return Response.json({ range: { from, to }, count: 0, schedules: [] });
   }
 
-  // 2) 그 일정들의 settlements 중 deposit > 0 만
+  // 2) 그 일정들의 settlements (있으면) — deposit 0 도 허용, settlement 없는 일정도 허용
   const ids = schedules.map((s) => s.id);
   const { data: settlementRows, error: stErr } = await supabase
     .from("settlements")
     .select("id, schedule_id, status, quote, deposit, balance, customer_name, customer_phone")
-    .in("schedule_id", ids)
-    .gt("deposit", 0);
+    .in("schedule_id", ids);
   if (stErr) {
     return Response.json({ error: "db_error", message: stErr.message }, { status: 502 });
   }
@@ -64,7 +65,6 @@ export async function GET(req: NextRequest) {
   const out = schedules
     .map((sch) => {
       const st = settlementMap.get(String(sch.id));
-      if (!st) return null;
       return {
         scheduleId: sch.id,
         date: sch.date,
@@ -73,18 +73,28 @@ export async function GET(req: NextRequest) {
         scheduleTitle: sch.title || "",
         scheduleNote: sch.note || "",
         memberName: sch.member_name || "",
-        settlement: {
-          id: st.id,
-          status: st.status,
-          quote: st.quote,
-          deposit: st.deposit,
-          balance: st.balance,
-          customerName: st.customer_name || "",
-          customerPhone: st.customer_phone || "",
-        },
+        scheduleStatus: sch.status || "",
+        settlement: st
+          ? {
+              id: st.id,
+              status: st.status,
+              quote: st.quote || 0,
+              deposit: st.deposit || 0,
+              balance: st.balance || 0,
+              customerName: st.customer_name || "",
+              customerPhone: st.customer_phone || "",
+            }
+          : {
+              id: "",
+              status: "none",
+              quote: 0,
+              deposit: 0,
+              balance: 0,
+              customerName: "",
+              customerPhone: "",
+            },
       };
     })
-    .filter((x): x is NonNullable<typeof x> => x !== null)
     .sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
 
   return Response.json({
