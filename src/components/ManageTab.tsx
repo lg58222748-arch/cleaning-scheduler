@@ -983,7 +983,12 @@ export function BranchMap({ allUsers, isAdmin = false }: { allUsers: { id?: stri
     if (typeof window === "undefined") return {};
     try { return JSON.parse(localStorage.getItem("map_custom_positions") || "{}"); } catch { return {}; }
   });
+  const [hiddenPins, setHiddenPins] = useState<Set<string>>(() => {
+    if (typeof window === "undefined") return new Set();
+    try { return new Set<string>(JSON.parse(localStorage.getItem("map_hidden_pins") || "[]")); } catch { return new Set(); }
+  });
   const circlesRef = useRef<Record<string, unknown>>({});
+  const markersRef = useRef<Record<string, unknown>>({});
 
   function saveCustomPosition(name: string, lat: number, lng: number) {
     setCustomPositions(prev => {
@@ -993,15 +998,37 @@ export function BranchMap({ allUsers, isAdmin = false }: { allUsers: { id?: stri
     });
   }
 
-  // 팀원 목록 (관리점 기준 분산 좌표)
+  function hidePin(name: string) {
+    setHiddenPins(prev => {
+      const next = new Set(prev); next.add(name);
+      localStorage.setItem("map_hidden_pins", JSON.stringify(Array.from(next)));
+      return next;
+    });
+    setSelectedUser(null);
+  }
+
+  function showAllPins() {
+    setHiddenPins(new Set());
+    localStorage.setItem("map_hidden_pins", "[]");
+    mapInitialized.current = false;
+    setReady(false);
+    setTimeout(() => setReady(true), 50);
+  }
+
+  // 팀원 목록 - 모든 사용자 표시 (관리점 없어도 기본 위치 + 관리자가 드래그 가능)
   const userList = useMemo(() => {
+    // 관리점별 그룹핑
     const branchUsers: Record<string, string[]> = {};
+    const noBranchUsers: string[] = [];
     for (const u of allUsers) {
-      if (!u.branch) continue;
-      const bname = u.branch.replace(/\[관리점\]/, "").trim();
-      if (!bname || !BRANCH_COORDS[bname]) continue;
-      if (!branchUsers[bname]) branchUsers[bname] = [];
-      branchUsers[bname].push(u.name);
+      if (hiddenPins.has(u.name)) continue; // 관리자가 숨긴 핀 제외
+      const bname = u.branch ? u.branch.replace(/\[관리점\]/, "").trim() : "";
+      if (bname && BRANCH_COORDS[bname]) {
+        if (!branchUsers[bname]) branchUsers[bname] = [];
+        branchUsers[bname].push(u.name);
+      } else {
+        noBranchUsers.push(u.name);
+      }
     }
     const result: { name: string; branch: string; lat: number; lng: number; color: string }[] = [];
     const branches = Object.keys(branchUsers);
@@ -1020,8 +1047,27 @@ export function BranchMap({ allUsers, isAdmin = false }: { allUsers: { id?: stri
         }
       });
     });
+    // 관리점 없는 팀원: 서울 중심 주변 배치 (드래그 가능)
+    const defaultCoord = { lat: 37.5665, lng: 126.9780 };
+    const defaultColor = "#6B7280";
+    noBranchUsers.forEach((uname, ui) => {
+      const custom = customPositions[uname];
+      if (custom) {
+        result.push({ name: uname, branch: "미지정", lat: custom.lat, lng: custom.lng, color: defaultColor });
+      } else {
+        const angle = (2 * Math.PI * ui) / Math.max(noBranchUsers.length, 1);
+        const spread = 0.03 + (ui % 4) * 0.01;
+        result.push({
+          name: uname,
+          branch: "미지정",
+          lat: defaultCoord.lat + Math.cos(angle) * spread,
+          lng: defaultCoord.lng + Math.sin(angle) * spread * 1.3,
+          color: defaultColor,
+        });
+      }
+    });
     return result;
-  }, [allUsers, customPositions]);
+  }, [allUsers, customPositions, hiddenPins]);
 
   useEffect(() => {
     const check = setInterval(() => {
@@ -1030,28 +1076,39 @@ export function BranchMap({ allUsers, isAdmin = false }: { allUsers: { id?: stri
     return () => clearInterval(check);
   }, []);
 
+  // 지도 인스턴스 1회 생성
+  const mapInstanceRef = useRef<unknown>(null);
   useEffect(() => {
-    if (!ready || !mapRef.current || userList.length === 0) return;
-    if (mapInitialized.current) return; // 한 번만 생성
+    if (!ready || !mapRef.current) return;
+    if (mapInitialized.current) return;
     mapInitialized.current = true;
     const N = window.naver.maps;
-
-    const map = new N.Map(mapRef.current, {
+    mapInstanceRef.current = new N.Map(mapRef.current, {
       center: new N.LatLng(37.5665, 126.9780),
       zoom: 7,
       zoomControl: true,
       zoomControlOptions: { position: 3 },
       minZoom: 6,
     });
+  }, [ready]);
 
-    let minLat = 90, maxLat = -90, minLng = 180, maxLng = -180;
+  // 마커/원 rebuild - userList 변할 때마다 (신규 가입자, 숨긴 핀 반영)
+  useEffect(() => {
+    if (!ready || !mapInstanceRef.current) return;
+    const N = window.naver.maps;
+    const map = mapInstanceRef.current as { /* naver map */ };
+
+    // 기존 마커/원 제거
+    Object.values(markersRef.current).forEach(m => {
+      try { (m as { setMap: (v: null) => void }).setMap(null); } catch { /* */ }
+    });
+    Object.values(circlesRef.current).forEach(c => {
+      try { (c as { setMap: (v: null) => void }).setMap(null); } catch { /* */ }
+    });
+    markersRef.current = {};
+    circlesRef.current = {};
 
     userList.forEach((u) => {
-      if (u.lat < minLat) minLat = u.lat;
-      if (u.lat > maxLat) maxLat = u.lat;
-      if (u.lng < minLng) minLng = u.lng;
-      if (u.lng > maxLng) maxLng = u.lng;
-
       const pos = new N.LatLng(u.lat, u.lng);
       const marker = new N.Marker({
         position: pos,
@@ -1062,13 +1119,12 @@ export function BranchMap({ allUsers, isAdmin = false }: { allUsers: { id?: stri
           anchor: { x: 20, y: 10 },
         },
       });
+      markersRef.current[u.name] = marker;
 
-      // 클릭 → 대표만 반경 조절 선택
       N.Event.addListener(marker, "click", () => {
         if (isAdmin) setSelectedUser(prev => prev === u.name ? null : u.name);
       });
 
-      // 활동반경 원 (항상 표시)
       const circle = new N.Circle({
         map,
         center: pos,
@@ -1078,7 +1134,7 @@ export function BranchMap({ allUsers, isAdmin = false }: { allUsers: { id?: stri
         strokeOpacity: 0.5,
         fillColor: u.color,
         fillOpacity: 0.08,
-        visible: true,
+        visible: showCircles,
       });
       circlesRef.current[u.name] = circle;
 
@@ -1086,14 +1142,11 @@ export function BranchMap({ allUsers, isAdmin = false }: { allUsers: { id?: stri
         N.Event.addListener(marker, "dragend", () => {
           const p = (marker as unknown as { getPosition: () => NaverLatLng }).getPosition();
           saveCustomPosition(u.name, p.lat(), p.lng());
-          // 원도 이동
           (circle as unknown as { setCenter: (c: NaverLatLng) => void }).setCenter(p);
         });
       }
     });
-
-    // 서울 중심 고정 (fitBounds 사용 안 함)
-  }, [ready, userList]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [ready, userList, isAdmin]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // 반경 실시간 반영 + 보기/끄기
   useEffect(() => {
@@ -1120,12 +1173,22 @@ export function BranchMap({ allUsers, isAdmin = false }: { allUsers: { id?: stri
       >
         {showCircles ? "활동범위 끄기" : "활동범위 보기"}
       </button>
-      {/* 선택된 팀원 반경 조절 - 대표만 */}
+      {/* 숨긴 핀 전체 복원 - 관리자만 */}
+      {isAdmin && hiddenPins.size > 0 && (
+        <button
+          onClick={showAllPins}
+          style={{ position: "absolute", top: 12, right: 12, zIndex: 10 }}
+          className="px-3 py-1.5 rounded-lg text-xs font-bold shadow-md bg-white text-gray-700 border border-gray-300 active:bg-gray-50"
+        >
+          숨긴 핀 복원 ({hiddenPins.size})
+        </button>
+      )}
+      {/* 선택된 팀원 반경 조절 + 삭제 - 대표만 */}
       {isAdmin && selectedUser && (
         <div style={{ position: "absolute", bottom: 16, left: 16, right: 16, zIndex: 10 }}>
-          <div className="bg-white/95 backdrop-blur rounded-xl shadow-lg px-4 py-2.5">
+          <div className="bg-white/95 backdrop-blur rounded-xl shadow-lg px-4 py-2.5 space-y-2">
             <div className="flex items-center gap-2">
-              <span className="text-xs font-bold text-gray-700">{selectedUser}</span>
+              <span className="text-xs font-bold text-gray-700 shrink-0">{selectedUser}</span>
               <input type="range" min={5} max={50} step={5} value={selRadius} onChange={(e) => {
                 const next = { ...userRadii, [selectedUser]: Number(e.target.value) };
                 setUserRadii(next);
@@ -1133,12 +1196,21 @@ export function BranchMap({ allUsers, isAdmin = false }: { allUsers: { id?: stri
               }} className="flex-1 accent-blue-500" />
               <span className="text-xs font-bold text-blue-600 w-12 text-right">{selRadius}km</span>
             </div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-gray-500 flex-1">드래그로 위치 이동 · 핀 삭제 가능</span>
+              <button
+                onClick={() => hidePin(selectedUser)}
+                className="px-3 py-1.5 rounded-lg text-xs font-bold bg-red-500 text-white active:bg-red-600"
+              >
+                핀 삭제
+              </button>
+            </div>
           </div>
         </div>
       )}
       {userList.length === 0 && (
         <div style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%,-50%)" }} className="text-gray-400 text-sm text-center">
-          관리점이 설정된 현장팀이 없습니다
+          표시할 팀원이 없습니다
         </div>
       )}
     </div>
