@@ -206,11 +206,12 @@ export default function AssignTab({ members, schedules, onAssigned, onDeleted, o
                     <div className="overflow-hidden flex-1 w-full relative">
                       {dayScheds.slice(0, 2).map((s) => {
                         const fullName = s.title;
+                        const schedColor = s.color || "#FFEDD5"; // 미배정 기본 주황 (달력탭과 동일 스타일)
                         return (
                           <div
                             key={s.id}
-                            className="text-[9px] leading-[1.2] px-0.5 py-0.5 rounded font-medium bg-orange-100 text-orange-700 overflow-hidden mb-0.5"
-                            style={{ maxHeight: "4em", display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical" as const }}
+                            className="text-[9px] md:text-[11px] leading-[1.2] md:leading-[1.4] px-0.5 py-0.5 rounded font-medium overflow-hidden mb-0.5"
+                            style={{ backgroundColor: schedColor, color: "#9a3412", maxHeight: "4em", display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical" as const }}
                           >
                             {fullName}
                           </div>
