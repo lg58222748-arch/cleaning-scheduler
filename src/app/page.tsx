@@ -1659,7 +1659,8 @@ export default function Home() {
           onSelectSchedule={(s) => {
             setShowSearch(false);
             consumeHash();
-            setDetailMode("calendar");
+            // 검색한 탭에 따라 상세 모드 결정 (배정탭 검색 → 배정 양식, 그 외 → 달력 양식)
+            setDetailMode(activeTab === "assign" ? "assign" : "calendar");
             // 검색 패널 닫힘 완료 후 상세 열기 (해시 충돌 방지)
             setTimeout(() => openDetailSchedule(s), 100);
           }}
