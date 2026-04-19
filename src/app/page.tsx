@@ -148,8 +148,12 @@ export default function Home() {
   const unassignedSchedulesRef = useRef<Schedule[]>([]);
   const schedulesRef = useRef<Schedule[]>([]);
   const currentUserRef = useRef<User | null>(null);
+  // 월 이동 race 방어: 마지막으로 시작된 fetch 의 seq 만 setSchedules 허용.
+  // 예) 4월→5월→4월 빠르게 클릭하면 먼저 쏜 4월 응답이 5월 응답을 덮어써 깜빡이는 현상 방지.
+  const loadSeqRef = useRef(0);
 
   const loadData = useCallback(async (monthDate?: Date, fullRefresh = false) => {
+    const seq = ++loadSeqRef.current;
     try {
       // 우선순위: 명시적 monthDate > 현재 보고 있는 달력 월 > selectedDate
       const d = monthDate || viewingMonthRef.current || selectedDate;
@@ -167,9 +171,11 @@ export default function Home() {
           fetchNotifications(),
           fetchUsers(),
         ]);
+        // stale 응답이면 schedule 관련은 덮어쓰지 않음 (월 이동 race)
+        const isStale = seq !== loadSeqRef.current;
         setMembers(m);
-        // 일정 액션 중이면 schedule 덮어쓰지 않음
-        if (Date.now() >= scheduleReloadSuppressRef.current) {
+        // 일정 액션 중이거나 stale 이면 schedule 덮어쓰지 않음
+        if (!isStale && Date.now() >= scheduleReloadSuppressRef.current) {
           setSchedules(rangeScheds);
           setUnassignedSchedules(unassignedScheds);
         }
@@ -223,6 +229,7 @@ export default function Home() {
         }, 0);
       } else {
         const rangeScheds = await fetchSchedules(start, end);
+        if (seq !== loadSeqRef.current) return; // stale 응답 무시
         if (Date.now() >= scheduleReloadSuppressRef.current) {
           setSchedules(rangeScheds);
         }
@@ -396,11 +403,14 @@ export default function Home() {
       const d = viewingMonthRef.current || selectedDate;
       const start = format(startOfMonth(subMonths(d, 1)), "yyyy-MM-dd");
       const end = format(endOfMonth(addMonths(d, 1)), "yyyy-MM-dd");
+      const seq = ++loadSeqRef.current;
       fetchSchedules(start, end).then(s => {
+        if (seq !== loadSeqRef.current) return; // 더 최근 fetch 가 있으면 stale 응답 버림
         if (Date.now() < scheduleReloadSuppressRef.current) return;
         setSchedules(s);
       }).catch(() => {});
       fetchUnassignedSchedules().then(s => {
+        // unassigned 는 월 범위 안 타므로 seq 가드 생략
         if (Date.now() < scheduleReloadSuppressRef.current) return;
         setUnassignedSchedules(s);
       }).catch(() => {});
