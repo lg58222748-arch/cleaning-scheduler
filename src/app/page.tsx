@@ -159,8 +159,9 @@ export default function Home() {
       const d = monthDate || viewingMonthRef.current || selectedDate;
       // 다음 reload 들도 동일 월 기준으로 찾게 ref 업데이트
       viewingMonthRef.current = d;
-      const start = format(startOfMonth(subMonths(d, 1)), "yyyy-MM-dd");
-      const end = format(endOfMonth(addMonths(d, 1)), "yyyy-MM-dd");
+      // ±3개월 range — 월 스와이프 시 대부분의 탐색이 캐시 히트. 첫 로드는 조금 더 받지만 이후 즉시.
+      const start = format(startOfMonth(subMonths(d, 3)), "yyyy-MM-dd");
+      const end = format(endOfMonth(addMonths(d, 3)), "yyyy-MM-dd");
 
       if (fullRefresh) {
         const [m, rangeScheds, unassignedScheds, sw, notif, usersData] = await Promise.all([
@@ -400,9 +401,10 @@ export default function Home() {
       // 일정 액션(반환/배정/생성/수정/삭제) 중엔 억제 - 낙관적 업데이트가 stale fetch 에 덮이는 것 방지
       if (Date.now() < scheduleReloadSuppressRef.current) return;
       // 현재 보고 있는 달력 월 기준 (스크롤해서 먼 달 보고 있어도 해당 월 데이터 유지)
+      // loadData 와 동일하게 ±3개월 range — realtime reload 가 범위를 좁혀서 캐시가 축소되는 것 방지
       const d = viewingMonthRef.current || selectedDate;
-      const start = format(startOfMonth(subMonths(d, 1)), "yyyy-MM-dd");
-      const end = format(endOfMonth(addMonths(d, 1)), "yyyy-MM-dd");
+      const start = format(startOfMonth(subMonths(d, 3)), "yyyy-MM-dd");
+      const end = format(endOfMonth(addMonths(d, 3)), "yyyy-MM-dd");
       const seq = ++loadSeqRef.current;
       fetchSchedules(start, end).then(s => {
         if (seq !== loadSeqRef.current) return; // 더 최근 fetch 가 있으면 stale 응답 버림
