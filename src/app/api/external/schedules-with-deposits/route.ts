@@ -95,6 +95,7 @@ export async function GET(req: NextRequest) {
     extra_charge: number; subtotal: number; vat: number; total_amount: number;
     payment_method: string; cash_receipt: boolean;
     customer_name: string; customer_phone: string;
+    accountant_note?: string;
   };
   type ChecklistRow = {
     id: string; schedule_id: string;
@@ -110,7 +111,7 @@ export async function GET(req: NextRequest) {
     const settlementPromises = chunks.map((slice) => {
       const list = slice.map((id) => `"${id}"`).join(",");
       return supaGet<SettlementRow[]>(
-        `settlements?schedule_id=in.(${list})&select=id,schedule_id,status,quote,deposit,balance,extra_charge,subtotal,vat,total_amount,payment_method,cash_receipt,customer_name,customer_phone&limit=${CHUNK}`
+        `settlements?schedule_id=in.(${list})&select=id,schedule_id,status,quote,deposit,balance,extra_charge,subtotal,vat,total_amount,payment_method,cash_receipt,customer_name,customer_phone,accountant_note&limit=${CHUNK}`
       );
     });
     const checklistPromises = chunks.map((slice) => {
@@ -162,6 +163,7 @@ export async function GET(req: NextRequest) {
               cashReceipt: !!st.cash_receipt,
               customerName: st.customer_name || "",
               customerPhone: st.customer_phone || "",
+              accountantNote: st.accountant_note || "",
             }
           : {
               id: "",
@@ -172,6 +174,7 @@ export async function GET(req: NextRequest) {
               cashReceipt: false,
               customerName: "",
               customerPhone: "",
+              accountantNote: "",
             },
         checklist: cl
           ? {
