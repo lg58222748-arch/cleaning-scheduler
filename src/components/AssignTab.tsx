@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useRef, useCallback } from "react";
+import { useState, useMemo, useRef, useCallback, memo } from "react";
 import { Schedule, Member } from "@/types";
 import { assignScheduleApi, softDeleteSchedule, fetchDeletedSchedules, restoreScheduleApi, emptyTrashApi } from "@/lib/api";
 import { showConfirm } from "@/lib/dialog";
@@ -26,7 +26,7 @@ interface AssignTabProps {
   onAddSchedule?: (date: Date) => void;
 }
 
-export default function AssignTab({ members, schedules, onAssigned, onDeleted, onOpenDetail, onAddSchedule }: AssignTabProps) {
+function AssignTab({ members, schedules, onAssigned, onDeleted, onOpenDetail, onAddSchedule }: AssignTabProps) {
   const unassigned = schedules;
 
   const [currentMonth, setCurrentMonth] = useState(new Date());
@@ -356,3 +356,5 @@ export default function AssignTab({ members, schedules, onAssigned, onDeleted, o
     </div>
   );
 }
+
+export default memo(AssignTab);

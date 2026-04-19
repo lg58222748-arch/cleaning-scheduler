@@ -6,9 +6,9 @@ import { Member, Schedule, SwapRequest, Notification as AppNotification, User, U
 type Notification = AppNotification;
 import Calendar from "@/components/Calendar";
 import LoginPage from "@/components/LoginPage";
-import ScheduleDetail from "@/components/ScheduleDetail";
 
 // 동적 로딩 - 필요할 때만 로드
+const ScheduleDetail = dynamic(() => import("@/components/ScheduleDetail"), { ssr: false });
 const ScheduleForm = dynamic(() => import("@/components/ScheduleForm"), { ssr: false });
 const MemberManager = dynamic(() => import("@/components/MemberManager"), { ssr: false });
 const SwapPanel = dynamic(() => import("@/components/SwapPanel"), { ssr: false });
@@ -69,11 +69,16 @@ export default function Home() {
       const cu = localStorage.getItem("cached_users");
       if (cu) { const d = JSON.parse(cu); setAllUsers(d.users || []); setPendingUsers(d.pendingUsers || []); hasCachedData = true; }
     } catch {}
-    // 캐시 있으면 즉시 표시, 없으면 짧은 스플래시
+    // 캐시 있으면 즉시, 없을 땐 아주 짧게만. 인위적 지연은 체감 로딩 속도의 주범.
+    if (hasCachedData) {
+      setShowSplash(false);
+      setAppReady(true);
+      return;
+    }
     const t = setTimeout(() => {
       setShowSplash(false);
       setAppReady(true);
-    }, hasCachedData ? 100 : 500);
+    }, 200);
     return () => clearTimeout(t);
   }, []);
   const [members, setMembers] = useState<Member[]>([]);
@@ -139,6 +144,11 @@ export default function Home() {
   // 알림 숨김/읽음 로딩 완료 여부
   const notifHiddenLoadedRef = useRef(false);
 
+  // 상태 ref — 콜백 안에서 항상 최신 상태 읽기 (useCallback 을 안정 deps 로 유지하기 위함)
+  const unassignedSchedulesRef = useRef<Schedule[]>([]);
+  const schedulesRef = useRef<Schedule[]>([]);
+  const currentUserRef = useRef<User | null>(null);
+
   const loadData = useCallback(async (monthDate?: Date, fullRefresh = false) => {
     try {
       // 우선순위: 명시적 monthDate > 현재 보고 있는 달력 월 > selectedDate
@@ -195,11 +205,22 @@ export default function Home() {
         }
         setAllUsers(usersData.users);
         setPendingUsers(usersData.pendingUsers);
-        // 캐시 저장
-        try {
-          localStorage.setItem("cached_members", JSON.stringify(m));
-          localStorage.setItem("cached_users", JSON.stringify(usersData));
-        } catch {}
+        // 캐시 저장 — 비동기로 (메인 스레드 양보, 대용량 JSON.stringify 지연 숨김)
+        setTimeout(() => {
+          try {
+            localStorage.setItem("cached_members", JSON.stringify(m));
+            localStorage.setItem("cached_users", JSON.stringify(usersData));
+            // schedules 캐시는 최근 3개월분만 (과거 1달 / 미래 2달) — WebView JSON.parse 부담 경감
+            const todayMs = Date.now();
+            const minMs = todayMs - 31 * 24 * 60 * 60 * 1000;
+            const maxMs = todayMs + 62 * 24 * 60 * 60 * 1000;
+            const trimmed = rangeScheds.filter((s) => {
+              const t = Date.parse(s.date);
+              return !Number.isNaN(t) && t >= minMs && t <= maxMs;
+            });
+            localStorage.setItem("cached_schedules", JSON.stringify(trimmed));
+          } catch {}
+        }, 0);
       } else {
         const rangeScheds = await fetchSchedules(start, end);
         if (Date.now() >= scheduleReloadSuppressRef.current) {
@@ -268,17 +289,10 @@ export default function Home() {
   }
 
   // 초기 로딩: 백그라운드로 최신 데이터 갱신 (캐시는 이미 위에서 복원됨)
+  // loadData 내부에서 schedules 캐시도 저장하므로 중복 fetch 안 함.
   useEffect(() => {
     if (currentUser) {
-      loadData(undefined, true).then(() => {
-        // 로드 완료 후 캐시 저장
-        const d = selectedDate;
-        const start = format(startOfMonth(subMonths(d, 1)), "yyyy-MM-dd");
-        const end = format(endOfMonth(addMonths(d, 1)), "yyyy-MM-dd");
-        fetchSchedules(start, end).then(s => {
-          try { localStorage.setItem("cached_schedules", JSON.stringify(s)); } catch {}
-        }).catch(() => {});
-      });
+      loadData(undefined, true);
       // 역할별 기본 탭
       const r = currentUser.role;
       if (r === "sales") setActiveTab("sales");
@@ -446,12 +460,34 @@ export default function Home() {
       if (pollInterval) { console.log("[RT] 폴링 중지 (Realtime 복구)"); clearInterval(pollInterval); pollInterval = null; }
     }
 
-    // Supabase Realtime 구독 (즉시 반영)
+    // 이벤트 폭주 방지: 연속 이벤트를 300ms 한 덩어리로 합쳐서 1회만 fetch.
+    let schedDebTimer: ReturnType<typeof setTimeout> | null = null;
+    let notifDebTimer: ReturnType<typeof setTimeout> | null = null;
+    let memberDebTimer: ReturnType<typeof setTimeout> | null = null;
+    let userDebTimer: ReturnType<typeof setTimeout> | null = null;
+    const debSched = () => {
+      if (schedDebTimer) clearTimeout(schedDebTimer);
+      schedDebTimer = setTimeout(() => { schedDebTimer = null; reloadSchedules(); }, 300);
+    };
+    const debNotif = () => {
+      if (notifDebTimer) clearTimeout(notifDebTimer);
+      notifDebTimer = setTimeout(() => { notifDebTimer = null; reloadNotifications(); }, 300);
+    };
+    const debMembers = () => {
+      if (memberDebTimer) clearTimeout(memberDebTimer);
+      memberDebTimer = setTimeout(() => { memberDebTimer = null; reloadMembers(); }, 300);
+    };
+    const debUsers = () => {
+      if (userDebTimer) clearTimeout(userDebTimer);
+      userDebTimer = setTimeout(() => { userDebTimer = null; reloadUsers(); }, 300);
+    };
+
+    // Supabase Realtime 구독 (즉시 반영, debounce 적용)
     const channel = sbClient.channel("all-db-changes")
-      .on("postgres_changes", { event: "*", schema: "public", table: "schedules" }, () => { console.log("[RT] schedules changed"); reloadSchedules(); })
-      .on("postgres_changes", { event: "*", schema: "public", table: "notifications" }, () => { console.log("[RT] notifications changed"); reloadNotifications(); })
-      .on("postgres_changes", { event: "*", schema: "public", table: "members" }, () => { console.log("[RT] members changed"); reloadMembers(); })
-      .on("postgres_changes", { event: "*", schema: "public", table: "users" }, () => { console.log("[RT] users changed (가입/승인)"); reloadUsers(); })
+      .on("postgres_changes", { event: "*", schema: "public", table: "schedules" }, () => { console.log("[RT] schedules changed"); debSched(); })
+      .on("postgres_changes", { event: "*", schema: "public", table: "notifications" }, () => { console.log("[RT] notifications changed"); debNotif(); })
+      .on("postgres_changes", { event: "*", schema: "public", table: "members" }, () => { console.log("[RT] members changed"); debMembers(); })
+      .on("postgres_changes", { event: "*", schema: "public", table: "users" }, () => { console.log("[RT] users changed (가입/승인)"); debUsers(); })
       .subscribe((status: string) => {
         console.log("[RT] status:", status);
         if (status === "SUBSCRIBED") {
@@ -494,6 +530,10 @@ export default function Home() {
 
     return () => {
       clearTimeout(fallbackTimer);
+      if (schedDebTimer) clearTimeout(schedDebTimer);
+      if (notifDebTimer) clearTimeout(notifDebTimer);
+      if (memberDebTimer) clearTimeout(memberDebTimer);
+      if (userDebTimer) clearTimeout(userDebTimer);
       stopPolling();
       sbClient.removeChannel(channel);
       document.removeEventListener("visibilitychange", onVisible);
@@ -711,6 +751,70 @@ export default function Home() {
       window.removeEventListener("popstate", onHashPop);
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // 매 렌더마다 최신 상태를 ref 에 반영 → 아래 useCallback 이 empty deps 로도 항상 최신 읽음
+  unassignedSchedulesRef.current = unassignedSchedules;
+  schedulesRef.current = schedules;
+  currentUserRef.current = currentUser;
+
+  // === 안정 콜백 (props 참조가 바뀌지 않아 memo 자식이 불필요하게 리렌더 안 됨) ===
+  const handleAssigned = useCallback((scheduleId: string, memberId: string, memberName: string) => {
+    scheduleReloadSuppressRef.current = Date.now() + 4000;
+    const target = unassignedSchedulesRef.current.find((s) => s.id === scheduleId);
+    if (!target) return;
+    setUnassignedSchedules((prev) => prev.filter((s) => s.id !== scheduleId));
+    setSchedules((prev) => {
+      const idx = prev.findIndex((s) => s.id === scheduleId);
+      const assigned = { ...target, memberId, memberName, status: "confirmed" as const };
+      if (idx >= 0) {
+        const next = [...prev];
+        next[idx] = assigned;
+        return next;
+      }
+      return [...prev, assigned];
+    });
+    assignScheduleApi(scheduleId, memberId, memberName).catch((err) => {
+      console.error("[assign] 실패, 롤백:", err);
+      setSchedules((prev) => prev.filter((s) => s.id !== scheduleId));
+      setUnassignedSchedules((prev) =>
+        prev.find((s) => s.id === scheduleId) ? prev : [...prev, target]
+      );
+      showAlert("배정 실패. 다시 시도해주세요.");
+    });
+  }, []);
+
+  const handleAssignDeleted = useCallback((id: string) => {
+    scheduleReloadSuppressRef.current = Date.now() + 4000;
+    setUnassignedSchedules((prev) => prev.filter((s) => s.id !== id));
+  }, []);
+
+  const handleAssignOpenDetail = useCallback((s: Schedule) => {
+    setDetailMode("assign");
+    openDetailSchedule(s);
+  }, [openDetailSchedule]);
+
+  const handleAssignAddSchedule = useCallback((d: Date) => {
+    setSelectedDate(d);
+    setEditingSchedule(null);
+    openModal(setShowScheduleForm);
+  }, [openModal]);
+
+  const handleCalendarSelectDate = useCallback((d: Date) => {
+    setSelectedDate(d);
+    pushHash("day");
+    setShowDayPopup(true);
+  }, [pushHash]);
+
+  const handleCalendarScheduleClick = useCallback((s: Schedule) => {
+    setDetailSchedule(s);
+    setDetailMode("calendar");
+    pushHash("detail");
+  }, [pushHash]);
+
+  const handleCalendarMonthChange = useCallback((d: Date) => {
+    viewingMonthRef.current = d;
+    loadData(d);
+  }, [loadData]);
 
   // 스플래시: 1초, 로고 이미지 배경과 동일 색상
   if (showSplash) {
@@ -1204,9 +1308,9 @@ export default function Home() {
             schedules={calendarSchedules}
             members={members}
             selectedDate={selectedDate}
-            onSelectDate={(d) => { setSelectedDate(d); pushHash("day"); setShowDayPopup(true); }}
-            onScheduleClick={(s) => { setDetailSchedule(s); setDetailMode("calendar"); pushHash("detail"); }}
-            onMonthChange={(d) => { viewingMonthRef.current = d; loadData(d); }}
+            onSelectDate={handleCalendarSelectDate}
+            onScheduleClick={handleCalendarScheduleClick}
+            onMonthChange={handleCalendarMonthChange}
           />
         </div>
 
@@ -1226,44 +1330,14 @@ export default function Home() {
 
         {canAssign && (
           <div className="h-full" style={{ display: activeTab === "assign" ? "block" : "none" }}>
-            <AssignTab members={members} schedules={unassignedSchedules} onAssigned={(scheduleId, memberId, memberName) => {
-              scheduleReloadSuppressRef.current = Date.now() + 4000;
-              // 낙관적 업데이트: 즉시 UI 반영
-              const target = unassignedSchedules.find((s) => s.id === scheduleId);
-              if (!target) return;
-              // 배정탭에서 제거
-              setUnassignedSchedules((prev) => prev.filter((s) => s.id !== scheduleId));
-              // 달력에 추가 — 같은 scheduleId 이미 있으면 덮어쓰기만, 없을 때만 추가 (중복 방지)
-              setSchedules((prev) => {
-                const idx = prev.findIndex((s) => s.id === scheduleId);
-                const assigned = { ...target, memberId, memberName, status: "confirmed" as const };
-                if (idx >= 0) {
-                  const next = [...prev];
-                  next[idx] = assigned;
-                  return next;
-                }
-                return [...prev, assigned];
-              });
-              // API 호출 + 실패 시 롤백
-              assignScheduleApi(scheduleId, memberId, memberName).catch((err) => {
-                console.error("[assign] 실패, 롤백:", err);
-                setSchedules((prev) => prev.filter((s) => s.id !== scheduleId));
-                setUnassignedSchedules((prev) =>
-                  prev.find((s) => s.id === scheduleId) ? prev : [...prev, target]
-                );
-                showAlert("배정 실패. 다시 시도해주세요.");
-              });
-            }} onDeleted={(id) => {
-              scheduleReloadSuppressRef.current = Date.now() + 4000;
-              setUnassignedSchedules((prev) => prev.filter((s) => s.id !== id));
-            }} onOpenDetail={(s) => {
-              setDetailMode("assign");
-              openDetailSchedule(s);
-            }} onAddSchedule={(d) => {
-              setSelectedDate(d);
-              setEditingSchedule(null);
-              openModal(setShowScheduleForm);
-            }} />
+            <AssignTab
+              members={members}
+              schedules={unassignedSchedules}
+              onAssigned={handleAssigned}
+              onDeleted={handleAssignDeleted}
+              onOpenDetail={handleAssignOpenDetail}
+              onAddSchedule={handleAssignAddSchedule}
+            />
           </div>
         )}
 

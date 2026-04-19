@@ -1,22 +1,90 @@
-const CACHE_NAME = 'cleaning-scheduler-v6';
+// 버전 올리면 구 캐시 전부 자동 정리. 롤백 필요 시 v7 → v6 로 내리면 됨.
+const CACHE_VERSION = 'v7';
+const STATIC_CACHE = `static-${CACHE_VERSION}`;
+const SHELL_CACHE = `shell-${CACHE_VERSION}`;
+const SHELL_URLS = ['/', '/manifest.json', '/logo.jpg'];
 
 self.addEventListener('install', (event) => {
   self.skipWaiting();
+  // 앱셸 프리캐시 (실패해도 install 은 성공)
+  event.waitUntil(
+    caches.open(SHELL_CACHE).then((cache) =>
+      cache.addAll(SHELL_URLS).catch(() => {})
+    )
+  );
 });
 
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches.keys().then((names) => {
-      return Promise.all(
-        names.filter((name) => name !== CACHE_NAME).map((name) => caches.delete(name))
-      );
-    }).then(() => clients.claim())
+    caches.keys().then((names) =>
+      Promise.all(
+        names
+          .filter((name) => name !== STATIC_CACHE && name !== SHELL_CACHE)
+          .map((name) => caches.delete(name))
+      )
+    ).then(() => clients.claim())
   );
 });
 
+// Fetch 전략:
+//  - /api/* : network-only (데이터는 항상 최신)
+//  - /_next/static/* : cache-first (콘텐츠 해시라 영구 캐시 안전)
+//  - GET HTML/manifest : stale-while-revalidate (즉시 표시 + 백그라운드 업데이트)
+//  - 그 외 GET : network-first, 실패 시 캐시
 self.addEventListener('fetch', (event) => {
-  event.respondWith(fetch(event.request));
+  const req = event.request;
+  if (req.method !== 'GET') return;
+  const url = new URL(req.url);
+
+  // 다른 오리진은 터치 안 함
+  if (url.origin !== self.location.origin) return;
+
+  // /api/* — 데이터 요청은 SW 우회
+  if (url.pathname.startsWith('/api/')) return;
+
+  // /_next/static/* — 영구 자산
+  if (url.pathname.startsWith('/_next/static/')) {
+    event.respondWith(cacheFirst(req, STATIC_CACHE));
+    return;
+  }
+
+  // 앱셸
+  if (url.pathname === '/' || url.pathname === '/manifest.json') {
+    event.respondWith(staleWhileRevalidate(req, SHELL_CACHE));
+    return;
+  }
+
+  // 그 외 GET 은 network-first
+  event.respondWith(
+    fetch(req).catch(() => caches.match(req).then((r) => r || Response.error()))
+  );
 });
+
+async function cacheFirst(req, cacheName) {
+  const cache = await caches.open(cacheName);
+  const cached = await cache.match(req);
+  if (cached) return cached;
+  try {
+    const res = await fetch(req);
+    if (res && res.status === 200) cache.put(req, res.clone());
+    return res;
+  } catch (e) {
+    return cached || Response.error();
+  }
+}
+
+async function staleWhileRevalidate(req, cacheName) {
+  const cache = await caches.open(cacheName);
+  const cached = await cache.match(req);
+  const networkPromise = fetch(req)
+    .then((res) => {
+      if (res && res.status === 200) cache.put(req, res.clone());
+      return res;
+    })
+    .catch(() => null);
+  // 캐시 있으면 즉시 리턴, 없으면 네트워크 대기
+  return cached || (await networkPromise) || Response.error();
+}
 
 // 알림 ON/OFF 상태 (클라이언트에서 postMessage로 전달)
 let notificationsEnabled = true;

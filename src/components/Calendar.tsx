@@ -15,6 +15,9 @@ import {
 } from "date-fns";
 import { ko } from "date-fns/locale";
 
+// 빈 배열 stable 참조 — DayCell memo 깨뜨리지 않기 위해 전 셀이 동일 ref 를 공유
+const EMPTY_SCHEDULES: Schedule[] = [];
+
 interface CalendarProps {
   schedules: Schedule[];
   members: Member[];
@@ -23,6 +26,57 @@ interface CalendarProps {
   onScheduleClick?: (schedule: Schedule) => void;
   onMonthChange: (date: Date) => void;
 }
+
+// 개별 day cell 을 memo 컴포넌트로 분리 → 해당 날짜 schedules 가 바뀌지 않으면 리렌더 안 됨.
+// 부모(Calendar) 가 리렌더돼도 42 셀 전부 다시 렌더되지 않도록 방어.
+interface DayCellProps {
+  day: Date;
+  isSelected: boolean;
+  isCurrentMonth: boolean;
+  isTodayDay: boolean;
+  dayOfWeek: number;
+  daySchedules: Schedule[];
+  isSnapping: boolean;
+  onSelectDate: (d: Date) => void;
+  onScheduleClick?: (s: Schedule) => void;
+}
+const DayCell = memo(function DayCell({
+  day, isSelected, isCurrentMonth, isTodayDay, dayOfWeek, daySchedules, isSnapping, onSelectDate, onScheduleClick,
+}: DayCellProps) {
+  return (
+    <button
+      onClick={() => !isSnapping && onSelectDate(day)}
+      className={`px-0.5 pt-0.5 pb-0 relative flex flex-col items-center ${
+        isSelected ? "bg-blue-50 ring-2 ring-blue-400 ring-inset" : "active:bg-gray-50"
+      } ${!isCurrentMonth ? "opacity-40" : ""}`}
+    >
+      <span className={`inline-flex items-center justify-center w-5 h-5 text-xs rounded-full ${
+        isTodayDay ? "bg-blue-500 text-white font-bold"
+          : dayOfWeek === 0 ? "text-red-500"
+          : dayOfWeek === 6 ? "text-blue-500"
+          : "text-gray-700"
+      }`}>
+        {format(day, "d")}
+      </span>
+      <div className="overflow-hidden flex-1 w-full relative">
+        {daySchedules.slice(0, 2).map((s) => {
+          const fullName = s.title;
+          const schedColor = s.color || "#FDDCCC";
+          return (
+            <div key={s.id} className="text-[9px] md:text-[11px] leading-[1.2] md:leading-[1.4] px-0.5 py-0.5 rounded font-medium overflow-hidden mb-0.5 md:cursor-pointer md:hover:opacity-80"
+              style={{ backgroundColor: s.status === "completed" ? "#D1FAE5" : schedColor, color: "#555", maxHeight: "4em", display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical" as const }}
+              onClick={(e) => { if (onScheduleClick && window.innerWidth >= 768) { e.stopPropagation(); onScheduleClick(s); } }}>
+              {fullName}
+            </div>
+          );
+        })}
+        {daySchedules.length > 2 && (
+          <div className="absolute bottom-0 right-0 text-[10px] md:text-[12px] text-blue-600 font-bold bg-blue-100 px-1.5 py-0.5 rounded-full leading-none border border-blue-300">+{daySchedules.length - 2}</div>
+        )}
+      </div>
+    </button>
+  );
+});
 
 export default memo(function Calendar({
   schedules,
@@ -225,44 +279,20 @@ export default memo(function Calendar({
           <div key={wi} className="grid grid-cols-7 divide-x divide-gray-50 flex-1">
             {week.map((d) => {
               const dateStr = format(d, "yyyy-MM-dd");
-              const daySchedules = scheduleMap.get(dateStr) || [];
-              const isSelected = isSameDay(d, selectedDate);
-              const isCurrentMonth = isSameMonth(d, currentMonth);
-              const dayOfWeek = d.getDay();
-
+              const daySchedules = scheduleMap.get(dateStr) || EMPTY_SCHEDULES;
               return (
-                <button
+                <DayCell
                   key={dateStr}
-                  onClick={() => !isSnapping && onSelectDate(d)}
-                  className={`px-0.5 pt-0.5 pb-0 relative flex flex-col items-center ${
-                    isSelected ? "bg-blue-50 ring-2 ring-blue-400 ring-inset" : "active:bg-gray-50"
-                  } ${!isCurrentMonth ? "opacity-40" : ""}`}
-                >
-                  <span className={`inline-flex items-center justify-center w-5 h-5 text-xs rounded-full ${
-                    isToday(d) ? "bg-blue-500 text-white font-bold"
-                      : dayOfWeek === 0 ? "text-red-500"
-                      : dayOfWeek === 6 ? "text-blue-500"
-                      : "text-gray-700"
-                  }`}>
-                    {format(d, "d")}
-                  </span>
-                  <div className="overflow-hidden flex-1 w-full relative">
-                    {daySchedules.slice(0, 2).map((s) => {
-                      const fullName = s.title;
-                      const schedColor = s.color || "#FDDCCC";
-                      return (
-                        <div key={s.id} className="text-[9px] md:text-[11px] leading-[1.2] md:leading-[1.4] px-0.5 py-0.5 rounded font-medium overflow-hidden mb-0.5 md:cursor-pointer md:hover:opacity-80"
-                          style={{ backgroundColor: s.status === "completed" ? "#D1FAE5" : schedColor, color: "#555", maxHeight: "4em", display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical" as const }}
-                          onClick={(e) => { if (onScheduleClick && window.innerWidth >= 768) { e.stopPropagation(); onScheduleClick(s); } }}>
-                          {fullName}
-                        </div>
-                      );
-                    })}
-                    {daySchedules.length > 2 && (
-                      <div className="absolute bottom-0 right-0 text-[10px] md:text-[12px] text-blue-600 font-bold bg-blue-100 px-1.5 py-0.5 rounded-full leading-none border border-blue-300">+{daySchedules.length - 2}</div>
-                    )}
-                  </div>
-                </button>
+                  day={d}
+                  isSelected={isSameDay(d, selectedDate)}
+                  isCurrentMonth={isSameMonth(d, currentMonth)}
+                  isTodayDay={isToday(d)}
+                  dayOfWeek={d.getDay()}
+                  daySchedules={daySchedules}
+                  isSnapping={isSnapping}
+                  onSelectDate={onSelectDate}
+                  onScheduleClick={onScheduleClick}
+                />
               );
             })}
           </div>
