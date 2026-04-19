@@ -130,11 +130,148 @@ export default function ManageTab({ isAdmin, userRole, userName = "", allUsers =
               </svg>
             </button>
           )}
-          <div className="px-4 py-6 text-center text-gray-400 text-xs">
-            추가 기능 업데이트 예정
+
+          {/* 일정 통계 */}
+          <div className="pt-4">
+            <div className="text-xs font-bold text-gray-500 mb-2">일정 통계</div>
+            <SchedulerStats />
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+/* ════════════ 일정 통계 섹션 ════════════ */
+function SchedulerStats() {
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string>("");
+  const [unassignedAll, setUnassignedAll] = useState<Schedule[]>([]);
+  const [assignedAll, setAssignedAll] = useState<Schedule[]>([]);
+  const [monthsToShow, setMonthsToShow] = useState(6);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError("");
+    try {
+      // /api/schedules (range 없음) = 전체 배정된 일정
+      // /api/schedules?unassigned=true = 미배정 전체
+      const [all, un] = await Promise.all([
+        fetchSchedules(),
+        fetch("/api/schedules?unassigned=true").then((r) => r.json()).catch(() => []),
+      ]);
+      // fetchSchedules()은 배정된 일정만 — 중복 방지용으로 unassigned 로 구분
+      setAssignedAll(Array.isArray(all) ? all : []);
+      setUnassignedAll(Array.isArray(un) ? un : []);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "로딩 실패");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const stats = useMemo(() => {
+    const assignedCount = assignedAll.length;
+    const unassignedCount = unassignedAll.length;
+    const total = assignedCount + unassignedCount;
+
+    // 월별 집계 (YYYY-MM → { assigned, unassigned, total })
+    const byMonth = new Map<string, { assigned: number; unassigned: number }>();
+    const ensure = (ym: string) => {
+      if (!byMonth.has(ym)) byMonth.set(ym, { assigned: 0, unassigned: 0 });
+      return byMonth.get(ym)!;
+    };
+    for (const s of assignedAll) {
+      if (!s.date) continue;
+      ensure(s.date.slice(0, 7)).assigned++;
+    }
+    for (const s of unassignedAll) {
+      if (!s.date) continue;
+      ensure(s.date.slice(0, 7)).unassigned++;
+    }
+    // 최신 월 먼저
+    const monthly = [...byMonth.entries()]
+      .map(([ym, v]) => ({ ym, assigned: v.assigned, unassigned: v.unassigned, total: v.assigned + v.unassigned }))
+      .sort((a, b) => (a.ym < b.ym ? 1 : -1));
+
+    return { assignedCount, unassignedCount, total, monthly };
+  }, [assignedAll, unassignedAll]);
+
+  if (loading) {
+    return <div className="px-2 py-6 text-center text-xs text-gray-400">불러오는 중...</div>;
+  }
+  if (error) {
+    return (
+      <div className="px-2 py-4 text-center text-xs text-red-500">
+        {error}
+        <button onClick={load} className="ml-2 underline">다시 시도</button>
+      </div>
+    );
+  }
+
+  const visibleMonths = stats.monthly.slice(0, monthsToShow);
+  const hasMore = stats.monthly.length > monthsToShow;
+
+  return (
+    <div className="space-y-2">
+      {/* 총합 카드 3개 */}
+      <div className="grid grid-cols-3 gap-2">
+        <div className="rounded-xl border border-orange-200 bg-orange-50 p-3">
+          <div className="text-[10px] font-medium text-orange-600">배정 탭 (미배정)</div>
+          <div className="mt-1 text-xl font-bold text-orange-700">{stats.unassignedCount.toLocaleString("ko-KR")}</div>
+          <div className="text-[10px] text-orange-500">건</div>
+        </div>
+        <div className="rounded-xl border border-blue-200 bg-blue-50 p-3">
+          <div className="text-[10px] font-medium text-blue-600">달력 (배정완료)</div>
+          <div className="mt-1 text-xl font-bold text-blue-700">{stats.assignedCount.toLocaleString("ko-KR")}</div>
+          <div className="text-[10px] text-blue-500">건</div>
+        </div>
+        <div className="rounded-xl border border-gray-300 bg-gray-50 p-3">
+          <div className="text-[10px] font-medium text-gray-600">합계</div>
+          <div className="mt-1 text-xl font-bold text-gray-800">{stats.total.toLocaleString("ko-KR")}</div>
+          <div className="text-[10px] text-gray-500">건</div>
+        </div>
+      </div>
+
+      {/* 월별 집계 */}
+      <div className="rounded-xl border border-gray-200 bg-white overflow-hidden">
+        <div className="px-3 py-2 border-b border-gray-100 flex items-center justify-between">
+          <span className="text-xs font-bold text-gray-700">월별</span>
+          <button onClick={load} className="text-[11px] text-blue-500 active:underline">새로고침</button>
+        </div>
+        {visibleMonths.length === 0 ? (
+          <div className="py-6 text-center text-xs text-gray-400">데이터 없음</div>
+        ) : (
+          <div className="divide-y divide-gray-100">
+            <div className="grid grid-cols-[1fr_auto_auto_auto] gap-3 px-3 py-2 text-[10px] text-gray-400">
+              <span>월</span>
+              <span className="w-10 text-right">미배정</span>
+              <span className="w-10 text-right">달력</span>
+              <span className="w-12 text-right font-bold">합계</span>
+            </div>
+            {visibleMonths.map((m) => (
+              <div key={m.ym} className="grid grid-cols-[1fr_auto_auto_auto] gap-3 px-3 py-2 text-xs">
+                <span className="text-gray-700 font-medium">{m.ym.replace("-", ".")}</span>
+                <span className="w-10 text-right text-orange-600">{m.unassigned.toLocaleString("ko-KR")}</span>
+                <span className="w-10 text-right text-blue-600">{m.assigned.toLocaleString("ko-KR")}</span>
+                <span className="w-12 text-right font-bold text-gray-800">{m.total.toLocaleString("ko-KR")}</span>
+              </div>
+            ))}
+          </div>
+        )}
+        {hasMore && (
+          <button
+            onClick={() => setMonthsToShow((n) => n + 12)}
+            className="w-full py-2 text-xs text-blue-500 active:bg-blue-50"
+          >
+            더보기 ({stats.monthly.length - monthsToShow}개월 더)
+          </button>
+        )}
+      </div>
     </div>
   );
 }
