@@ -88,36 +88,56 @@ export async function GET(req: NextRequest) {
     return Response.json({ range: { from, to }, count: 0, schedules: [] });
   }
 
-  // 2) 그 일정들의 settlements — IN 절이 URL 길이 제한에 걸리지 않도록 200개씩 청크.
+  // 2) 그 일정들의 settlements + checklists — IN 절 URL 길이 제한 회피용 200개씩 청크.
   type SettlementRow = {
-    id: string; schedule_id: string; status: string; quote: number; deposit: number;
-    balance: number; customer_name: string; customer_phone: string;
+    id: string; schedule_id: string; status: string;
+    quote: number; deposit: number; balance: number;
+    extra_charge: number; subtotal: number; vat: number; total_amount: number;
+    payment_method: string; cash_receipt: boolean;
+    customer_name: string; customer_phone: string;
+  };
+  type ChecklistRow = {
+    id: string; schedule_id: string;
+    completed_count: number; total_count: number; submitted_at: string | null;
   };
   const ids = schedules.map((s) => s.id);
   const CHUNK = 200;
   const settlementRows: SettlementRow[] = [];
+  const checklistRows: ChecklistRow[] = [];
   try {
     const chunks: string[][] = [];
     for (let i = 0; i < ids.length; i += CHUNK) chunks.push(ids.slice(i, i + CHUNK));
-    const results = await Promise.all(
-      chunks.map((slice) => {
-        const list = slice.map((id) => `"${id}"`).join(",");
-        return supaGet<SettlementRow[]>(
-          `settlements?schedule_id=in.(${list})&select=id,schedule_id,status,quote,deposit,balance,customer_name,customer_phone&limit=${CHUNK}`
-        );
-      })
-    );
-    for (const r of results) settlementRows.push(...r);
+    const settlementPromises = chunks.map((slice) => {
+      const list = slice.map((id) => `"${id}"`).join(",");
+      return supaGet<SettlementRow[]>(
+        `settlements?schedule_id=in.(${list})&select=id,schedule_id,status,quote,deposit,balance,extra_charge,subtotal,vat,total_amount,payment_method,cash_receipt,customer_name,customer_phone&limit=${CHUNK}`
+      );
+    });
+    const checklistPromises = chunks.map((slice) => {
+      const list = slice.map((id) => `"${id}"`).join(",");
+      return supaGet<ChecklistRow[]>(
+        `checklists?schedule_id=in.(${list})&select=id,schedule_id,completed_count,total_count,submitted_at&limit=${CHUNK}`
+      );
+    });
+    const [sResults, cResults] = await Promise.all([
+      Promise.all(settlementPromises),
+      Promise.all(checklistPromises),
+    ]);
+    for (const r of sResults) settlementRows.push(...r);
+    for (const r of cResults) checklistRows.push(...r);
   } catch (e) {
     return Response.json({ error: "db_error", message: e instanceof Error ? e.message : String(e) }, { status: 502 });
   }
 
   const settlementMap = new Map<string, typeof settlementRows[number]>();
   for (const s of settlementRows || []) settlementMap.set(String(s.schedule_id), s);
+  const checklistMap = new Map<string, typeof checklistRows[number]>();
+  for (const c of checklistRows || []) checklistMap.set(String(c.schedule_id), c);
 
   const out = schedules
     .map((sch) => {
       const st = settlementMap.get(String(sch.id));
+      const cl = checklistMap.get(String(sch.id));
       return {
         scheduleId: sch.id,
         date: sch.date,
@@ -134,18 +154,32 @@ export async function GET(req: NextRequest) {
               quote: st.quote || 0,
               deposit: st.deposit || 0,
               balance: st.balance || 0,
+              extraCharge: st.extra_charge || 0,
+              subtotal: st.subtotal || 0,
+              vat: st.vat || 0,
+              totalAmount: st.total_amount || 0,
+              paymentMethod: st.payment_method || "transfer",
+              cashReceipt: !!st.cash_receipt,
               customerName: st.customer_name || "",
               customerPhone: st.customer_phone || "",
             }
           : {
               id: "",
               status: "none",
-              quote: 0,
-              deposit: 0,
-              balance: 0,
+              quote: 0, deposit: 0, balance: 0,
+              extraCharge: 0, subtotal: 0, vat: 0, totalAmount: 0,
+              paymentMethod: "transfer",
+              cashReceipt: false,
               customerName: "",
               customerPhone: "",
             },
+        checklist: cl
+          ? {
+              completedCount: cl.completed_count || 0,
+              totalCount: cl.total_count || 0,
+              submittedAt: cl.submitted_at,
+            }
+          : null,
       };
     })
     .sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
