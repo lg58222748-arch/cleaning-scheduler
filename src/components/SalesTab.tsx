@@ -1076,11 +1076,11 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
                   <div className="p-3">
                     <textarea
                       value={sel.content}
-                      readOnly={!isAdmin}
-                      onChange={(e) => isAdmin && updateTemplateField(sel.id, "content", e.target.value)}
+                      readOnly={!(isAdmin || canEditTemplates)}
+                      onChange={(e) => (isAdmin || canEditTemplates) && updateTemplateField(sel.id, "content", e.target.value)}
                       rows={20}
                       style={{ fontSize: "13px" }}
-                      className={`w-full text-gray-700 leading-relaxed rounded-lg p-2 outline-none resize-y ${isAdmin ? "bg-white border border-gray-200 focus:border-green-500" : "bg-gray-50"}`}
+                      className={`w-full text-gray-700 leading-relaxed rounded-lg p-2 outline-none resize-y ${(isAdmin || canEditTemplates) ? "bg-white border border-gray-200 focus:border-green-500" : "bg-gray-50"}`}
                     />
                     <button onClick={() => handleCopy(sel.content, `tpl${selIdx}`)} className="mt-2 w-full py-2 bg-green-700 text-white rounded-lg text-sm font-bold active:bg-green-800">
                       {copied.has(`tpl${selIdx}`) ? "복사됨!" : "복사"}
@@ -1177,7 +1177,7 @@ function TemplateCard({
             </button>
           </div>
         )}
-        {isAdmin && editingTitle ? (
+        {(isAdmin || canEdit) && editingTitle ? (
           <input
             value={titleDraft}
             autoFocus
@@ -1189,9 +1189,9 @@ function TemplateCard({
         ) : (
           <button
             onClick={() => { setOpen(!open); onSelect?.(); }}
-            onDoubleClick={() => { if (isAdmin) { setTitleDraft(title); setEditingTitle(true); } }}
+            onDoubleClick={() => { if (isAdmin || canEdit) { setTitleDraft(title); setEditingTitle(true); } }}
             className="flex-1 flex items-center justify-between text-left active:bg-gray-50 rounded px-1 py-0.5"
-            title={isAdmin ? "더블클릭하여 제목 수정" : ""}
+            title={(isAdmin || canEdit) ? "더블클릭하여 제목 수정" : ""}
           >
             <span className="text-[12px] font-medium text-gray-800 truncate">{title}</span>
             <svg className={`w-3 h-3 text-gray-400 transition-transform shrink-0 ${open ? "rotate-90" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1209,11 +1209,11 @@ function TemplateCard({
         <div className="px-3 pb-2.5 border-t border-gray-100 md:hidden">
           <textarea
             value={content}
-            readOnly={!isAdmin}
-            onChange={(e) => isAdmin && onChangeContent?.(e.target.value)}
+            readOnly={!(isAdmin || canEdit)}
+            onChange={(e) => (isAdmin || canEdit) && onChangeContent?.(e.target.value)}
             rows={8}
             style={{ fontSize: "12px" }}
-            className={`w-full mt-2 text-gray-700 leading-relaxed rounded-lg p-2 outline-none resize-y ${isAdmin ? "bg-white border border-gray-200 focus:border-green-500" : "bg-gray-50"}`}
+            className={`w-full mt-2 text-gray-700 leading-relaxed rounded-lg p-2 outline-none resize-y ${(isAdmin || canEdit) ? "bg-white border border-gray-200 focus:border-green-500" : "bg-gray-50"}`}
           />
           <button onClick={() => onCopy(content)} className="mt-1.5 w-full py-1.5 bg-green-700 text-white rounded-lg text-xs font-bold active:bg-green-800">
             {copied ? "복사됨!" : "복사"}
