@@ -366,9 +366,14 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
     setParseDone(false);
     setParseError("");
     const formData = extractFormData(customerText);
-    const confirmServices = activeConfirm.services.length > 0 ? activeConfirm.services : formData.services;
+    // 항상 파싱 결과 기준으로 fresh — 이전 확정 세션의 services 는 덮어씀 (다른 고객 데이터 섞임 방지).
+    const confirmServices = formData.services;
+
+    // 파싱 성공 시 양식발송 탭 데이터 초기화 (다음 고객용으로 깨끗하게).
+    const resetForm = () => updateForm({ services: [], pyeong: "", buildType: "선택", salesNote: "", copied: new Set() });
 
     const finishSuccess = () => {
+      resetForm();
       setParsing(false);
       setParseDone(true);
       setTimeout(() => parsedResultRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 100);
@@ -395,6 +400,7 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
           finishError("❌ 파싱 실패 - 이름/주소/연락처/날짜 중 아무것도 찾지 못했습니다");
           return;
         }
+        // 예약확정 fresh 하게 덮어씀 (parsedQuote/Deposit/Balance 도 빈값으로, 이전 세션 잔여 제거).
         updateConfirm({
           parsedName: data.name || "",
           parsedPhone: data.phone || "",
@@ -402,7 +408,10 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
           parsedWishDate: data.date || "",
           parsedNote: data.note || "",
           parsedSalesNote: data.salesNote || "",
-          parsedPyeong: formData.pyeong || activeConfirm.parsedPyeong,
+          parsedPyeong: formData.pyeong || "",
+          parsedQuote: "",
+          parsedDeposit: "",
+          parsedBalance: "",
           services: confirmServices,
           schedules: confirmServices.map((s) => ({ service: s.name, date: "", time: "선택" })),
         });
@@ -439,10 +448,10 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
       if (m11 && m11[1].trim()) salesNote = m11[1].trim();
     }
 
-    // 서비스/평수 추출 (공통 헬퍼 사용)
+    // 서비스/평수 추출 (공통 헬퍼 사용) — 항상 fresh 기준, 이전 확정 세션 값 섞지 않음.
     const formData = extractFormData(t);
-    const svcList: ServiceEntry[] = activeConfirm.services.length > 0 ? activeConfirm.services : formData.services;
-    const pyeongToUse = formData.pyeong || activeConfirm.parsedPyeong;
+    const svcList: ServiceEntry[] = formData.services;
+    const pyeongToUse = formData.pyeong || "";
 
     // 2차: 양식 뒤 자유형식 답변 추출
     // 마지막 "*" 줄 이후의 내용물을 모두 수집
@@ -508,6 +517,9 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
       parsedNote: note,
       parsedSalesNote: salesNote,
       parsedPyeong: pyeongToUse,
+      parsedQuote: "",
+      parsedDeposit: "",
+      parsedBalance: "",
       services: svcList,
       schedules: svcList.map((s) => ({ service: s.name, date: "", time: "선택" })),
     });
