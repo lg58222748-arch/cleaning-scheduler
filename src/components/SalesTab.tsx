@@ -485,8 +485,18 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
         if (fullSales && fullSales.length > rSalesNote.length) rSalesNote = fullSales;
         const hasInfo = !!(rName || rPhone || rAddr || rWish);
         if (!hasInfo) {
-          finishError("❌ 파싱 실패 - 이름/주소/연락처/날짜 중 아무것도 찾지 못했습니다");
+          finishError(`❌ 파싱 실패 — 주요 항목 모두 못 찾음\n인식 실패 항목: 1)성함, 2)주소, 3)연락처, 4)날짜\n형식 예) "1)이름" "2)주소" "3)연락처" "4)날짜" 로 작성해주세요`);
           return;
+        }
+        // 부분 성공: 누락 필드 경고 표시 (에러는 아니고 주의 메시지)
+        const apiMissing: string[] = [];
+        if (!rName) apiMissing.push("1)성함");
+        if (!rAddr) apiMissing.push("2)주소");
+        if (!rPhone) apiMissing.push("3)연락처");
+        if (!rWish) apiMissing.push("4)날짜");
+        if (apiMissing.length > 0) {
+          setParseError(`⚠️ 일부 항목 누락: ${apiMissing.join(", ")} — 예약확정 탭에서 직접 입력해주세요`);
+          setTimeout(() => setParseError(""), 12000);
         }
         // 예약확정 fresh 하게 덮어씀 (parsedQuote/Deposit/Balance 도 빈값으로, 이전 세션 잔여 제거).
         updateConfirm({
@@ -504,7 +514,7 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
           services: confirmServices,
           schedules: confirmServices.map((s) => ({ service: s.name, date: wishDateToISO(rWish), time: "선택" })),
         });
-        generateConfirmMsg(rName, rAddr, rPhone, rWish, rNote, confirmServices, formData.pyeong, undefined, formData.pyeongExtra);
+        generateConfirmMsg(rName, rAddr, rPhone, rWish, rNote, confirmServices, formData.pyeong, undefined, formData.pyeongExtra, rSalesNote);
         finishSuccess();
         return;
       }
@@ -514,8 +524,13 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
     const { ok, missing } = regexParse(textSnapshot);
     if (!ok) {
       const missingStr = missing.length > 0 ? `\n인식 실패 항목: ${missing.join(", ")}` : "";
-      finishError(`❌ 파싱 실패 - 1~5번 번호 형식(1. 또는 1))으로 작성된 내용이 있어야 합니다.${missingStr}`);
+      finishError(`❌ 파싱 실패 — 주요 항목을 찾지 못했습니다${missingStr}\n형식 예) "1)이름" "2)주소" "3)연락처" "4)날짜" (또는 "1. 이름") 로 작성해주세요`);
     } else {
+      // 부분 성공: 누락 필드 경고 표시
+      if (missing.length > 0) {
+        setParseError(`⚠️ 일부 항목 누락: ${missing.join(", ")} — 예약확정 탭에서 직접 입력해주세요`);
+        setTimeout(() => setParseError(""), 12000);
+      }
       finishSuccess();
     }
   }
@@ -628,11 +643,11 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
     });
 
     // 확정 메시지 생성
-    generateConfirmMsg(name, addr, phone, wish, note, svcList, pyeongToUse, undefined, formData.pyeongExtra);
+    generateConfirmMsg(name, addr, phone, wish, note, svcList, pyeongToUse, undefined, formData.pyeongExtra, salesNote);
     return { ok: true, missing };
   }
 
-  function generateConfirmMsg(name?: string, addr?: string, phone?: string, _wish?: string, note?: string, overrideServices?: ServiceEntry[], overridePyeong?: string, overrideSchedules?: ParsedSchedule[], overridePyeongExtra?: string) {
+  function generateConfirmMsg(name?: string, addr?: string, phone?: string, _wish?: string, note?: string, overrideServices?: ServiceEntry[], overridePyeong?: string, overrideSchedules?: ParsedSchedule[], overridePyeongExtra?: string, overrideSalesNote?: string) {
     const n = name || parsedName;
     const svcs = overrideServices || activeConfirm.services;
     const schedsRaw = overrideSchedules || activeConfirm.schedules;
@@ -677,7 +692,8 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
       msg += `총 잔금 : ${totalBalance > 0 ? totalBalance.toLocaleString() + "원" : ""}\n`;
     }
 
-    msg += `11)상담사 특이사항 : ${activeConfirm.parsedSalesNote || ""}\n`;
+    const salesNoteVal = overrideSalesNote !== undefined ? overrideSalesNote : activeConfirm.parsedSalesNote;
+    msg += `11)상담사 특이사항 : ${salesNoteVal || ""}\n`;
     msg += `\n*예약금은 본사 확정 비용, 잔금과 세금 증빙은 당일 관리점에서 작업 마무리 후 처리됩니다.\n`;
     msg += `*최종 정산은 현장 작업 완료 후 공급가액과 부가세를 구분하여 안내드립니다.`;
     setConfirmMsg(msg);
@@ -996,11 +1012,15 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
               style={{ fontSize: "12px" }} className="w-full px-3 py-2.5 border border-gray-200 rounded-lg outline-none focus:border-green-500 resize-y min-h-[300px]" />
             <button onClick={parseCustomer} disabled={parsing}
               className="mt-2 w-full py-3.5 rounded-xl text-sm font-bold text-white disabled:opacity-70 transition-colors"
-              style={{ background: parseError ? "#dc2626" : parseDone ? "#00a35e" : "#1c1c1e" }}>
-              {parsing ? "🔄 AI 파싱 처리중..." : parseError ? "❌ 파싱 실패" : parseDone ? "✅ 자동파싱 완료!" : "🤖 AI 자동 파싱"}
+              style={{ background: parseError ? (parseError.startsWith("⚠️") ? "#d97706" : "#dc2626") : parseDone ? "#00a35e" : "#1c1c1e" }}>
+              {parsing ? "🔄 AI 파싱 처리중..." : parseError ? (parseError.startsWith("⚠️") ? "⚠️ 일부 누락" : "❌ 파싱 실패") : parseDone ? "✅ 자동파싱 완료!" : "🤖 AI 자동 파싱"}
             </button>
             {parseError && (
-              <div className="mt-2 p-2.5 bg-red-50 border border-red-200 rounded-lg text-xs text-red-600 font-medium">
+              <div className={`mt-2 p-2.5 border rounded-lg text-xs font-medium whitespace-pre-line ${
+                parseError.startsWith("⚠️")
+                  ? "bg-amber-50 border-amber-200 text-amber-700"
+                  : "bg-red-50 border-red-200 text-red-600"
+              }`}>
                 {parseError}
               </div>
             )}
