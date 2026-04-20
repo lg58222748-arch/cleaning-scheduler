@@ -390,13 +390,22 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
       return;
     }
 
-    // 파싱 시작 시 새 확정 세션 생성 (기존 세션 유지)
     const textSnapshot = customerText;
     const prevActiveId = activeConfirmId;
-    const newSession = makeConfirmSession(`확정${confirmSessions.length + 1}`);
-    parseTargetIdRef.current = newSession.id;
-    setConfirmSessions(prev => renumberConfirm([...prev, { ...newSession, customerText: textSnapshot }]));
-    setActiveConfirmId(newSession.id);
+
+    // 현재 세션이 비어있으면 재사용, 데이터 있으면 새 세션 생성
+    const isCurrentEmpty = !activeConfirm.parsedName && !activeConfirm.parsedAddr && !activeConfirm.parsedPhone && !activeConfirm.confirmed;
+    let newSession: ReturnType<typeof makeConfirmSession> | null = null;
+
+    if (isCurrentEmpty) {
+      parseTargetIdRef.current = activeConfirmId;
+      setConfirmSessions(prev => prev.map(s => s.id === activeConfirmId ? { ...s, customerText: textSnapshot } : s));
+    } else {
+      newSession = makeConfirmSession(`확정${confirmSessions.length + 1}`);
+      parseTargetIdRef.current = newSession.id;
+      setConfirmSessions(prev => renumberConfirm([...prev, { ...newSession!, customerText: textSnapshot }]));
+      setActiveConfirmId(newSession.id);
+    }
 
     setParsing(true);
     setParseDone(false);
@@ -417,12 +426,14 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
     };
     const finishError = (msg: string) => {
       parseTargetIdRef.current = null;
-      // 실패 시 새로 만든 빈 세션 제거 후 이전 세션 복원
-      setConfirmSessions(prev => {
-        const filtered = prev.filter(s => s.id !== newSession.id);
-        return filtered.length > 0 ? renumberConfirm(filtered) : [makeConfirmSession("확정1")];
-      });
-      setActiveConfirmId(prevActiveId);
+      // 실패 시 새로 만든 세션이 있으면 제거 후 이전 복원
+      if (newSession) {
+        setConfirmSessions(prev => {
+          const filtered = prev.filter(s => s.id !== newSession!.id);
+          return filtered.length > 0 ? renumberConfirm(filtered) : [makeConfirmSession("확정1")];
+        });
+        setActiveConfirmId(prevActiveId);
+      }
       setParsing(false);
       setParseDone(false);
       setParseError(msg);
