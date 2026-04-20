@@ -412,15 +412,19 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
 
     let name = "", phone = "", addr = "", wish = "", note = "", salesNote = "";
 
-    // 양식 번호(1~5, 11)로 파싱 — "1)" 와 "1." 형식 모두 지원
+    // 양식 번호(1~5, 11)로 파싱 — "1)" / "1." 형식, 라벨 있음/없음 모두 지원
     for (const line of lines) {
-      // 1번: "1) 성함 : 홍길동" / "1. 성함 : 홍길동" / "1. 홍길동" (라벨 없이 이름만)
-      const m1 = line.match(/1[.)]\s*성함\s*[:：]\s*(.+)/); if (m1 && m1[1].trim()) name = m1[1].trim();
+      // 1번: "1) 성함 : 홍길동" / "1. 성함 : 홍길동" / "1. 홍길동"
+      const m1 = line.match(/^1[.)]\s*성함\s*[:：]\s*(.+)/); if (m1 && m1[1].trim()) name = m1[1].trim();
       if (!name) { const m1b = line.match(/^1[.)]\s*([가-힣]{2,5})\s*$/); if (m1b) name = m1b[1].trim(); }
-      const m2 = line.match(/2[.)]\s*주소\s*[:：]\s*(.+)/); if (m2 && m2[1].trim()) addr = m2[1].trim();
-      const m3 = line.match(/3[.)]\s*연락처\s*[:：]\s*(.+)/); if (m3 && m3[1].trim()) phone = m3[1].trim();
-      const m4 = line.match(/4[.)]\s*.*날짜\s*[:：]?\s*(.+)/); if (m4 && m4[1].trim()) wish = m4[1].trim();
-      const m5 = line.match(/5[.)]\s*.*특이사항\s*[:：]?\s*(.+)/); if (m5 && m5[1].trim()) note = m5[1].trim();
+      // 2번: "2) 주소 : 서울..." / "2. 주소 : 서울..." / "2. 서울..."
+      const m2 = line.match(/^2[.)]\s*(?:주소\s*[:：]\s*)?(.+)/); if (m2 && m2[1].trim()) addr = m2[1].trim();
+      // 3번: "3) 연락처 : 010-..." / "3. 010-..."
+      const m3 = line.match(/^3[.)]\s*(?:연락처\s*[:：]\s*)?(.+)/); if (m3 && m3[1].trim()) phone = m3[1].trim();
+      // 4번: "4) 날짜 : 5월..." / "4. 5월 19일..."
+      const m4 = line.match(/^4[.)]\s*(?:.*날짜\s*[:：]?\s*)?(.+)/); if (m4 && m4[1].trim()) wish = m4[1].trim();
+      // 5번: "5) 특이사항 : ..." / "5. 계단이 좁습니다."
+      const m5 = line.match(/^5[.)]\s*(?:.*특이사항\s*[:：]?\s*)?(.+)/); if (m5 && m5[1].trim()) note = m5[1].trim();
       // 상담사 특이사항은 "11)" / "11." 또는 "상담사 특이사항" 로 시작
       const m11 = line.match(/(?:11[.)]\s*)?상담사\s*특이사항\s*[:：]?\s*(.+)/);
       if (m11 && m11[1].trim()) salesNote = m11[1].trim();
