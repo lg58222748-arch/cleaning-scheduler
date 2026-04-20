@@ -330,6 +330,21 @@ export default function Home() {
         }
         if (receive !== "granted") { console.log("[FCM] 권한 거절"); return true; }
         await PushNotifications.removeAllListeners();
+        // 알림 채널 생성 — 잠금화면/Doze 모드에서도 진동+소리 울리도록 importance: 5 (HIGH)
+        // 이미 동일 id 채널이 있으면 무시됨. 사용자가 수동으로 설정에서 알림 토글 끈 건 유지.
+        try {
+          await PushNotifications.createChannel({
+            id: "default",
+            name: "새집느낌 파트너",
+            description: "일정 배정 · 반환 · 알림",
+            importance: 5, // IMPORTANCE_HIGH
+            visibility: 1, // VISIBILITY_PUBLIC
+            sound: "default",
+            vibration: true,
+            lights: true,
+            lightColor: "#3a9ad9",
+          });
+        } catch (e) { console.warn("[FCM] createChannel 실패 (구 Android 일 수 있음):", e); }
         await PushNotifications.register();
         PushNotifications.addListener("registration", async (token) => {
           console.log("[FCM] 토큰 획득:", token.value.slice(0, 20) + "...");

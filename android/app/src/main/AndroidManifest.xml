@@ -38,4 +38,12 @@
     <!-- Permissions -->
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Android 13+ 필수: 없으면 알림 아예 안 옴 -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- 진동 -->
+    <uses-permission android:name="android.permission.VIBRATE" />
+    <!-- Doze 모드에서도 예정 시간에 알림 깨우기 (happy call reminder 등) -->
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <!-- FCM 기본 권한 -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 </manifest>

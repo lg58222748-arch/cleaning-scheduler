@@ -1,5 +1,5 @@
-// 버전 올리면 구 캐시 전부 자동 정리. 롤백 필요 시 v7 → v6 로 내리면 됨.
-const CACHE_VERSION = 'v7';
+// 버전 올리면 구 캐시 전부 자동 정리. 롤백 필요 시 v8 → v7 로 내리면 됨.
+const CACHE_VERSION = 'v8';
 const STATIC_CACHE = `static-${CACHE_VERSION}`;
 const SHELL_CACHE = `shell-${CACHE_VERSION}`;
 const SHELL_URLS = ['/', '/manifest.json', '/logo.jpg'];
@@ -127,6 +127,8 @@ self.addEventListener('push', (event) => {
     tag: `${data.tag || 'default'}-${now}`,
     renotify: false,
     silent: false,
+    vibrate: [200, 100, 200, 100, 200], // 잠금화면에서 진동 패턴
+    requireInteraction: true, // 자동으로 사라지지 않음 - 사용자가 tap/dismiss 해야 닫힘
   };
   event.waitUntil(self.registration.showNotification(title, options));
 });

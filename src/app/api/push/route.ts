@@ -148,5 +148,30 @@ export async function POST(req: NextRequest) {
     return Response.json({ kept: subs.length - toDelete.length, deleted: toDelete.length });
   }
 
+  // 진단용: 특정 사용자의 구독 상태 조회 (읽기 전용, DB 변경 없음)
+  if (body.action === "status") {
+    const { userName } = body;
+    if (!userName) return Response.json({ error: "userName required" }, { status: 400 });
+    const { data: users } = await supabase.from("users").select("id, name, role, status").eq("name", userName);
+    if (!users || users.length === 0) {
+      return Response.json({ userName, found: false, note: "이름으로 user 못 찾음" });
+    }
+    const ids = users.map(u => String(u.id));
+    const { data: subs } = await supabase.from("push_subscriptions").select("id, endpoint, enabled, user_id").in("user_id", ids);
+    const summary = (subs || []).map(s => ({
+      type: s.endpoint?.startsWith("fcm:") ? "FCM(APK)" : "WebPush",
+      enabled: s.enabled !== false,
+      preview: String(s.endpoint || "").slice(0, 40) + "...",
+    }));
+    return Response.json({
+      userName,
+      found: true,
+      users: users.map(u => ({ id: u.id, name: u.name, role: u.role, status: u.status })),
+      subscriptions: summary,
+      totalSubs: summary.length,
+      enabledSubs: summary.filter(s => s.enabled).length,
+    });
+  }
+
   return Response.json({ error: "Invalid action" }, { status: 400 });
 }

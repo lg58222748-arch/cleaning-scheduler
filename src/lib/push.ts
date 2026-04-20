@@ -72,9 +72,15 @@ async function sendFcmNotification(fcmToken: string, title: string, body: string
           notification: { title, body },
           android: {
             priority: "HIGH",
+            ttl: "86400s", // 24시간 — Doze 모드 등에서 지연될 경우 24시간까지 재시도
             notification: {
               tag: tag || "notification",
               click_action: "FLUTTER_NOTIFICATION_CLICK",
+              channel_id: "default", // page.tsx 에서 생성한 채널과 매칭
+              default_sound: true,
+              default_vibrate_timings: true,
+              notification_priority: "PRIORITY_HIGH",
+              visibility: "PUBLIC",
             },
           },
           data: { url: "/", tag: tag || "notification" },
