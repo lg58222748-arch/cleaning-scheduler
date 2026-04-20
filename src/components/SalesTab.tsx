@@ -648,15 +648,12 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
   async function handleCopyFormAndFill() {
     const formText = activeForm.formText || getFormText();
     await handleCopy(formText, "form");
-    const formIdx = formSessions.findIndex(s => s.id === activeFormId);
-    if (formIdx < 0) return;
-    // 확정은 단일 세션이라 formIdx 무시하고 현재 activeConfirm 에 customerText 만 세팅
-    setConfirmSessions(prev => {
-      const next = [...prev];
-      if (next.length === 0) next.push(makeConfirmSession("확정1"));
-      next[0] = { ...next[0], customerText: formText };
-      return next;
-    });
+    // 기존 세션 덮어쓰지 않고 새 확정 세션 생성 후 활성화
+    const newSession = makeConfirmSession(`확정${confirmSessions.length + 1}`);
+    newSession.customerText = formText;
+    setConfirmSessions(prev => renumberConfirm([...prev, newSession]));
+    setActiveConfirmId(newSession.id);
+    setStep(2);
   }
 
   const POST_MSGS = [
