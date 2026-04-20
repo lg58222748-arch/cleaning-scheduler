@@ -33,6 +33,7 @@ interface FormSession {
   services: ServiceEntry[];
   pyeong: string;
   buildType: string;
+  pyeongNote: string; // 구조 추가설명 (복층, 펜트하우스, 복도식 등)
   salesNote: string;
   copied: Set<string>;
 }
@@ -61,7 +62,7 @@ interface ConfirmSession {
 }
 
 function makeFormSession(name: string): FormSession {
-  return { id: "f-" + Date.now() + "-" + Math.random().toString(36).slice(2, 6), name, services: [], pyeong: "", buildType: "선택", salesNote: "", copied: new Set() };
+  return { id: "f-" + Date.now() + "-" + Math.random().toString(36).slice(2, 6), name, services: [], pyeong: "", buildType: "선택", pyeongNote: "", salesNote: "", copied: new Set() };
 }
 
 function makeConfirmSession(name: string): ConfirmSession {
@@ -120,6 +121,7 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
   const services = activeForm.services;
   const pyeong = activeForm.pyeong;
   const buildType = activeForm.buildType;
+  const pyeongNote = activeForm.pyeongNote;
   const salesNote = activeForm.salesNote;
 
   const customerText = activeConfirm.customerText;
@@ -140,6 +142,7 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
   const setServices = (v: ServiceEntry[] | ((prev: ServiceEntry[]) => ServiceEntry[])) => updateForm({ services: typeof v === "function" ? v(activeForm.services) : v });
   const setPyeong = (v: string) => updateForm({ pyeong: v });
   const setBuildType = (v: string) => updateForm({ buildType: v });
+  const setPyeongNote = (v: string) => updateForm({ pyeongNote: v });
   const setSalesNote = (v: string) => updateForm({ salesNote: v });
 
   const setCustomerText = (v: string) => updateConfirm({ customerText: v });
@@ -251,7 +254,7 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
     text += `1)성함 :\n2)주소 : (아파트명+동호수)\n3)연락처 :\n4)청소희망날짜:\n  (오전: 7시~9시, 오후: 1시~3시 사이 방문 선택)\n5)고객님 특이사항 :\n\n`;
     text += `──────────────────\n`;
     text += `6)서비스 종류 : ${svcList}\n`;
-    text += `7)평수 : ${pyeong ? pyeong + "평" : ""}${buildType && buildType !== "선택" ? " " + buildType : ""}\n`;
+    text += `7)평수 : ${pyeong ? pyeong + "평" : ""}${buildType && buildType !== "선택" ? " " + buildType : ""}${pyeongNote ? " " + pyeongNote : ""}\n`;
 
     services.forEach((s, i) => {
       text += `► ${s.name}\n`;
@@ -334,7 +337,7 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
     const confirmServices = formData.services;
 
     // 파싱 성공 시 양식발송 탭 데이터 초기화 (다음 고객용으로 깨끗하게).
-    const resetForm = () => updateForm({ services: [], pyeong: "", buildType: "선택", salesNote: "", copied: new Set() });
+    const resetForm = () => updateForm({ services: [], pyeong: "", buildType: "선택", pyeongNote: "", salesNote: "", copied: new Set() });
 
     const finishSuccess = () => {
       resetForm();
@@ -713,6 +716,11 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
                   {TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
                 </select>
               </div>
+            </div>
+            <div className="mb-3">
+              <label className="text-xs text-gray-400 mb-0.5 block">구조 추가 (선택)</label>
+              <input value={pyeongNote} onChange={(e) => setPyeongNote(e.target.value)} placeholder="예) 복층, 펜트하우스, 복도식"
+                style={{ fontSize: "12px" }} className="w-full px-3 py-2 border border-gray-200 rounded-lg outline-none focus:border-green-500" />
             </div>
 
             {/* 서비스별 견적 */}
