@@ -283,13 +283,17 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
 
   // 서비스명에 따른 날짜 라벨
   function getDateLabel(svcNames: string[]): string {
-    const map: Record<string, string> = {
-      "줄눈시공": "줄눈시공 희망날짜",
-      "탄성코트": "탄성코트 희망날짜",
-      "에어컨청소": "에어컨청소 희망날짜",
-      "새집증후군": "새집증후군 희망날짜",
-    };
-    return map[svcNames[0]] || "청소희망날짜";
+    // 특수 서비스 우선 감지 (선택 순서와 무관, 부분 매칭)
+    const specials: [string, string][] = [
+      ["줄눈시공", "줄눈시공 희망날짜"],
+      ["탄성코트", "탄성코트 희망날짜"],
+      ["에어컨청소", "에어컨청소 희망날짜"],
+      ["새집증후군", "새집증후군 희망날짜"],
+    ];
+    for (const [key, label] of specials) {
+      if (svcNames.some(n => n && n.includes(key))) return label;
+    }
+    return "청소희망날짜";
   }
 
   // 캘린더 제목 생성
@@ -697,8 +701,8 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
   // "STEP 2 · 파싱으로 이동" 버튼 - 확정 세션 생성/재사용 후 step 2 이동
   function goToParseStep() {
     const formText = activeForm.formText || getFormText();
-    // 현재 확정 세션이 비어있으면 재사용, 데이터 있으면 새 세션 생성
-    const isCurrentEmpty = !activeConfirm.parsedName && !activeConfirm.parsedAddr && !activeConfirm.parsedPhone && !activeConfirm.customerText && !activeConfirm.confirmed;
+    // 파싱된 실제 고객 데이터가 있는 경우에만 "사용된" 세션으로 판단
+    const isCurrentEmpty = !activeConfirm.parsedName && !activeConfirm.parsedAddr && !activeConfirm.parsedPhone && !activeConfirm.confirmed;
     if (isCurrentEmpty) {
       updateConfirm({ customerText: formText });
     } else {
