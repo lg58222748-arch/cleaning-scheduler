@@ -581,6 +581,10 @@ export default function Home() {
   const [showInstallBanner, setShowInstallBanner] = useState(false);
   const [isInApp, setIsInApp] = useState(false);
 
+  // APK 자동 업데이트 체크 — Capacitor 앱에서만. 웹/PWA 는 Vercel 이 자동이라 불필요.
+  const [appUpdate, setAppUpdate] = useState<{ currentVer: string; latestVer: string; apkUrl: string } | null>(null);
+  const [appUpdateDismissed, setAppUpdateDismissed] = useState(false);
+
   useEffect(() => {
     if ("serviceWorker" in navigator) {
       navigator.serviceWorker.register("/sw.js");
@@ -598,6 +602,41 @@ export default function Home() {
     window.addEventListener("beforeinstallprompt", handler);
     return () => window.removeEventListener("beforeinstallprompt", handler);
   }, []);
+
+  // APK 업데이트 체크: 네이티브 앱이면 현재 버전 읽고, 서버에서 최신 버전과 비교.
+  // 최신 > 현재 이면 상단에 "업데이트" 배너 띄움. 세션 동안만 dismiss 가능.
+  useEffect(() => {
+    if (!currentUser) return;
+    (async () => {
+      try {
+        const { Capacitor } = await import("@capacitor/core");
+        if (!Capacitor.isNativePlatform()) return; // 웹/PWA 는 Vercel 자동 배포 — 스킵
+        const { App } = await import("@capacitor/app");
+        const info = await App.getInfo();
+        const currentVer = info.version || "";
+        const res = await fetch("/api/app-version");
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!data.latest || !data.apkUrl) return;
+        // 버전 비교 (1.3 vs 1.2 → 숫자별로)
+        const cmp = (a: string, b: string): number => {
+          const pa = a.split(".").map((x) => parseInt(x, 10) || 0);
+          const pb = b.split(".").map((x) => parseInt(x, 10) || 0);
+          const n = Math.max(pa.length, pb.length);
+          for (let i = 0; i < n; i++) {
+            const d = (pa[i] || 0) - (pb[i] || 0);
+            if (d !== 0) return d;
+          }
+          return 0;
+        };
+        if (cmp(String(data.latest), currentVer) > 0) {
+          setAppUpdate({ currentVer, latestVer: String(data.latest), apkUrl: String(data.apkUrl) });
+        }
+      } catch (e) {
+        console.warn("[update-check] 실패:", e);
+      }
+    })();
+  }, [currentUser]);
 
   // 뒤로가기 처리 - 모달/탭 열 때 pushState, popstate에서 닫기
   const prevTabRef = useRef<TabMode>("calendar");
@@ -1117,6 +1156,29 @@ export default function Home() {
 
   return (
     <div className="h-[100dvh] bg-white pb-14 flex flex-col overflow-hidden" style={{ paddingTop: "env(safe-area-inset-top, 0px)" }}>
+      {/* APK 업데이트 배너 — 네이티브 앱에서 새 버전 감지 시 */}
+      {appUpdate && !appUpdateDismissed && (
+        <div className="flex items-center justify-between bg-blue-600 text-white px-3 py-2 text-sm flex-shrink-0">
+          <div className="flex-1 truncate">
+            <span className="font-bold">새 버전 {appUpdate.latestVer}</span>
+            <span className="text-blue-100 ml-2 text-xs">현재 {appUpdate.currentVer}</span>
+          </div>
+          <button
+            onClick={() => { window.open(appUpdate.apkUrl, "_system"); }}
+            className="bg-white text-blue-600 font-bold text-xs px-3 py-1.5 rounded-lg active:bg-blue-50 mr-1"
+          >
+            업데이트
+          </button>
+          <button
+            onClick={() => setAppUpdateDismissed(true)}
+            className="text-white/70 text-lg px-2 active:text-white"
+            aria-label="닫기"
+          >
+            ×
+          </button>
+        </div>
+      )}
+
       {/* 카카오톡 인앱브라우저 감지 → 외부 브라우저 이동 */}
       {isInApp && (
         <div className="fixed inset-0 bg-black/80 z-[100] flex items-center justify-center p-6" style={{ paddingTop: "env(safe-area-inset-top, 0px)", paddingBottom: "env(safe-area-inset-bottom, 0px)" }}>
