@@ -95,7 +95,8 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
     setFormSessions(prev => prev.map(s => s.id === activeFormId ? { ...s, ...patch } : s));
   }
   function updateConfirm(patch: Partial<ConfirmSession>) {
-    setConfirmSessions(prev => prev.map(s => s.id === activeConfirmId ? { ...s, ...patch } : s));
+    const targetId = parseTargetIdRef.current ?? activeConfirmId;
+    setConfirmSessions(prev => prev.map(s => s.id === targetId ? { ...s, ...patch } : s));
   }
   // 양식발송은 단일 세션 (탭 없음). 예약확정은 여러 개 탭으로 관리.
   function renumberConfirm(list: ConfirmSession[]): ConfirmSession[] {
@@ -326,6 +327,7 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
   const [parseDone, setParseDone] = useState(false);
   const [parseError, setParseError] = useState("");
   const parsedResultRef = useRef<HTMLDivElement>(null);
+  const parseTargetIdRef = useRef<string | null>(null);
 
   // 양식(6)서비스 종류·7)평수·► 항목) 에서 서비스/평수 추출
   function extractFormData(text: string): { services: ServiceEntry[]; pyeong: string; pyeongExtra: string } {
@@ -372,17 +374,26 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
       setTimeout(() => setParseError(""), 3000);
       return;
     }
+
+    // 파싱 시작 시 새 확정 세션 생성 (기존 세션 유지)
+    const textSnapshot = customerText;
+    const prevActiveId = activeConfirmId;
+    const newSession = makeConfirmSession(`확정${confirmSessions.length + 1}`);
+    parseTargetIdRef.current = newSession.id;
+    setConfirmSessions(prev => renumberConfirm([...prev, { ...newSession, customerText: textSnapshot }]));
+    setActiveConfirmId(newSession.id);
+
     setParsing(true);
     setParseDone(false);
     setParseError("");
-    const formData = extractFormData(customerText);
-    // 항상 파싱 결과 기준으로 fresh — 이전 확정 세션의 services 는 덮어씀 (다른 고객 데이터 섞임 방지).
+    const formData = extractFormData(textSnapshot);
     const confirmServices = formData.services;
 
     // 파싱 성공 시 양식발송 탭 데이터 초기화 (다음 고객용으로 깨끗하게).
     const resetForm = () => updateForm({ services: [], pyeong: "", buildType: "선택", pyeongNote: "", salesNote: "", copied: new Set() });
 
     const finishSuccess = () => {
+      parseTargetIdRef.current = null;
       resetForm();
       setParsing(false);
       setParseDone(true);
@@ -390,6 +401,13 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
       setTimeout(() => setParseDone(false), 2500);
     };
     const finishError = (msg: string) => {
+      parseTargetIdRef.current = null;
+      // 실패 시 새로 만든 빈 세션 제거 후 이전 세션 복원
+      setConfirmSessions(prev => {
+        const filtered = prev.filter(s => s.id !== newSession.id);
+        return filtered.length > 0 ? renumberConfirm(filtered) : [makeConfirmSession("확정1")];
+      });
+      setActiveConfirmId(prevActiveId);
       setParsing(false);
       setParseDone(false);
       setParseError(msg);
@@ -401,14 +419,14 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
       const res = await fetch("/api/parse", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: customerText }),
+        body: JSON.stringify({ text: textSnapshot }),
       });
       const data = await res.json();
       if (data.success) {
         // API 결과가 비어있는 필드는 regex로 보완
         let rName = data.name || "", rPhone = data.phone || "", rAddr = data.addr || "", rWish = data.date || "", rNote = data.note || "", rSalesNote = data.salesNote || "";
         if (!rName || !rPhone || !rAddr || !rWish) {
-          for (const line of customerText.split("\n").map((l) => l.trim()).filter(Boolean)) {
+          for (const line of textSnapshot.split("\n").map((l) => l.trim()).filter(Boolean)) {
             const m1 = line.match(/^1[.)]\s*성함\s*[:：]\s*(.+)/); if (m1 && m1[1].trim() && !rName) rName = m1[1].trim();
             if (!rName) { const m1b = line.match(/^1[.)]\s*([가-힣]{1,3}(?:\s+[가-힣]{1,3})?)\s*$/); if (m1b) rName = m1b[1].trim(); }
             const m2 = line.match(/^2[.)]\s*(?:주소\s*[:：]\s*)?(.+)/); if (m2 && m2[1].trim() && !rAddr) rAddr = m2[1].trim();
@@ -446,7 +464,7 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
     } catch {}
 
     // 2차: regex fallback
-    const { ok, missing } = regexParse();
+    const { ok, missing } = regexParse(textSnapshot);
     if (!ok) {
       const missingStr = missing.length > 0 ? `\n인식 실패 항목: ${missing.join(", ")}` : "";
       finishError(`❌ 파싱 실패 - 1~5번 번호 형식(1. 또는 1))으로 작성된 내용이 있어야 합니다.${missingStr}`);
@@ -455,8 +473,8 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
     }
   }
 
-  function regexParse(): { ok: boolean; missing: string[] } {
-    const t = customerText;
+  function regexParse(textSnapshot?: string): { ok: boolean; missing: string[] } {
+    const t = textSnapshot ?? customerText;
     const lines = t.split("\n").map((l) => l.trim()).filter(Boolean);
 
     let name = "", phone = "", addr = "", wish = "", note = "", salesNote = "";
@@ -648,11 +666,8 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
   async function handleCopyFormAndFill() {
     const formText = activeForm.formText || getFormText();
     await handleCopy(formText, "form");
-    // 기존 세션 덮어쓰지 않고 새 확정 세션 생성 후 활성화
-    const newSession = makeConfirmSession(`확정${confirmSessions.length + 1}`);
-    newSession.customerText = formText;
-    setConfirmSessions(prev => renumberConfirm([...prev, newSession]));
-    setActiveConfirmId(newSession.id);
+    // 현재 확정 세션 customerText 에 기입 후 예약확정 탭으로 이동 (파싱 시 새 세션 생성됨)
+    updateConfirm({ customerText: formText });
     setStep(2);
   }
 
