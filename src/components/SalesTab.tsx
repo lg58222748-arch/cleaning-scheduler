@@ -11,7 +11,7 @@ interface SalesTabProps {
   canEditTemplates?: boolean; // 영업팀 이상 (add/delete)
 }
 
-const ALL_SERVICES = ["입주청소", "거주청소", "인테리어청소", "사이청소", "새집증후군 시공", "줄눈시공", "탄성코트", "에어컨청소(완전분해)"];
+const ALL_SERVICES = ["입주청소", "거주청소", "인테리어청소", "사이청소", "새집증후군", "줄눈시공", "탄성코트", "에어컨청소(완전분해)"];
 const TIME_SLOTS = ["오전", "오후", "시무", "사이"];
 const TYPES = ["확장형", "비확장형", "부분비확장형"];
 
@@ -94,62 +94,28 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
   function updateConfirm(patch: Partial<ConfirmSession>) {
     setConfirmSessions(prev => prev.map(s => s.id === activeConfirmId ? { ...s, ...patch } : s));
   }
-  // 세션 이름을 현재 위치에 맞춰 재번호 (양식1, 양식2, ...)
-  function renumberForm(list: FormSession[]): FormSession[] {
-    return list.map((s, i) => ({ ...s, name: `양식${i + 1}` }));
-  }
+  // 확정 세션 이름 재번호 (확정1, 확정2, ...)
   function renumberConfirm(list: ConfirmSession[]): ConfirmSession[] {
     return list.map((s, i) => ({ ...s, name: `확정${i + 1}` }));
   }
-  // 양식/확정 활성 탭을 인덱스 기준으로 동기화 (한쪽 누르면 다른 쪽도 자동 전환)
-  useEffect(() => {
-    const fIdx = formSessions.findIndex(s => s.id === activeFormId);
-    if (fIdx < 0) return;
-    const matching = confirmSessions[fIdx];
-    if (matching && matching.id !== activeConfirmId) setActiveConfirmId(matching.id);
-  }, [activeFormId]); // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => {
-    const cIdx = confirmSessions.findIndex(s => s.id === activeConfirmId);
-    if (cIdx < 0) return;
-    const matching = formSessions[cIdx];
-    if (matching && matching.id !== activeFormId) setActiveFormId(matching.id);
-  }, [activeConfirmId]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // 양식과 확정은 1:1 세트로 함께 생성/삭제 (양식N 생기면 확정N 같이, 삭제도 같이)
-  function addFormSession() {
-    const idx = formSessions.length;
-    const f = makeFormSession(`양식${idx + 1}`);
+  // 양식발송 ↔ 예약확정 탭 연동 제거: 양식은 항상 1개 고정, 확정은 여러 개 독립 관리.
+  // 확정 탭 추가/삭제 (양식은 건드리지 않음)
+  function addConfirmSession() {
+    const idx = confirmSessions.length;
     const c = makeConfirmSession(`확정${idx + 1}`);
-    setFormSessions(prev => renumberForm([...prev, f]));
     setConfirmSessions(prev => renumberConfirm([...prev, c]));
-    setActiveFormId(f.id);
     setActiveConfirmId(c.id);
   }
-  function removeFormSession(id: string) {
-    if (formSessions.length <= 1) return;
-    const idx = formSessions.findIndex(s => s.id === id);
-    if (idx < 0) return;
-    const confirmAtIdx = confirmSessions[idx];
-
-    const nextForm = renumberForm(formSessions.filter(s => s.id !== id));
-    const nextConfirm = confirmAtIdx
-      ? renumberConfirm(confirmSessions.filter(s => s.id !== confirmAtIdx.id))
-      : confirmSessions;
-
-    setFormSessions(nextForm);
-    setConfirmSessions(nextConfirm);
-    const newIdx = Math.max(0, idx - 1);
-    if (activeFormId === id) setActiveFormId(nextForm[newIdx]?.id || nextForm[0].id);
-    if (confirmAtIdx && activeConfirmId === confirmAtIdx.id) {
-      setActiveConfirmId(nextConfirm[newIdx]?.id || nextConfirm[0]?.id);
-    }
-  }
-  // 확정 탭 삭제는 양식 삭제로 위임 (세트 유지)
   function removeConfirmSession(id: string) {
+    if (confirmSessions.length <= 1) return;
     const idx = confirmSessions.findIndex(s => s.id === id);
     if (idx < 0) return;
-    const formAtIdx = formSessions[idx];
-    if (formAtIdx) removeFormSession(formAtIdx.id);
+    const nextConfirm = renumberConfirm(confirmSessions.filter(s => s.id !== id));
+    setConfirmSessions(nextConfirm);
+    if (activeConfirmId === id) {
+      const newIdx = Math.max(0, idx - 1);
+      setActiveConfirmId(nextConfirm[newIdx]?.id || nextConfirm[0]?.id);
+    }
   }
 
   // 활성 세션 필드 접근용 별칭 (렌더/함수에서 사용)
@@ -701,20 +667,7 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
       {/* ===== STEP 1 ===== */}
       {step === 1 && (
         <>
-        {/* 세션 탭 바 */}
-        <div className="flex items-center gap-1 px-2 py-2 border-b border-gray-100 overflow-x-auto bg-gray-50">
-          <button onClick={addFormSession} className="px-3 py-1.5 rounded-lg text-xs font-bold bg-white border border-dashed border-green-400 text-green-700 shrink-0 active:bg-green-50 sticky left-0 z-10">+</button>
-          {formSessions.map(s => (
-            <div key={s.id} className={`flex items-center gap-1 rounded-lg shrink-0 ${activeFormId === s.id ? "bg-green-700 text-white" : "bg-white text-gray-600 border border-gray-200"}`}>
-              <button onClick={() => setActiveFormId(s.id)} className="px-3 py-1.5 text-xs font-bold">
-                {s.name}
-              </button>
-              {formSessions.length > 1 && (
-                <button onClick={() => removeFormSession(s.id)} className={`pr-2 text-xs font-bold ${activeFormId === s.id ? "opacity-80 hover:opacity-100" : "opacity-50"}`}>✕</button>
-              )}
-            </div>
-          ))}
-        </div>
+        {/* 양식발송은 단일 세션 — 탭 바 제거. 파싱할 때마다 자동 초기화되어 다음 고객에 재사용. */}
         <div className="p-3 flex flex-col md:flex-row md:gap-6">
         <div className="space-y-3 md:flex-1">
           {/* 서비스 선택 (복수) */}
@@ -850,9 +803,9 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
       {/* ===== STEP 2 ===== */}
       {step === 2 && (
         <>
-        {/* 세션 탭 바 */}
+        {/* 세션 탭 바 — 예약확정만 독립적으로 여러 개 관리 */}
         <div className="flex items-center gap-1 px-2 py-2 border-b border-gray-100 overflow-x-auto bg-gray-50">
-          <button onClick={addFormSession} className="px-3 py-1.5 rounded-lg text-xs font-bold bg-white border border-dashed border-green-400 text-green-700 shrink-0 active:bg-green-50 sticky left-0 z-10" title="양식+확정 세트 추가">+</button>
+          <button onClick={addConfirmSession} className="px-3 py-1.5 rounded-lg text-xs font-bold bg-white border border-dashed border-green-400 text-green-700 shrink-0 active:bg-green-50 sticky left-0 z-10" title="예약확정 추가">+</button>
           {confirmSessions.map(s => {
             const displayName = s.parsedName ? `${s.name} · ${s.parsedName}` : s.name;
             return (
