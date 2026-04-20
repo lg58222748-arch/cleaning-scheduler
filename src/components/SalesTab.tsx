@@ -63,6 +63,21 @@ interface ConfirmSession {
   copied: Set<string>;
 }
 
+function wishDateToISO(wish: string): string {
+  if (!wish) return "";
+  if (/^\d{4}-\d{2}-\d{2}$/.test(wish)) return wish;
+  const m = wish.match(/(\d{1,2})[월\/\-]\s*(\d{1,2})/);
+  if (!m) return "";
+  const month = parseInt(m[1], 10);
+  const day = parseInt(m[2], 10);
+  if (month < 1 || month > 12 || day < 1 || day > 31) return "";
+  const now = new Date();
+  let year = now.getFullYear();
+  const candidate = new Date(year, month - 1, day);
+  if (candidate < now) year++;
+  return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+
 function makeFormSession(name: string): FormSession {
   return { id: "f-" + Date.now() + "-" + Math.random().toString(36).slice(2, 6), name, services: [], pyeong: "", buildType: "선택", pyeongNote: "", salesNote: "", copied: new Set(), formText: "" };
 }
@@ -455,7 +470,7 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
           parsedDeposit: "",
           parsedBalance: "",
           services: confirmServices,
-          schedules: confirmServices.map((s) => ({ service: s.name, date: "", time: "선택" })),
+          schedules: confirmServices.map((s) => ({ service: s.name, date: wishDateToISO(rWish), time: "선택" })),
         });
         generateConfirmMsg(rName, rAddr, rPhone, rWish, rNote, confirmServices, formData.pyeong, undefined, formData.pyeongExtra);
         finishSuccess();
@@ -577,7 +592,7 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
       parsedDeposit: "",
       parsedBalance: "",
       services: svcList,
-      schedules: svcList.map((s) => ({ service: s.name, date: "", time: "선택" })),
+      schedules: svcList.map((s) => ({ service: s.name, date: wishDateToISO(wish), time: "선택" })),
     });
 
     // 확정 메시지 생성
