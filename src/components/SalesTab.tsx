@@ -201,8 +201,11 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
     saveTemplates(next);
   }
   function updateTemplateField(id: string, field: "title" | "content", value: string) {
-    const next = templates.map(t => t.id === id ? { ...t, [field]: value } : t);
-    saveTemplates(next);
+    setTemplates(prev => {
+      const next = prev.map(t => t.id === id ? { ...t, [field]: value } : t);
+      localStorage.setItem("salesTemplates", JSON.stringify(next));
+      return next;
+    });
   }
   function addTemplate() {
     const newTpl = { id: "tpl-" + Date.now(), title: "새 양식", content: "" };
@@ -1182,22 +1185,31 @@ function TemplateCard({
             value={titleDraft}
             autoFocus
             onChange={(e) => setTitleDraft(e.target.value)}
-            onBlur={() => { if (titleDraft.trim() && titleDraft !== title) onChangeTitle?.(titleDraft.trim()); setEditingTitle(false); }}
+            onBlur={() => { if (titleDraft.trim()) onChangeTitle?.(titleDraft.trim()); setEditingTitle(false); }}
             onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); if (e.key === "Escape") { setTitleDraft(title); setEditingTitle(false); } }}
             className="flex-1 text-[12px] font-medium text-gray-800 border-b-2 border-green-400 outline-none bg-transparent px-1 py-0"
           />
         ) : (
-          <button
-            onClick={() => { setOpen(!open); onSelect?.(); }}
-            onDoubleClick={() => { if (isAdmin || canEdit) { setTitleDraft(title); setEditingTitle(true); } }}
-            className="flex-1 flex items-center justify-between text-left active:bg-gray-50 rounded px-1 py-0.5"
-            title={(isAdmin || canEdit) ? "더블클릭하여 제목 수정" : ""}
-          >
-            <span className="text-[12px] font-medium text-gray-800 truncate">{title}</span>
-            <svg className={`w-3 h-3 text-gray-400 transition-transform shrink-0 ${open ? "rotate-90" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-            </svg>
-          </button>
+          <>
+            <button
+              onClick={() => { setOpen(!open); onSelect?.(); }}
+              className="flex-1 flex items-center justify-between text-left active:bg-gray-50 rounded px-1 py-0.5 min-w-0"
+            >
+              <span className="text-[12px] font-medium text-gray-800 truncate">{title}</span>
+              <svg className={`w-3 h-3 text-gray-400 transition-transform shrink-0 ${open ? "rotate-90" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+            </button>
+            {(isAdmin || canEdit) && (
+              <button
+                onClick={() => { setTitleDraft(title); setEditingTitle(true); }}
+                className="p-1 text-gray-300 active:text-green-500 shrink-0"
+                title="제목 수정"
+              >
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536M9 13l6.586-6.586a2 2 0 112.828 2.828L11.828 15.828a2 2 0 01-1.415.586H9v-2a2 2 0 01.586-1.414z" /></svg>
+              </button>
+            )}
+          </>
         )}
         {canEdit && (
           <button onClick={() => onDelete?.()} className="p-1 text-gray-300 active:text-red-500 shrink-0" title="삭제">
