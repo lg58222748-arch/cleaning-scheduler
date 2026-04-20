@@ -184,18 +184,22 @@ export default function Home() {
         // 알림 액션(모두읽음/지우기) 직후엔 loadData 결과로 덮어쓰지 않음 (깜빡임 방지)
         if (Date.now() >= notifReloadSuppressRef.current) {
           // 알림 필터:
+          // - 가입 시점 이전 알림은 신규 가입자에게 안 보여줌 (누적된 히스토리 제외)
           // - system_notice: 모두
           // - 일정 반환: 대표/admin/일정관리자/영업팀 (현장팀 제외)
           // - 그 외: 본인 이름 포함된 것만 (현장팀 포함)
           const allNotifs = notif.notifications as Notification[];
           const uName = currentUser?.name || "";
           const uRole = currentUser?.role || "";
+          const uCreatedAt = currentUser?.createdAt || "";
           const deleted = deletedNotifIdsRef.current;
           const isReturn = (n: Notification) => n.type === "schedule_returned" || n.title === "일정 반환";
           const isAdminOrScheduler = uRole === "ceo" || uRole === "admin" || uRole === "scheduler";
           const localRead = localReadIdsRef.current;
           const myNotifs = allNotifs.filter(n => {
             if (deleted.has(n.id)) return false;
+            // 가입 이전 알림 제외 (ISO 날짜 문자열 비교)
+            if (uCreatedAt && n.createdAt && n.createdAt < uCreatedAt) return false;
             if (n.type === "system_notice") return true; // 전체공지는 모두(영업 포함)
             if (uRole === "sales") return false; // 영업: 전체공지 외 모두 제외
             if (isReturn(n)) {
@@ -439,12 +443,15 @@ export default function Home() {
         // fetch 응답 도착 시점에도 재확인 (in-flight 중 액션 발생 케이스 방어)
         if (Date.now() < notifReloadSuppressRef.current) return;
         const allNotifs = notif.notifications as Notification[];
+        const uCreatedAt = currentUser?.createdAt || "";
         const deleted = deletedNotifIdsRef.current;
         const isReturn = (n: Notification) => n.type === "schedule_returned" || n.title === "일정 반환";
         const isAdminOrScheduler = uRole === "ceo" || uRole === "admin" || uRole === "scheduler";
         const localRead = localReadIdsRef.current;
         const myNotifs = allNotifs.filter(n => {
           if (deleted.has(n.id)) return false;
+          // 가입 이전 알림 제외
+          if (uCreatedAt && n.createdAt && n.createdAt < uCreatedAt) return false;
           if (n.type === "system_notice") return true; // 전체공지는 모두(영업 포함)
           if (uRole === "sales") return false;
           if (isReturn(n)) {
