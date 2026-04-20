@@ -363,7 +363,7 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
       setParsing(false);
       setParseDone(false);
       setParseError(msg);
-      setTimeout(() => setParseError(""), 4000);
+      setTimeout(() => setParseError(""), 12000);
     };
 
     // 1차: Claude API 시도
@@ -380,7 +380,7 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
         if (!rName || !rPhone || !rAddr || !rWish) {
           for (const line of customerText.split("\n").map((l) => l.trim()).filter(Boolean)) {
             const m1 = line.match(/^1[.)]\s*성함\s*[:：]\s*(.+)/); if (m1 && m1[1].trim() && !rName) rName = m1[1].trim();
-            if (!rName) { const m1b = line.match(/^1[.)]\s*([가-힣]{2,5})\s*$/); if (m1b) rName = m1b[1].trim(); }
+            if (!rName) { const m1b = line.match(/^1[.)]\s*([가-힣]{1,3}(?:\s+[가-힣]{1,3})?)\s*$/); if (m1b) rName = m1b[1].trim(); }
             const m2 = line.match(/^2[.)]\s*(?:주소\s*[:：]\s*)?(.+)/); if (m2 && m2[1].trim() && !rAddr) rAddr = m2[1].trim();
             const m3 = line.match(/^3[.)]\s*(?:연락처\s*[:：]\s*)?(.+)/); if (m3 && m3[1].trim() && !rPhone) rPhone = m3[1].trim();
             const m4 = line.match(/^4[.)]\s*(?:.*날짜\s*[:：]?\s*)?(.+)/); if (m4 && m4[1].trim() && !rWish) rWish = m4[1].trim();
@@ -416,15 +416,16 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
     } catch {}
 
     // 2차: regex fallback
-    const ok = regexParse();
+    const { ok, missing } = regexParse();
     if (!ok) {
-      finishError("❌ 파싱 실패 - 고객 답장에서 정보를 찾지 못했습니다. 형식을 확인해주세요");
+      const missingStr = missing.length > 0 ? `\n인식 실패 항목: ${missing.join(", ")}` : "";
+      finishError(`❌ 파싱 실패 - 1~5번 번호 형식(1. 또는 1))으로 작성된 내용이 있어야 합니다.${missingStr}`);
     } else {
       finishSuccess();
     }
   }
 
-  function regexParse(): boolean {
+  function regexParse(): { ok: boolean; missing: string[] } {
     const t = customerText;
     const lines = t.split("\n").map((l) => l.trim()).filter(Boolean);
 
@@ -434,7 +435,7 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
     for (const line of lines) {
       // 1번: "1) 성함 : 홍길동" / "1. 성함 : 홍길동" / "1. 홍길동"
       const m1 = line.match(/^1[.)]\s*성함\s*[:：]\s*(.+)/); if (m1 && m1[1].trim()) name = m1[1].trim();
-      if (!name) { const m1b = line.match(/^1[.)]\s*([가-힣]{2,5})\s*$/); if (m1b) name = m1b[1].trim(); }
+      if (!name) { const m1b = line.match(/^1[.)]\s*([가-힣]{1,3}(?:\s+[가-힣]{1,3})?)\s*$/); if (m1b) name = m1b[1].trim(); }
       // 2번: "2) 주소 : 서울..." / "2. 주소 : 서울..." / "2. 서울..."
       const m2 = line.match(/^2[.)]\s*(?:주소\s*[:：]\s*)?(.+)/); if (m2 && m2[1].trim()) addr = m2[1].trim();
       // 3번: "3) 연락처 : 010-..." / "3. 010-..."
@@ -506,8 +507,14 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
       else if (c.type === "note" && !note) note = c.value;
     }
 
+    const missing: string[] = [];
+    if (!name) missing.push("1)성함");
+    if (!addr) missing.push("2)주소");
+    if (!phone) missing.push("3)연락처");
+    if (!wish) missing.push("4)날짜");
+
     const hasInfo = !!(name || phone || addr || wish);
-    if (!hasInfo) return false;
+    if (!hasInfo) return { ok: false, missing };
 
     updateConfirm({
       parsedName: name,
@@ -527,7 +534,7 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
 
     // 확정 메시지 생성
     generateConfirmMsg(name, addr, phone, wish, note, svcList, pyeongToUse, undefined, formData.pyeongExtra);
-    return true;
+    return { ok: true, missing };
   }
 
   function generateConfirmMsg(name?: string, addr?: string, phone?: string, _wish?: string, note?: string, overrideServices?: ServiceEntry[], overridePyeong?: string, overrideSchedules?: ParsedSchedule[], overridePyeongExtra?: string) {
