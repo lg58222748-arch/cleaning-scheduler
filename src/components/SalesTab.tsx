@@ -241,8 +241,23 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
     setServices((prev) => prev.filter((s) => s.name !== name));
   }
 
+  function calcAutoDeposit(svcName: string, quote: number): number | null {
+    const highGroup = ["입주청소", "거주청소", "인테리어청소", "사이청소"];
+    const lowGroup = ["새집증후군", "줄눈시공", "탄성코트", "에어컨청소"];
+    if (highGroup.includes(svcName) && quote > 0) return Math.round((quote - 10000) * 0.24 + 10000);
+    if (lowGroup.includes(svcName) && quote > 0) return Math.round(quote * 0.1);
+    return null;
+  }
+
   function updateService(name: string, field: "quote" | "deposit", value: string) {
-    setServices((prev) => prev.map((s) => s.name === name ? { ...s, [field]: value } : s));
+    setServices((prev) => prev.map((s) => {
+      if (s.name !== name) return s;
+      if (field === "quote") {
+        const auto = calcAutoDeposit(name, parseInt(value) || 0);
+        return { ...s, quote: value, deposit: auto !== null ? String(auto) : s.deposit };
+      }
+      return { ...s, [field]: value };
+    }));
   }
 
   function getBalance(s: ServiceEntry) {
@@ -794,8 +809,8 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
                       style={{ fontSize: "12px" }} className="w-full px-2 py-1.5 border border-gray-200 rounded outline-none focus:border-green-500" />
                   </div>
                   <div className="flex-1">
-                    <label className="text-xs text-gray-400 block">예약금</label>
-                    <input value={s.deposit} onChange={(e) => updateService(s.name, "deposit", e.target.value)} placeholder="예) 108000원" type="tel"
+                    <label className="text-xs text-gray-400 block">예약금 <span className="text-green-600">(자동계산·수정가능)</span></label>
+                    <input value={s.deposit} onChange={(e) => updateService(s.name, "deposit", e.target.value)} placeholder="견적금액 입력 시 자동계산" type="tel"
                       style={{ fontSize: "12px" }} className="w-full px-2 py-1.5 border border-gray-200 rounded outline-none focus:border-green-500" />
                   </div>
                   <div className="flex-1">
