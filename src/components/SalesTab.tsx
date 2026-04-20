@@ -244,8 +244,8 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
   function calcAutoDeposit(svcName: string, quote: number): number | null {
     const highGroup = ["입주청소", "거주청소", "인테리어청소", "사이청소"];
     const lowGroup = ["새집증후군", "줄눈시공", "탄성코트", "에어컨청소"];
-    if (highGroup.includes(svcName) && quote > 0) return Math.round((quote - 10000) * 0.24 + 10000);
-    if (lowGroup.includes(svcName) && quote > 0) return Math.round(quote * 0.1);
+    if (highGroup.includes(svcName) && quote > 0) return Math.ceil(((quote - 10000) * 0.24 + 10000) / 10000) * 10000;
+    if (lowGroup.includes(svcName) && quote > 0) return Math.ceil((quote * 0.1) / 10000) * 10000;
     return null;
   }
 
