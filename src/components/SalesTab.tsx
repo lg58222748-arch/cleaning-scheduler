@@ -48,6 +48,7 @@ interface ConfirmSession {
   parsedAddr: string;
   parsedWishDate: string;
   parsedPyeong: string;
+  parsedPyeongExtra: string; // 확장형/복층 등 구조 추가설명
   parsedNote: string;
   parsedQuote: string;
   parsedDeposit: string;
@@ -70,7 +71,7 @@ function makeConfirmSession(name: string): ConfirmSession {
     id: "c-" + Date.now() + "-" + Math.random().toString(36).slice(2, 6), name,
     services: [], customerText: "",
     parsedName: "", parsedPhone: "", parsedAddr: "", parsedWishDate: "",
-    parsedPyeong: "", parsedNote: "", parsedQuote: "", parsedDeposit: "", parsedBalance: "", parsedSalesNote: "",
+    parsedPyeong: "", parsedPyeongExtra: "", parsedNote: "", parsedQuote: "", parsedDeposit: "", parsedBalance: "", parsedSalesNote: "",
     calendarNote: "", schedules: [], confirmMsg: "", confirmed: false, postDone: [], copied: new Set(),
   };
 }
@@ -130,6 +131,7 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
   const parsedAddr = activeConfirm.parsedAddr;
   const parsedWishDate = activeConfirm.parsedWishDate;
   const parsedPyeong = activeConfirm.parsedPyeong;
+  const parsedPyeongExtra = activeConfirm.parsedPyeongExtra;
   const parsedNote = activeConfirm.parsedNote;
   const parsedSalesNote = activeConfirm.parsedSalesNote;
   const calendarNote = activeConfirm.calendarNote;
@@ -151,6 +153,7 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
   const setParsedAddr = (v: string) => updateConfirm({ parsedAddr: v });
   const setParsedWishDate = (v: string) => updateConfirm({ parsedWishDate: v });
   const setParsedPyeong = (v: string) => updateConfirm({ parsedPyeong: v });
+  const setParsedPyeongExtra = (v: string) => updateConfirm({ parsedPyeongExtra: v });
   const setParsedNote = (v: string) => updateConfirm({ parsedNote: v });
   const setParsedQuote = (v: string) => updateConfirm({ parsedQuote: v });
   const setParsedDeposit = (v: string) => updateConfirm({ parsedDeposit: v });
@@ -292,7 +295,7 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
   const parsedResultRef = useRef<HTMLDivElement>(null);
 
   // 양식(6)서비스 종류·7)평수·► 항목) 에서 서비스/평수 추출
-  function extractFormData(text: string): { services: ServiceEntry[]; pyeong: string } {
+  function extractFormData(text: string): { services: ServiceEntry[]; pyeong: string; pyeongExtra: string } {
     const lines = text.split("\n").map((l) => l.trim()).filter(Boolean);
     let svcFromText = "", pyeongFromText = "";
     for (const line of lines) {
@@ -316,10 +319,12 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
         return { name: n, quote, deposit };
       });
     }
-    // 평수에서 숫자만 추출 (예: "25평 확장형" → "25")
-    const pyeongNumMatch = pyeongFromText.match(/\d+/);
-    const pyeong = pyeongNumMatch ? pyeongNumMatch[0] : pyeongFromText;
-    return { services, pyeong };
+    // 평수: 숫자 부분과 나머지 (확장형/복층 등) 를 분리 저장.
+    // 예: "34평 확장형 복층" → pyeong: "34", pyeongExtra: "확장형 복층"
+    const pyeongNumMatch = pyeongFromText.match(/(\d+)\s*평?\s*(.*)/);
+    const pyeong = pyeongNumMatch ? pyeongNumMatch[1] : pyeongFromText;
+    const pyeongExtra = pyeongNumMatch ? (pyeongNumMatch[2] || "").trim() : "";
+    return { services, pyeong, pyeongExtra };
   }
 
   // AI 파싱 - Claude API 우선, 실패시 regex fallback
@@ -376,13 +381,14 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
           parsedNote: data.note || "",
           parsedSalesNote: data.salesNote || "",
           parsedPyeong: formData.pyeong || "",
+          parsedPyeongExtra: formData.pyeongExtra || "",
           parsedQuote: "",
           parsedDeposit: "",
           parsedBalance: "",
           services: confirmServices,
           schedules: confirmServices.map((s) => ({ service: s.name, date: "", time: "선택" })),
         });
-        generateConfirmMsg(data.name, data.addr, data.phone, data.date, data.note, confirmServices, formData.pyeong);
+        generateConfirmMsg(data.name, data.addr, data.phone, data.date, data.note, confirmServices, formData.pyeong, undefined, formData.pyeongExtra);
         finishSuccess();
         return;
       }
@@ -484,6 +490,7 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
       parsedNote: note,
       parsedSalesNote: salesNote,
       parsedPyeong: pyeongToUse,
+      parsedPyeongExtra: formData.pyeongExtra || "",
       parsedQuote: "",
       parsedDeposit: "",
       parsedBalance: "",
@@ -492,16 +499,17 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
     });
 
     // 확정 메시지 생성
-    generateConfirmMsg(name, addr, phone, wish, note, svcList, pyeongToUse);
+    generateConfirmMsg(name, addr, phone, wish, note, svcList, pyeongToUse, undefined, formData.pyeongExtra);
     return true;
   }
 
-  function generateConfirmMsg(name?: string, addr?: string, phone?: string, _wish?: string, note?: string, overrideServices?: ServiceEntry[], overridePyeong?: string, overrideSchedules?: ParsedSchedule[]) {
+  function generateConfirmMsg(name?: string, addr?: string, phone?: string, _wish?: string, note?: string, overrideServices?: ServiceEntry[], overridePyeong?: string, overrideSchedules?: ParsedSchedule[], overridePyeongExtra?: string) {
     const n = name || parsedName;
     const svcs = overrideServices || activeConfirm.services;
     const schedsRaw = overrideSchedules || activeConfirm.schedules;
     const schedsArr = schedsRaw.length > 0 ? schedsRaw : svcs.map(s => ({ service: s.name, date: "", time: "선택" }));
     const pyeongVal = overridePyeong || parsedPyeong;
+    const pyeongExtraVal = overridePyeongExtra !== undefined ? overridePyeongExtra : parsedPyeongExtra;
     const svcList = svcs.map((s) => s.name).join(", ");
     const timeDesc: Record<string, string> = {
       "오전": " 오전(7~9시 사이 방문)",
@@ -518,7 +526,7 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
     msg += `4)청소희망날짜 : ${schedDateStr}\n`;
     msg += `5)고객님 특이사항 : ${note || parsedNote}\n\n`;
     msg += `──────────────────\n`;
-    msg += `6)서비스 종류 : ${svcList}\n7)평수 : ${pyeongVal ? pyeongVal + "평" : ""}\n`;
+    msg += `6)서비스 종류 : ${svcList}\n7)평수 : ${pyeongVal ? pyeongVal + "평" : ""}${pyeongExtraVal ? " " + pyeongExtraVal : ""}\n`;
 
     svcs.forEach((s) => {
       msg += `► ${s.name}\n`;
@@ -859,6 +867,10 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
                 <div className="flex gap-2">
                   <div className="flex-1"><label className="text-xs text-gray-400">4) 청소희망날짜</label><input value={parsedWishDate} onChange={(e) => setParsedWishDate(e.target.value)} className="w-full px-2 py-1.5 border border-gray-200 rounded outline-none" style={{ fontSize: "12px" }} /></div>
                   <div className="flex-1"><label className="text-xs text-gray-400">7) 평수</label><input value={parsedPyeong} onChange={(e) => setParsedPyeong(e.target.value)} className="w-full px-2 py-1.5 border border-gray-200 rounded outline-none" style={{ fontSize: "12px" }} /></div>
+                </div>
+                <div>
+                  <label className="text-xs text-gray-400">구조 (확장형/복층 등)</label>
+                  <input value={parsedPyeongExtra} onChange={(e) => setParsedPyeongExtra(e.target.value)} placeholder="예) 확장형 복층" className="w-full px-2 py-1.5 border border-gray-200 rounded outline-none" style={{ fontSize: "12px" }} />
                 </div>
                 <div>
                   <label className="text-xs text-gray-400">5) 고객님 특이사항</label>
