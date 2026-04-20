@@ -629,14 +629,16 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
       "시무": " 시무(별도협의)",
       "사이": " 사이(별도협의)",
     };
-    const dateLabel = getDateLabel(svcs.map(s => s.name));
-    const schedDateStr = schedsArr
-      .filter(s => s.date)
-      .map(s => `${s.date}${s.time && s.time !== "선택" ? timeDesc[s.time] || ` ${s.time}` : ""}`)
-      .join(`\n4)${dateLabel} : `) || _wish || parsedWishDate;
+    const fallbackLabel = getDateLabel(svcs.map(s => s.name));
+    const schedLines = schedsArr.filter(s => s.date).map(s => {
+      const lbl = getDateLabel([s.service || ""]);
+      const timeStr = s.time && s.time !== "선택" ? timeDesc[s.time] || ` ${s.time}` : "";
+      return `4)${lbl} : ${s.date}${timeStr}`;
+    });
+    const dateBlock = schedLines.length > 0 ? schedLines.join("\n") : `4)${fallbackLabel} : ${_wish || parsedWishDate}`;
     let msg = `안녕하세요 ${n}님 😊\n예약이 확정되었습니다!\n\n`;
     msg += `1)성함 : ${n}\n2)주소 : ${addr || parsedAddr}\n3)연락처 : ${phone || parsedPhone}\n`;
-    msg += `4)${dateLabel} : ${schedDateStr}\n`;
+    msg += `${dateBlock}\n`;
     msg += `5)고객님 특이사항 : ${note || parsedNote}\n\n`;
     msg += `────────────\n`;
     msg += `6)서비스 종류 : ${svcList}\n7)평수 : ${pyeongVal ? pyeongVal + "평" : ""}${pyeongExtraVal ? " " + pyeongExtraVal : ""}\n`;
