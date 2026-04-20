@@ -692,8 +692,15 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
   async function handleCopyFormAndFill() {
     const formText = activeForm.formText || getFormText();
     await handleCopy(formText, "form");
-    // 현재 확정 세션 customerText 에 기입 후 예약확정 탭으로 이동 (파싱 시 새 세션 생성됨)
-    updateConfirm({ customerText: formText });
+    // 현재 확정 세션이 비어있으면 재사용, 데이터 있으면 새 세션 생성
+    const isCurrentEmpty = !activeConfirm.parsedName && !activeConfirm.parsedAddr && !activeConfirm.parsedPhone && !activeConfirm.customerText && !activeConfirm.confirmed;
+    if (isCurrentEmpty) {
+      updateConfirm({ customerText: formText });
+    } else {
+      const newSession = makeConfirmSession(`확정${confirmSessions.length + 1}`);
+      setConfirmSessions(prev => renumberConfirm([...prev, { ...newSession, customerText: formText }]));
+      setActiveConfirmId(newSession.id);
+    }
     // 양식발송 현재 세션 내용 초기화 (예약확정 탭은 그대로 유지)
     updateForm({ services: [], pyeong: "", buildType: "선택", pyeongNote: "", salesNote: "", copied: new Set(), formText: "" });
     setStep(2);
