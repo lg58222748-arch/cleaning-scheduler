@@ -91,6 +91,80 @@ function wishDateToISO(wish: string): string {
   return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 }
 
+// 유연한 필드 탐지 — 번호(1/2/3..) 위치가 다르거나 빠져도 라벨/내용 패턴으로 추출.
+// API·regex 양쪽에서 공유. seed 는 기존에 확보한 값이 있으면 덮어쓰지 않음.
+function detectFields(text: string, seed: { name?: string; phone?: string; addr?: string; wish?: string; note?: string } = {}) {
+  let name = seed.name || "", phone = seed.phone || "", addr = seed.addr || "", wish = seed.wish || "", note = seed.note || "";
+  const lines = text.split("\n").map((l) => l.trim()).filter(Boolean);
+
+  // Phase 1: 라벨 기반 매칭 (가장 신뢰도 높음, 번호 무관)
+  for (const line of lines) {
+    if (!name) { const m = line.match(/(?:^\d+[.)]\s*)?성함\s*[:：]\s*(.+)/); if (m && m[1].trim()) name = m[1].trim(); }
+    if (!phone) { const m = line.match(/(?:^\d+[.)]\s*)?(?:연락처|전화(?:번호)?)\s*[:：]\s*(.+)/); if (m && m[1].trim()) phone = m[1].trim(); }
+    if (!addr) { const m = line.match(/(?:^\d+[.)]\s*)?주소\s*[:：]\s*(.+)/); if (m && m[1].trim()) addr = m[1].trim(); }
+    if (!wish) { const m = line.match(/(?:^\d+[.)]\s*)?(?:[가-힣]*\s*)?희망날짜\s*[:：]?\s*(.+)/); if (m && m[1].trim()) wish = m[1].trim(); }
+    if (!wish) {
+      // "날짜 : ..." (희망 없이) — 특이사항 라인 제외
+      if (!/특이사항/.test(line)) {
+        const m = line.match(/(?:^\d+[.)]\s*)?날짜\s*[:：]\s*(.+)/);
+        if (m && m[1].trim()) wish = m[1].trim();
+      }
+    }
+    if (!note) {
+      // "고객 특이사항" 은 매칭, "상담사 특이사항" 은 제외
+      if (!/상담사/.test(line)) {
+        const m = line.match(/(?:^\d+[.)]\s*)?(?:고객(?:님)?\s*)?특이사항\s*[:：]?\s*(.+)/);
+        if (m && m[1].trim() && !/상담사/.test(m[1])) note = m[1].trim();
+      }
+    }
+  }
+
+  // Phase 2: 라벨 없는 줄은 내용 패턴으로 분류 (번호만 있는 경우)
+  for (const line of lines) {
+    const body = line.replace(/^\d+[.)]\s*/, "").trim();
+    if (!body) continue;
+    // 이미 처리된 라벨 줄은 건너뜀
+    if (/^(성함|연락처|전화|주소|평수|견적|예\s*약|잔\s*금|상담사|고객|서비스\s*종류|희망날짜|날짜\s*[:：])/.test(body)) continue;
+
+    // 전화번호 (010 으로 시작 10~11자리)
+    const phoneClean = body.replace(/[-.\s]/g, "");
+    if (!phone && /^01[016789]\d{7,8}$/.test(phoneClean)) {
+      phone = phoneClean.replace(/(01[016789])(\d{3,4})(\d{4})/, "$1-$2-$3");
+      continue;
+    }
+    // 날짜 (N월N일, N/N, N.N, YYYY-MM-DD)
+    if (!wish && (/\d{1,2}\s*월\s*\d{1,2}/.test(body) || /^\d{1,2}[\/\.\-]\d{1,2}(?!\d)/.test(body) || /^\d{4}-\d{2}-\d{2}/.test(body))) {
+      wish = body; continue;
+    }
+    // 한글 이름 (2~4자 단독)
+    if (!name && /^[가-힣]{2,4}$/.test(body)) {
+      name = body; continue;
+    }
+    // 주소 (시/도/군/구/읍/면/동/리/로/길 포함 또는 아파트명)
+    if (!addr && (/[시도군구읍면동리]/.test(body) || /아파트|오피스텔|빌라|맨션|자이|푸르지오|래미안|힐스|센트럴|로얄|메르/.test(body))) {
+      addr = body; continue;
+    }
+  }
+
+  // Phase 3: 다중행 주소 — addr 뒤 라인에 번호/전화/날짜 패턴 없고 건물/호수스러우면 합침
+  if (addr) {
+    const addrIdx = lines.findIndex((l) => l.includes(addr));
+    if (addrIdx >= 0 && addrIdx + 1 < lines.length) {
+      const nextRaw = lines[addrIdx + 1];
+      const hasPrefix = /^\d+[.)]/.test(nextRaw);
+      const phoneCheck = nextRaw.replace(/[-.\s]/g, "");
+      const isPhone = /^01[016789]\d{7,8}$/.test(phoneCheck);
+      const isDate = /\d+\s*월\s*\d+/.test(nextRaw) || /^\d{1,2}[\/\.\-]\d{1,2}/.test(nextRaw) || /^\d{4}-\d{2}-\d{2}/.test(nextRaw);
+      const looksLikeBuilding = /아파트|오피스텔|빌라|자이|푸르지오|래미안|힐스|센트럴|로얄|메르|관|\d+호$|\d+동\s*\d+호|[가-힣]+\s*\d+동|[가-힣]+\s*\d+호/.test(nextRaw);
+      if (!hasPrefix && !isPhone && !isDate && (looksLikeBuilding || /^[가-힣\d\s]+$/.test(nextRaw))) {
+        addr = addr + " " + nextRaw.trim();
+      }
+    }
+  }
+
+  return { name, phone, addr, wish, note };
+}
+
 function makeFormSession(name: string): FormSession {
   return { id: "f-" + Date.now() + "-" + Math.random().toString(36).slice(2, 6), name, services: [], pyeong: "", buildType: "선택", pyeongNote: "", salesNote: "", copied: new Set(), formText: "" };
 }
@@ -363,13 +437,13 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
   const parsedResultRef = useRef<HTMLDivElement>(null);
   const parseTargetIdRef = useRef<string | null>(null);
 
-  // 양식(6)서비스 종류·7)평수·► 항목) 에서 서비스/평수 추출
+  // 양식(서비스 종류·평수·► 항목) 에서 서비스/평수 추출 — 번호(6/7 등) 위치 무관
   function extractFormData(text: string): { services: ServiceEntry[]; pyeong: string; pyeongExtra: string } {
     const lines = text.split("\n").map((l) => l.trim()).filter(Boolean);
     let svcFromText = "", pyeongFromText = "";
     for (const line of lines) {
-      const m6 = line.match(/6\)\s*서비스\s*종류\s*[:：]\s*(.+)/); if (m6) svcFromText = m6[1].trim();
-      const m7 = line.match(/7\)\s*평수\s*[:：]\s*(.+)/); if (m7) pyeongFromText = m7[1].trim();
+      const m6 = line.match(/(?:^\d+[.)]\s*)?서비스\s*종류\s*[:：]\s*(.+)/); if (m6) svcFromText = m6[1].trim();
+      const m7 = line.match(/(?:^\d+[.)]\s*)?평수\s*[:：]\s*(.+)/); if (m7) pyeongFromText = m7[1].trim();
     }
     let services: ServiceEntry[] = [];
     if (svcFromText) {
@@ -468,17 +542,11 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
       });
       const data = await res.json();
       if (data.success) {
-        // API 결과가 비어있는 필드는 regex로 보완
+        // API 결과가 비어있는 필드는 내용 기반 탐지로 보완 (비표준 번호 포맷도 지원)
         let rName = data.name || "", rPhone = data.phone || "", rAddr = data.addr || "", rWish = data.date || "", rNote = data.note || "", rSalesNote = data.salesNote || "";
-        if (!rName || !rPhone || !rAddr || !rWish) {
-          for (const line of textSnapshot.split("\n").map((l) => l.trim()).filter(Boolean)) {
-            const m1 = line.match(/^1[.)]\s*성함\s*[:：]\s*(.+)/); if (m1 && m1[1].trim() && !rName) rName = m1[1].trim();
-            if (!rName) { const m1b = line.match(/^1[.)]\s*([가-힣]{1,3}(?:\s+[가-힣]{1,3})?)\s*$/); if (m1b) rName = m1b[1].trim(); }
-            const m2 = line.match(/^2[.)]\s*(?:주소\s*[:：]\s*)?(.+)/); if (m2 && m2[1].trim() && !rAddr) rAddr = m2[1].trim();
-            const m3 = line.match(/^3[.)]\s*(?:연락처\s*[:：]\s*)?(.+)/); if (m3 && m3[1].trim() && !rPhone) rPhone = m3[1].trim();
-            const m4 = line.match(/^4[.)]\s*(?:.*날짜\s*[:：]?\s*)?(.+)/); if (m4 && m4[1].trim() && !rWish) rWish = m4[1].trim();
-            const m5 = line.match(/^5[.)]\s*(?:.*특이사항\s*[:：]?\s*)?(.+)/); if (m5 && m5[1].trim() && !rNote) rNote = m5[1].trim();
-          }
+        if (!rName || !rPhone || !rAddr || !rWish || !rNote) {
+          const detected = detectFields(textSnapshot, { name: rName, phone: rPhone, addr: rAddr, wish: rWish, note: rNote });
+          rName = detected.name; rPhone = detected.phone; rAddr = detected.addr; rWish = detected.wish; rNote = detected.note;
         }
         // 상담사 특이사항은 여러 줄일 수 있음 — 전체 텍스트에서 추출해서 더 긴 쪽 채택
         const fullSales = extractSalesNote(textSnapshot);
@@ -537,35 +605,31 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
 
   function regexParse(textSnapshot?: string): { ok: boolean; missing: string[] } {
     const t = textSnapshot ?? customerText;
-    const lines = t.split("\n").map((l) => l.trim()).filter(Boolean);
 
-    let name = "", phone = "", addr = "", wish = "", note = "", salesNote = "";
+    // 유연한 필드 탐지 (라벨 기반 → 내용 기반)
+    const detected = detectFields(t);
+    let { name, phone, addr, wish, note } = detected;
+    let salesNote = "";
 
-    // 양식 번호(1~5, 11)로 파싱 — "1)" / "1." 형식, 라벨 있음/없음 모두 지원
-    for (const line of lines) {
-      // 1번: "1) 성함 : 홍길동" / "1. 성함 : 홍길동" / "1. 홍길동"
-      const m1 = line.match(/^1[.)]\s*성함\s*[:：]\s*(.+)/); if (m1 && m1[1].trim()) name = m1[1].trim();
-      if (!name) { const m1b = line.match(/^1[.)]\s*([가-힣]{1,3}(?:\s+[가-힣]{1,3})?)\s*$/); if (m1b) name = m1b[1].trim(); }
-      // 2번: "2) 주소 : 서울..." / "2. 주소 : 서울..." / "2. 서울..."
-      const m2 = line.match(/^2[.)]\s*(?:주소\s*[:：]\s*)?(.+)/); if (m2 && m2[1].trim()) addr = m2[1].trim();
-      // 3번: "3) 연락처 : 010-..." / "3. 010-..."
-      const m3 = line.match(/^3[.)]\s*(?:연락처\s*[:：]\s*)?(.+)/); if (m3 && m3[1].trim()) phone = m3[1].trim();
-      // 4번: "4) 날짜 : 5월..." / "4. 5월 19일..."
-      const m4 = line.match(/^4[.)]\s*(?:.*날짜\s*[:：]?\s*)?(.+)/); if (m4 && m4[1].trim()) wish = m4[1].trim();
-      // 5번: "5) 특이사항 : ..." / "5. 계단이 좁습니다."
-      const m5 = line.match(/^5[.)]\s*(?:.*특이사항\s*[:：]?\s*)?(.+)/); if (m5 && m5[1].trim()) note = m5[1].trim();
-    }
-    // 상담사 특이사항은 여러 줄 가능 — 전체 텍스트에서 추출 (라인 루프와 별도)
+    // 상담사 특이사항은 여러 줄 가능 — 전체 텍스트에서 추출
     const multiSales = extractSalesNote(t);
     if (multiSales) salesNote = multiSales;
 
-    // 서비스/평수 추출 (공통 헬퍼 사용) — 항상 fresh 기준, 이전 확정 세션 값 섞지 않음.
+    // 서비스/평수 추출
     const formData = extractFormData(t);
     const svcList: ServiceEntry[] = formData.services;
     const pyeongToUse = formData.pyeong || "";
 
-    // 2차: 양식 뒤 자유형식 답변 추출
-    // 마지막 "*" 줄 이후의 내용물을 모두 수집
+    // 3차: "1. 이름" 처럼 번호+이름 패턴 (라벨 없음)
+    if (!name) {
+      for (const line of t.split("\n").map((l) => l.trim()).filter(Boolean)) {
+        const m1b = line.match(/^1[.)]\s*([가-힣]{2,4})\s*$/);
+        if (m1b) { name = m1b[1].trim(); break; }
+      }
+    }
+
+    // 4차: 양식 꼬리말(*) 이후의 자유형식 답변 — 번호 없이 이름/전화/날짜/주소 나열한 경우
+    const lines = t.split("\n").map((l) => l.trim()).filter(Boolean);
     const freeLines: string[] = [];
     let lastStarIdx = -1;
     for (let i = lines.length - 1; i >= 0; i--) {
@@ -577,44 +641,19 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
         if (l) freeLines.push(l);
       }
     }
-
-    // 자유형식: 각 줄을 타입별로 분류
-    const classified: { type: string; value: string }[] = [];
     for (const line of freeLines) {
       const stripped = line.replace(/[-\s]/g, "");
-      // 전화번호 (010으로 시작하는 10-11자리)
-      if (/^01[016789]\d{7,8}$/.test(stripped)) {
-        classified.push({ type: "phone", value: stripped }); continue;
-      }
-      // 이름+전화 같은 줄 "김개똥 01058222748"
+      if (!phone && /^01[016789]\d{7,8}$/.test(stripped)) { phone = stripped; continue; }
       const namePhone = line.match(/^([가-힣]{2,4})\s+(01[016789][\d\-]{7,9})$/);
       if (namePhone) {
-        classified.push({ type: "name", value: namePhone[1] });
-        classified.push({ type: "phone", value: namePhone[2].replace(/-/g, "") }); continue;
+        if (!name) name = namePhone[1];
+        if (!phone) phone = namePhone[2].replace(/-/g, "");
+        continue;
       }
-      // 날짜 패턴 (4.21, 4/21, 0421, 4월21일, 2026-05-20 등)
-      if (/^\d{1,2}[\.\/-]\d{1,2}$/.test(line) || /^\d{4}$/.test(line) || /\d+월\s*\d+일/.test(line) || /^\d{4}-\d{2}-\d{2}$/.test(line)) {
-        classified.push({ type: "date", value: line }); continue;
-      }
-      // 주소 (시/도/구/동/길/로 또는 아파트 이름)
-      if (/[시도군구읍면동리로길]/.test(line) || /아파트|오피스텔|빌라|맨션|자이|푸르지오|래미안|힐스|센트럴/.test(line)) {
-        classified.push({ type: "addr", value: line }); continue;
-      }
-      // 한글 2-4자 = 이름
-      if (/^[가-힣]{2,4}$/.test(line)) {
-        classified.push({ type: "name", value: line }); continue;
-      }
-      // 나머지 = 특이사항
-      classified.push({ type: "note", value: line });
-    }
-
-    // 분류 결과 적용
-    for (const c of classified) {
-      if (c.type === "name" && !name) name = c.value;
-      else if (c.type === "phone" && !phone) phone = c.value;
-      else if (c.type === "addr" && !addr) addr = c.value;
-      else if (c.type === "date" && !wish) wish = c.value;
-      else if (c.type === "note" && !note) note = c.value;
+      if (!wish && (/^\d{1,2}[\.\/-]\d{1,2}$/.test(line) || /^\d{4}$/.test(line) || /\d+월\s*\d+일/.test(line) || /^\d{4}-\d{2}-\d{2}$/.test(line))) { wish = line; continue; }
+      if (!addr && (/[시도군구읍면동리로길]/.test(line) || /아파트|오피스텔|빌라|맨션|자이|푸르지오|래미안|힐스|센트럴/.test(line))) { addr = line; continue; }
+      if (!name && /^[가-힣]{2,4}$/.test(line)) { name = line; continue; }
+      if (!note) { note = line; }
     }
 
     const missing: string[] = [];
@@ -758,9 +797,40 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
     { label: "5. 인터넷 할인 안내", getText: () => `아참 그리구요 이번에 이사하실때 인터넷도 알아보고 계시다면 1644-0199로 연락주시면\n\n저희 새집느낌 인터넷 센터 통해서 48만원 지원금도 받고 청소 비용도 10~20만원 할인받을 수 있으셔서 참고하시면 좋으실거 같으세용\n\n참고해보세요 고객님^^\n오늘도 좋은 하루되세요!` },
   ];
 
+  // 일정 수동 추가/삭제/서비스 변경 — 서비스가 자동 감지되지 않거나 후 변경할 때 사용
+  function addScheduleRow() {
+    const newSched: ParsedSchedule = { service: "선택", date: wishDateToISO(parsedWishDate), time: "선택" };
+    const newSvc: ServiceEntry = { name: "선택", quote: "", deposit: "" };
+    const newSchedules = [...schedules, newSched];
+    const newServices = [...activeConfirm.services, newSvc];
+    updateConfirm({ schedules: newSchedules, services: newServices });
+    generateConfirmMsg(undefined, undefined, undefined, undefined, undefined, newServices, undefined, newSchedules);
+  }
+  function removeScheduleRow(idx: number) {
+    const newSchedules = schedules.filter((_, i) => i !== idx);
+    const newServices = activeConfirm.services.filter((_, i) => i !== idx);
+    updateConfirm({ schedules: newSchedules, services: newServices });
+    generateConfirmMsg(undefined, undefined, undefined, undefined, undefined, newServices, undefined, newSchedules);
+  }
+  function updateScheduleService(idx: number, newName: string) {
+    const newSchedules = schedules.map((s, i) => i === idx ? { ...s, service: newName } : s);
+    const newServices = activeConfirm.services.map((s, i) => i === idx ? { ...s, name: newName } : s);
+    updateConfirm({ schedules: newSchedules, services: newServices });
+    generateConfirmMsg(undefined, undefined, undefined, undefined, undefined, newServices, undefined, newSchedules);
+  }
+
   async function handleConfirm() {
-    // 날짜 검증: 일정별 날짜가 비어있는지 확인
+    // 일정이 하나도 없으면 거부
+    if (schedules.length === 0) {
+      showAlert("일정이 없습니다.\n우측 \"+ 일정 추가\" 버튼으로 일정을 추가해주세요.");
+      return;
+    }
+    // 서비스/날짜 검증
     for (let i = 0; i < schedules.length; i++) {
+      if (!schedules[i].service || schedules[i].service === "선택") {
+        showAlert(`${i + 1}번째 일정의 서비스가 선택되지 않았습니다.`);
+        return;
+      }
       if (!schedules[i].date) {
         showAlert(`${i + 1}번째 일정의 날짜가 설정되지 않았습니다.`);
         return;
@@ -1026,8 +1096,9 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
             )}
           </div>
 
-          {/* 파싱 결과 */}
-          {parsedName && (
+          {/* 파싱 결과 — 이름/전화/주소/날짜 중 하나라도 있거나, 일정이 이미 추가됐거나, 고객 답장이 붙여넣어진 경우 표시
+              (파싱 실패해도 수동 입력 가능하도록) */}
+          {(parsedName || parsedPhone || parsedAddr || parsedWishDate || schedules.length > 0 || customerText.trim().length > 0) && (
             <div ref={parsedResultRef} className="flex flex-col md:flex-row md:gap-6">
             <div className="space-y-4 md:flex-1">
               <div className="border border-green-200 rounded-xl p-3 space-y-2">
@@ -1057,12 +1128,32 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
 
               {/* 서비스별 날짜+시간대 */}
               <div>
-                <label className="text-xs font-bold text-green-700 mb-2 block">일정별 날짜 <span className="text-gray-400 font-normal">캘린더에 각각 저장됩니다</span></label>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="text-xs font-bold text-green-700 block">일정별 날짜 <span className="text-gray-400 font-normal">캘린더에 각각 저장됩니다</span></label>
+                  <button onClick={addScheduleRow} className="text-[10px] px-2 py-1 rounded-lg border border-green-400 text-green-700 font-bold active:bg-green-50" title="일정 추가">
+                    + 일정 추가
+                  </button>
+                </div>
+                {schedules.length === 0 && (
+                  <div className="p-3 border border-dashed border-gray-300 rounded-xl text-xs text-gray-500 text-center">
+                    서비스가 감지되지 않았습니다.<br />
+                    우측 상단 <b className="text-green-700">&quot;+ 일정 추가&quot;</b>를 눌러 직접 추가해주세요.
+                  </div>
+                )}
                 {schedules.map((sched, i) => (
                   <div key={i} className="border border-gray-200 rounded-xl p-3 mb-2">
                     <div className="flex items-center gap-2 mb-2">
-                      <span className="w-5 h-5 bg-green-700 text-white rounded-full text-xs font-bold flex items-center justify-center">{i + 1}</span>
-                      <span className="text-sm font-bold text-green-800">{sched.service}</span>
+                      <span className="w-5 h-5 bg-green-700 text-white rounded-full text-xs font-bold flex items-center justify-center shrink-0">{i + 1}</span>
+                      <select
+                        value={sched.service}
+                        onChange={(e) => updateScheduleService(i, e.target.value)}
+                        style={{ fontSize: "12px" }}
+                        className="flex-1 px-2 py-1 border border-gray-200 rounded outline-none bg-white focus:border-green-500 text-green-800 font-bold"
+                      >
+                        <option value="선택">서비스 선택</option>
+                        {ALL_SERVICES.map((s) => <option key={s} value={s}>{s}</option>)}
+                      </select>
+                      <button onClick={() => removeScheduleRow(i)} className="text-red-400 text-lg font-bold px-2 active:text-red-600" title="이 일정 삭제">×</button>
                     </div>
                     <div className="flex gap-2">
                       <input type="date" value={sched.date} onChange={(e) => {
