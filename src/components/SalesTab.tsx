@@ -247,6 +247,17 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
     return (parseInt(s.quote) || 0) - (parseInt(s.deposit) || 0);
   }
 
+  // 서비스명에 따른 날짜 라벨
+  function getDateLabel(svcNames: string[]): string {
+    const map: Record<string, string> = {
+      "줄눈시공": "줄눈시공 희망날짜",
+      "탄성코트": "탄성코트 희망날짜",
+      "에어컨청소": "에어컨청소 희망날짜",
+      "새집증후군": "새집증후군 희망날짜",
+    };
+    return map[svcNames[0]] || "청소희망날짜";
+  }
+
   // 캘린더 제목 생성
   function getCalTitle(svcName: string, index: number) {
     const total = services.length;
@@ -257,7 +268,8 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
   function getFormText() {
     const svcList = services.map((s) => s.name).join(", ");
     let text = `안녕하세요 고객님\n예약 양식 전달드립니다^^\n\n`;
-    text += `1)성함 :\n2)주소 : (아파트명+동호수)\n3)연락처 :\n4)청소희망날짜:\n  (오전: 7시~9시, 오후: 1시~3시 사이 방문 선택)\n5)고객님 특이사항 :\n\n`;
+    const dateLabel1 = getDateLabel(services.map(s => s.name));
+    text += `1)성함 :\n2)주소 : (아파트명+동호수)\n3)연락처 :\n4)${dateLabel1}:\n  (오전: 7시~9시, 오후: 1시~3시 사이 방문 선택)\n5)고객님 특이사항 :\n\n`;
     text += `──────────────────\n`;
     text += `6)서비스 종류 : ${svcList}\n`;
     text += `7)평수 : ${pyeong ? pyeong + "평" : ""}${buildType && buildType !== "선택" ? " " + buildType : ""}${pyeongNote ? " " + pyeongNote : ""}\n`;
@@ -551,13 +563,14 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
       "시무": " 시무(별도협의)",
       "사이": " 사이(별도협의)",
     };
+    const dateLabel = getDateLabel(svcs.map(s => s.name));
     const schedDateStr = schedsArr
       .filter(s => s.date)
       .map(s => `${s.date}${s.time && s.time !== "선택" ? timeDesc[s.time] || ` ${s.time}` : ""}`)
-      .join("\n4)청소희망날짜 : ") || _wish || parsedWishDate;
+      .join(`\n4)${dateLabel} : `) || _wish || parsedWishDate;
     let msg = `안녕하세요 ${n}님 😊\n예약이 확정되었습니다!\n\n`;
     msg += `1)성함 : ${n}\n2)주소 : ${addr || parsedAddr}\n3)연락처 : ${phone || parsedPhone}\n`;
-    msg += `4)청소희망날짜 : ${schedDateStr}\n`;
+    msg += `4)${dateLabel} : ${schedDateStr}\n`;
     msg += `5)고객님 특이사항 : ${note || parsedNote}\n\n`;
     msg += `──────────────────\n`;
     msg += `6)서비스 종류 : ${svcList}\n7)평수 : ${pyeongVal ? pyeongVal + "평" : ""}${pyeongExtraVal ? " " + pyeongExtraVal : ""}\n`;
