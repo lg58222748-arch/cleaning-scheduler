@@ -437,8 +437,16 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
   const parsedResultRef = useRef<HTMLDivElement>(null);
   const parseTargetIdRef = useRef<string | null>(null);
 
-  // 양식(서비스 종류·평수·► 항목) 에서 서비스/평수 추출 — 번호(6/7 등) 위치 무관
-  function extractFormData(text: string): { services: ServiceEntry[]; pyeong: string; pyeongExtra: string } {
+  // "31만원" → "310000", "82,000원" → "82000" 등 금액 문자열 파싱
+  function parsePriceString(digits: string, unit?: string): string {
+    const num = parseInt(digits.replace(/,/g, ""), 10);
+    if (!num) return "";
+    if (unit && unit.includes("만")) return String(num * 10000);
+    return String(num);
+  }
+
+  // 양식(서비스 종류·평수·► 항목·견적/예약금/잔금) 에서 서비스/평수/top-level 금액 추출 — 번호(6/7 등) 위치 무관
+  function extractFormData(text: string): { services: ServiceEntry[]; pyeong: string; pyeongExtra: string; topQuote: string; topDeposit: string; topBalance: string } {
     const lines = text.split("\n").map((l) => l.trim()).filter(Boolean);
     let svcFromText = "", pyeongFromText = "";
     for (const line of lines) {
@@ -462,6 +470,23 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
         return { name: n, quote, deposit };
       });
     }
+    // Top-level 견적/예약금/잔금 — ► 서비스 블록 없이 번호만 있는 경우 지원 (박금진 케이스)
+    // "31만원", "82000원", "228,000원" 모두 처리
+    let topQuote = "", topDeposit = "", topBalance = "";
+    for (const line of lines) {
+      if (!topQuote) {
+        const m = line.match(/(?:^\d+[.)]\s*)?견적금액[^\d]*([\d,]+)\s*(만원|원)?/);
+        if (m) topQuote = parsePriceString(m[1], m[2]);
+      }
+      if (!topDeposit) {
+        const m = line.match(/(?:^\d+[.)]\s*)?예\s*약\s*금[^\d]*([\d,]+)\s*(만원|원)?/);
+        if (m) topDeposit = parsePriceString(m[1], m[2]);
+      }
+      if (!topBalance) {
+        const m = line.match(/(?:^\d+[.)]\s*)?잔\s*금[^\d]*([\d,]+)\s*(만원|원)?/);
+        if (m) topBalance = parsePriceString(m[1], m[2]);
+      }
+    }
     // 평수: 숫자 부분과 나머지 (확장형/복층 등) 를 분리 저장.
     // 제곱미터/㎡ 형식이면 전체를 extra에 저장 (평 단위 아님)
     let pyeong = "", pyeongExtra = "";
@@ -472,7 +497,7 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
       pyeong = pyeongNumMatch ? pyeongNumMatch[1] : pyeongFromText;
       pyeongExtra = pyeongNumMatch ? (pyeongNumMatch[2] || "").trim() : "";
     }
-    return { services, pyeong, pyeongExtra };
+    return { services, pyeong, pyeongExtra, topQuote, topDeposit, topBalance };
   }
 
   // AI 파싱 - Claude API 우선, 실패시 regex fallback
@@ -566,7 +591,7 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
           setParseError(`⚠️ 일부 항목 누락: ${apiMissing.join(", ")} — 예약확정 탭에서 직접 입력해주세요`);
           setTimeout(() => setParseError(""), 12000);
         }
-        // 예약확정 fresh 하게 덮어씀 (parsedQuote/Deposit/Balance 도 빈값으로, 이전 세션 잔여 제거).
+        // 예약확정 fresh 하게 덮어씀 — top-level 금액(박금진처럼 ► 블록 없는 케이스) 도 parsedQuote/Deposit/Balance 로 보존.
         updateConfirm({
           parsedName: rName,
           parsedPhone: rPhone,
@@ -576,13 +601,13 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
           parsedSalesNote: rSalesNote,
           parsedPyeong: formData.pyeong || "",
           parsedPyeongExtra: formData.pyeongExtra || "",
-          parsedQuote: "",
-          parsedDeposit: "",
-          parsedBalance: "",
+          parsedQuote: formData.topQuote || "",
+          parsedDeposit: formData.topDeposit || "",
+          parsedBalance: formData.topBalance || "",
           services: confirmServices,
           schedules: confirmServices.map((s) => ({ service: s.name, date: wishDateToISO(rWish), time: "선택" })),
         });
-        generateConfirmMsg(rName, rAddr, rPhone, rWish, rNote, confirmServices, formData.pyeong, undefined, formData.pyeongExtra, rSalesNote);
+        generateConfirmMsg(rName, rAddr, rPhone, rWish, rNote, confirmServices, formData.pyeong, undefined, formData.pyeongExtra, rSalesNote, formData.topQuote, formData.topDeposit, formData.topBalance);
         finishSuccess();
         return;
       }
@@ -674,25 +699,28 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
       parsedSalesNote: salesNote,
       parsedPyeong: pyeongToUse,
       parsedPyeongExtra: formData.pyeongExtra || "",
-      parsedQuote: "",
-      parsedDeposit: "",
-      parsedBalance: "",
+      parsedQuote: formData.topQuote || "",
+      parsedDeposit: formData.topDeposit || "",
+      parsedBalance: formData.topBalance || "",
       services: svcList,
       schedules: svcList.map((s) => ({ service: s.name, date: wishDateToISO(wish), time: "선택" })),
     });
 
     // 확정 메시지 생성
-    generateConfirmMsg(name, addr, phone, wish, note, svcList, pyeongToUse, undefined, formData.pyeongExtra, salesNote);
+    generateConfirmMsg(name, addr, phone, wish, note, svcList, pyeongToUse, undefined, formData.pyeongExtra, salesNote, formData.topQuote, formData.topDeposit, formData.topBalance);
     return { ok: true, missing };
   }
 
-  function generateConfirmMsg(name?: string, addr?: string, phone?: string, _wish?: string, note?: string, overrideServices?: ServiceEntry[], overridePyeong?: string, overrideSchedules?: ParsedSchedule[], overridePyeongExtra?: string, overrideSalesNote?: string) {
+  function generateConfirmMsg(name?: string, addr?: string, phone?: string, _wish?: string, note?: string, overrideServices?: ServiceEntry[], overridePyeong?: string, overrideSchedules?: ParsedSchedule[], overridePyeongExtra?: string, overrideSalesNote?: string, overrideTopQuote?: string, overrideTopDeposit?: string, overrideTopBalance?: string) {
     const n = name || parsedName;
     const svcs = overrideServices || activeConfirm.services;
     const schedsRaw = overrideSchedules || activeConfirm.schedules;
     const schedsArr = schedsRaw.length > 0 ? schedsRaw : svcs.map(s => ({ service: s.name, date: "", time: "선택" }));
     const pyeongVal = overridePyeong || parsedPyeong;
     const pyeongExtraVal = overridePyeongExtra !== undefined ? overridePyeongExtra : parsedPyeongExtra;
+    const topQ = overrideTopQuote !== undefined ? overrideTopQuote : activeConfirm.parsedQuote;
+    const topD = overrideTopDeposit !== undefined ? overrideTopDeposit : activeConfirm.parsedDeposit;
+    const topB = overrideTopBalance !== undefined ? overrideTopBalance : activeConfirm.parsedBalance;
     const svcList = svcs.map((s) => s.name).join(", ");
     const timeDesc: Record<string, string> = {
       "오전": " 오전(7~9시 사이 방문)",
@@ -720,6 +748,16 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
       msg += `9)예 약 금 : ${s.deposit ? parseInt(s.deposit).toLocaleString() + "원" : ""}\n`;
       msg += `10)잔 금 : ${getBalance(s) > 0 ? getBalance(s).toLocaleString() + "원" : ""}\n`;
     });
+
+    // 서비스 블록 없지만 top-level 금액이 있으면 단독 블록으로 출력 (박금진 케이스 등)
+    if (svcs.length === 0 && (topQ || topD || topB)) {
+      const qNum = parseInt(topQ) || 0;
+      const dNum = parseInt(topD) || 0;
+      const bNum = parseInt(topB) || (qNum && dNum ? qNum - dNum : 0);
+      msg += `8)견적금액(공급가액) : ${qNum > 0 ? qNum.toLocaleString() + "원" : ""}\n`;
+      msg += `9)예 약 금 : ${dNum > 0 ? dNum.toLocaleString() + "원" : ""}\n`;
+      msg += `10)잔 금 : ${bNum > 0 ? bNum.toLocaleString() + "원" : ""}\n`;
+    }
 
     if (svcs.length > 1) {
       const totalQuote = svcs.reduce((sum, s) => sum + (parseInt(s.quote) || 0), 0);
@@ -800,7 +838,11 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
   // 일정 수동 추가/삭제/서비스 변경 — 서비스가 자동 감지되지 않거나 후 변경할 때 사용
   function addScheduleRow() {
     const newSched: ParsedSchedule = { service: "선택", date: wishDateToISO(parsedWishDate), time: "선택" };
-    const newSvc: ServiceEntry = { name: "선택", quote: "", deposit: "" };
+    // 첫 번째 추가 & top-level 금액이 있으면 (박금진 케이스) 기본 견적/예약금으로 사용
+    const isFirst = activeConfirm.services.length === 0;
+    const newSvc: ServiceEntry = isFirst
+      ? { name: "선택", quote: activeConfirm.parsedQuote || "", deposit: activeConfirm.parsedDeposit || "" }
+      : { name: "선택", quote: "", deposit: "" };
     const newSchedules = [...schedules, newSched];
     const newServices = [...activeConfirm.services, newSvc];
     updateConfirm({ schedules: newSchedules, services: newServices });
