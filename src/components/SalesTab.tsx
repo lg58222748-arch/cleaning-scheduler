@@ -36,6 +36,7 @@ interface FormSession {
   pyeongNote: string; // 구조 추가설명 (복층, 펜트하우스, 복도식 등)
   salesNote: string;
   copied: Set<string>;
+  formText: string; // 양식 미리보기 편집 텍스트 (빈값이면 auto-generate)
 }
 
 interface ConfirmSession {
@@ -63,7 +64,7 @@ interface ConfirmSession {
 }
 
 function makeFormSession(name: string): FormSession {
-  return { id: "f-" + Date.now() + "-" + Math.random().toString(36).slice(2, 6), name, services: [], pyeong: "", buildType: "선택", pyeongNote: "", salesNote: "", copied: new Set() };
+  return { id: "f-" + Date.now() + "-" + Math.random().toString(36).slice(2, 6), name, services: [], pyeong: "", buildType: "선택", pyeongNote: "", salesNote: "", copied: new Set(), formText: "" };
 }
 
 function makeConfirmSession(name: string): ConfirmSession {
@@ -146,6 +147,7 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
   const setBuildType = (v: string) => updateForm({ buildType: v });
   const setPyeongNote = (v: string) => updateForm({ pyeongNote: v });
   const setSalesNote = (v: string) => updateForm({ salesNote: v });
+  const setFormText = (v: string) => updateForm({ formText: v });
 
   const setCustomerText = (v: string) => updateConfirm({ customerText: v });
   const setParsedName = (v: string) => updateConfirm({ parsedName: v });
@@ -628,7 +630,7 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
 
   // "1. 양식 복사" 전용 - 같은 인덱스의 확정 세션 customerText 에 자동 기입
   async function handleCopyFormAndFill() {
-    const formText = getFormText();
+    const formText = activeForm.formText || getFormText();
     await handleCopy(formText, "form");
     const formIdx = formSessions.findIndex(s => s.id === activeFormId);
     if (formIdx < 0) return;
@@ -834,8 +836,21 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
           )}
           {/* 미리보기 */}
           <div className="bg-green-50 border border-green-200 rounded-xl p-2">
-            <div className="text-xs font-bold text-green-700 mb-1">양식 미리보기</div>
-            <pre className="text-xs text-gray-700 whitespace-pre-wrap font-sans leading-tight max-h-[100px] md:max-h-[500px] overflow-y-auto">{getFormText()}</pre>
+            <div className="flex items-center justify-between mb-1">
+              <div className="text-xs font-bold text-green-700">양식 미리보기</div>
+              <button
+                onClick={() => setFormText(getFormText())}
+                className="text-[10px] px-1.5 py-0.5 rounded border border-green-400 text-green-700 active:bg-green-100"
+                title="자동 생성 텍스트로 초기화"
+              >↺ 초기화</button>
+            </div>
+            <textarea
+              value={activeForm.formText || getFormText()}
+              onChange={(e) => setFormText(e.target.value)}
+              rows={12}
+              style={{ fontSize: "12px" }}
+              className="w-full text-gray-700 leading-relaxed rounded-lg p-2 outline-none resize-y bg-white border border-green-200 focus:border-green-500"
+            />
           </div>
 
           {/* 버튼 */}
