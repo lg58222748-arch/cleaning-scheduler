@@ -692,6 +692,11 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
   async function handleCopyFormAndFill() {
     const formText = activeForm.formText || getFormText();
     await handleCopy(formText, "form");
+  }
+
+  // "STEP 2 · 파싱으로 이동" 버튼 - 확정 세션 생성/재사용 후 step 2 이동
+  function goToParseStep() {
+    const formText = activeForm.formText || getFormText();
     // 현재 확정 세션이 비어있으면 재사용, 데이터 있으면 새 세션 생성
     const isCurrentEmpty = !activeConfirm.parsedName && !activeConfirm.parsedAddr && !activeConfirm.parsedPhone && !activeConfirm.customerText && !activeConfirm.confirmed;
     if (isCurrentEmpty) {
@@ -928,7 +933,7 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
             </button>
           </div>
 
-          <button onClick={() => setStep(2)}
+          <button onClick={goToParseStep}
             className="w-full py-2 rounded-lg text-xs font-bold text-white" style={{ background: "#1a6b3c" }}>
             STEP 2 · 파싱으로 이동 →
           </button>
