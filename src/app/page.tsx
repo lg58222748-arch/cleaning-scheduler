@@ -584,6 +584,8 @@ export default function Home() {
   // APK 자동 업데이트 체크 — Capacitor 앱에서만. 웹/PWA 는 Vercel 이 자동이라 불필요.
   const [appUpdate, setAppUpdate] = useState<{ currentVer: string; latestVer: string; apkUrl: string } | null>(null);
   const [appUpdateDismissed, setAppUpdateDismissed] = useState(false);
+  // 모달: "기존 앱 삭제 → APK 설치" 2단계 가이드 (서명 키 불일치 케이스용)
+  const [showUpdateModal, setShowUpdateModal] = useState(false);
 
   useEffect(() => {
     if ("serviceWorker" in navigator) {
@@ -1164,7 +1166,7 @@ export default function Home() {
             <span className="text-blue-100 ml-2 text-xs">현재 {appUpdate.currentVer}</span>
           </div>
           <button
-            onClick={() => { window.open(appUpdate.apkUrl, "_system"); }}
+            onClick={() => setShowUpdateModal(true)}
             className="bg-white text-blue-600 font-bold text-xs px-3 py-1.5 rounded-lg active:bg-blue-50 mr-1"
           >
             업데이트
@@ -1176,6 +1178,65 @@ export default function Home() {
           >
             ×
           </button>
+        </div>
+      )}
+
+      {/* 업데이트 2단계 모달 — 서명 키 불일치 케이스 대응 (v1.1 → v1.2 첫 전환용).
+          v1.2 이상 사용자는 같은 키라 삭제 불필요하지만 동일 UI 로 안내. */}
+      {showUpdateModal && appUpdate && (
+        <div className="fixed inset-0 bg-black/60 z-[110] flex items-center justify-center p-4" onClick={() => setShowUpdateModal(false)}>
+          <div className="bg-white rounded-2xl p-5 max-w-sm w-full" onClick={(e) => e.stopPropagation()}>
+            <h2 className="text-lg font-bold text-gray-900 mb-1">새 버전 {appUpdate.latestVer} 업데이트</h2>
+            <p className="text-xs text-gray-500 mb-4">아래 순서대로 진행해주세요.<br/>일정 데이터는 서버에 있어 그대로 유지됩니다.</p>
+
+            {/* 1단계: 기존 앱 삭제 */}
+            <div className="border border-gray-200 rounded-xl p-3 mb-2">
+              <div className="flex items-start gap-2 mb-2">
+                <span className="text-blue-600 font-bold">①</span>
+                <div className="flex-1">
+                  <div className="font-semibold text-gray-900 text-sm">기존 앱 삭제</div>
+                  <div className="text-xs text-gray-500 mt-0.5">시스템 설정 화면이 열립니다. "제거" 버튼을 눌러주세요.</div>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  // Android 앱 정보 화면 바로 열기 — 거기서 "제거" 버튼 누르면 됨
+                  window.location.href = "intent://#Intent;action=android.settings.APPLICATION_DETAILS_SETTINGS;data=package:com.saejipneukkeim.partner;end";
+                }}
+                className="w-full py-2 bg-blue-600 text-white rounded-lg font-semibold text-sm active:bg-blue-700"
+              >
+                앱 정보 열기
+              </button>
+            </div>
+
+            {/* 2단계: 새 APK 다운로드 & 설치 */}
+            <div className="border border-gray-200 rounded-xl p-3 mb-4">
+              <div className="flex items-start gap-2 mb-2">
+                <span className="text-blue-600 font-bold">②</span>
+                <div className="flex-1">
+                  <div className="font-semibold text-gray-900 text-sm">새 APK 다운로드 & 설치</div>
+                  <div className="text-xs text-gray-500 mt-0.5">삭제 완료 후 탭. 다운로드 알림에서 설치 진행.</div>
+                </div>
+              </div>
+              <button
+                onClick={() => { window.open(appUpdate.apkUrl, "_system"); }}
+                className="w-full py-2 bg-blue-600 text-white rounded-lg font-semibold text-sm active:bg-blue-700"
+              >
+                APK 다운로드
+              </button>
+            </div>
+
+            <p className="text-[11px] text-gray-400 text-center mb-3">
+              다음 업데이트부터는 이 과정 없이 ②만 탭하면 됩니다.
+            </p>
+
+            <button
+              onClick={() => setShowUpdateModal(false)}
+              className="w-full py-2 text-gray-600 text-sm active:text-gray-900"
+            >
+              나중에
+            </button>
+          </div>
         </div>
       )}
 
