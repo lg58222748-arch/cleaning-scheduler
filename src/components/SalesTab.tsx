@@ -63,6 +63,19 @@ interface ConfirmSession {
   copied: Set<string>;
 }
 
+// 상담사 특이사항 본문 전체(여러 줄) 추출 — "11)상담사 특이사항" 또는 "상담사 특이사항" 뒤부터
+// 공통 꼬리말(예약금은/최종 정산은 *, ──── 구분선, 확인 차원에서)까지를 자르고 반환.
+function extractSalesNote(text: string): string {
+  if (!text) return "";
+  const m = text.match(/(?:11[.)]\s*)?상담사\s*특이사항\s*[:：]?\s*([\s\S]*)$/);
+  if (!m) return "";
+  let content = m[1];
+  content = content.split(/\n\s*[*※]/)[0];
+  content = content.split(/────+/)[0];
+  content = content.split(/\n\s*확인\s*차원/)[0];
+  return content.trim();
+}
+
 function wishDateToISO(wish: string): string {
   if (!wish) return "";
   if (/^\d{4}-\d{2}-\d{2}$/.test(wish)) return wish;
@@ -465,9 +478,11 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
             const m3 = line.match(/^3[.)]\s*(?:연락처\s*[:：]\s*)?(.+)/); if (m3 && m3[1].trim() && !rPhone) rPhone = m3[1].trim();
             const m4 = line.match(/^4[.)]\s*(?:.*날짜\s*[:：]?\s*)?(.+)/); if (m4 && m4[1].trim() && !rWish) rWish = m4[1].trim();
             const m5 = line.match(/^5[.)]\s*(?:.*특이사항\s*[:：]?\s*)?(.+)/); if (m5 && m5[1].trim() && !rNote) rNote = m5[1].trim();
-            const m11 = line.match(/(?:11[.)]\s*)?상담사\s*특이사항\s*[:：]?\s*(.+)/); if (m11 && m11[1].trim() && !rSalesNote) rSalesNote = m11[1].trim();
           }
         }
+        // 상담사 특이사항은 여러 줄일 수 있음 — 전체 텍스트에서 추출해서 더 긴 쪽 채택
+        const fullSales = extractSalesNote(textSnapshot);
+        if (fullSales && fullSales.length > rSalesNote.length) rSalesNote = fullSales;
         const hasInfo = !!(rName || rPhone || rAddr || rWish);
         if (!hasInfo) {
           finishError("❌ 파싱 실패 - 이름/주소/연락처/날짜 중 아무것도 찾지 못했습니다");
@@ -524,10 +539,10 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
       const m4 = line.match(/^4[.)]\s*(?:.*날짜\s*[:：]?\s*)?(.+)/); if (m4 && m4[1].trim()) wish = m4[1].trim();
       // 5번: "5) 특이사항 : ..." / "5. 계단이 좁습니다."
       const m5 = line.match(/^5[.)]\s*(?:.*특이사항\s*[:：]?\s*)?(.+)/); if (m5 && m5[1].trim()) note = m5[1].trim();
-      // 상담사 특이사항은 "11)" / "11." 또는 "상담사 특이사항" 로 시작
-      const m11 = line.match(/(?:11[.)]\s*)?상담사\s*특이사항\s*[:：]?\s*(.+)/);
-      if (m11 && m11[1].trim()) salesNote = m11[1].trim();
     }
+    // 상담사 특이사항은 여러 줄 가능 — 전체 텍스트에서 추출 (라인 루프와 별도)
+    const multiSales = extractSalesNote(t);
+    if (multiSales) salesNote = multiSales;
 
     // 서비스/평수 추출 (공통 헬퍼 사용) — 항상 fresh 기준, 이전 확정 세션 값 섞지 않음.
     const formData = extractFormData(t);
