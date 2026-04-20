@@ -66,10 +66,18 @@ export default function AdminPanel({ onClose, onRefresh }: AdminPanelProps) {
     const user = saved ? JSON.parse(saved) : null;
     if (!user) { setPushRegisterMsg("로그인 후 다시 시도하세요"); setPushRegistering(false); return; }
 
-    // 1) Capacitor 네이티브 (APK) → FCM
+    // 플랫폼 감지 — android/ios 이면 네이티브 경로만 사용, web 이면 Web Push 경로만 사용.
+    // isNativePlatform 만으로는 일시적 false 가 날 수 있어 getPlatform 도 함께 확인.
+    let isNative = false;
     try {
       const { Capacitor } = await import("@capacitor/core");
-      if (Capacitor.isNativePlatform()) {
+      const platform = Capacitor.getPlatform?.() || "web";
+      isNative = Capacitor.isNativePlatform?.() === true || platform === "android" || platform === "ios";
+    } catch { isNative = false; }
+
+    // 1) Capacitor 네이티브 (APK) → FCM (실패해도 Web Push 로 폴백하지 않음)
+    if (isNative) {
+      try {
         const { PushNotifications } = await import("@capacitor/push-notifications");
         const status = await PushNotifications.checkPermissions();
         let receive = status.receive;
@@ -101,10 +109,12 @@ export default function AdminPanel({ onClose, onRefresh }: AdminPanelProps) {
         await PushNotifications.register();
         const ok = await donePromise;
         setPushRegisterMsg(ok ? "✅ FCM 등록 완료! 알림 받을 수 있습니다" : "❌ FCM 등록 실패. 폰 재시작 후 다시 시도");
-        setPushRegistering(false);
-        return;
+      } catch (e) {
+        setPushRegisterMsg("❌ 네이티브 푸시 플러그인 로드 실패: " + (e instanceof Error ? e.message : "알 수 없는 오류"));
       }
-    } catch { /* Capacitor 없음 → 웹으로 */ }
+      setPushRegistering(false);
+      return;
+    }
 
     // 2) 웹/PWA → Web Push
     try {
