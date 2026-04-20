@@ -323,10 +323,15 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
       });
     }
     // 평수: 숫자 부분과 나머지 (확장형/복층 등) 를 분리 저장.
-    // 예: "34평 확장형 복층" → pyeong: "34", pyeongExtra: "확장형 복층"
-    const pyeongNumMatch = pyeongFromText.match(/(\d+)\s*평?\s*(.*)/);
-    const pyeong = pyeongNumMatch ? pyeongNumMatch[1] : pyeongFromText;
-    const pyeongExtra = pyeongNumMatch ? (pyeongNumMatch[2] || "").trim() : "";
+    // 제곱미터/㎡ 형식이면 전체를 extra에 저장 (평 단위 아님)
+    let pyeong = "", pyeongExtra = "";
+    if (/제곱미터|㎡|m²/.test(pyeongFromText)) {
+      pyeongExtra = pyeongFromText;
+    } else {
+      const pyeongNumMatch = pyeongFromText.match(/(\d+)\s*평?\s*(.*)/);
+      pyeong = pyeongNumMatch ? pyeongNumMatch[1] : pyeongFromText;
+      pyeongExtra = pyeongNumMatch ? (pyeongNumMatch[2] || "").trim() : "";
+    }
     return { services, pyeong, pyeongExtra };
   }
 
@@ -370,19 +375,32 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
       });
       const data = await res.json();
       if (data.success) {
-        const hasInfo = !!(data.name || data.phone || data.addr || data.date);
+        // API 결과가 비어있는 필드는 regex로 보완
+        let rName = data.name || "", rPhone = data.phone || "", rAddr = data.addr || "", rWish = data.date || "", rNote = data.note || "", rSalesNote = data.salesNote || "";
+        if (!rName || !rPhone || !rAddr || !rWish) {
+          for (const line of customerText.split("\n").map((l) => l.trim()).filter(Boolean)) {
+            const m1 = line.match(/^1[.)]\s*성함\s*[:：]\s*(.+)/); if (m1 && m1[1].trim() && !rName) rName = m1[1].trim();
+            if (!rName) { const m1b = line.match(/^1[.)]\s*([가-힣]{2,5})\s*$/); if (m1b) rName = m1b[1].trim(); }
+            const m2 = line.match(/^2[.)]\s*(?:주소\s*[:：]\s*)?(.+)/); if (m2 && m2[1].trim() && !rAddr) rAddr = m2[1].trim();
+            const m3 = line.match(/^3[.)]\s*(?:연락처\s*[:：]\s*)?(.+)/); if (m3 && m3[1].trim() && !rPhone) rPhone = m3[1].trim();
+            const m4 = line.match(/^4[.)]\s*(?:.*날짜\s*[:：]?\s*)?(.+)/); if (m4 && m4[1].trim() && !rWish) rWish = m4[1].trim();
+            const m5 = line.match(/^5[.)]\s*(?:.*특이사항\s*[:：]?\s*)?(.+)/); if (m5 && m5[1].trim() && !rNote) rNote = m5[1].trim();
+            const m11 = line.match(/(?:11[.)]\s*)?상담사\s*특이사항\s*[:：]?\s*(.+)/); if (m11 && m11[1].trim() && !rSalesNote) rSalesNote = m11[1].trim();
+          }
+        }
+        const hasInfo = !!(rName || rPhone || rAddr || rWish);
         if (!hasInfo) {
           finishError("❌ 파싱 실패 - 이름/주소/연락처/날짜 중 아무것도 찾지 못했습니다");
           return;
         }
         // 예약확정 fresh 하게 덮어씀 (parsedQuote/Deposit/Balance 도 빈값으로, 이전 세션 잔여 제거).
         updateConfirm({
-          parsedName: data.name || "",
-          parsedPhone: data.phone || "",
-          parsedAddr: data.addr || "",
-          parsedWishDate: data.date || "",
-          parsedNote: data.note || "",
-          parsedSalesNote: data.salesNote || "",
+          parsedName: rName,
+          parsedPhone: rPhone,
+          parsedAddr: rAddr,
+          parsedWishDate: rWish,
+          parsedNote: rNote,
+          parsedSalesNote: rSalesNote,
           parsedPyeong: formData.pyeong || "",
           parsedPyeongExtra: formData.pyeongExtra || "",
           parsedQuote: "",
@@ -391,7 +409,7 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
           services: confirmServices,
           schedules: confirmServices.map((s) => ({ service: s.name, date: "", time: "선택" })),
         });
-        generateConfirmMsg(data.name, data.addr, data.phone, data.date, data.note, confirmServices, formData.pyeong, undefined, formData.pyeongExtra);
+        generateConfirmMsg(rName, rAddr, rPhone, rWish, rNote, confirmServices, formData.pyeong, undefined, formData.pyeongExtra);
         finishSuccess();
         return;
       }
