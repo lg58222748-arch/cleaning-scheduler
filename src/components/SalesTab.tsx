@@ -288,7 +288,7 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
     let text = `안녕하세요 고객님\n예약 양식 전달드립니다^^\n\n`;
     const dateLabel1 = getDateLabel(services.map(s => s.name));
     text += `1)성함 :\n2)주소 : (아파트명+동호수)\n3)연락처 :\n4)${dateLabel1}:\n  (오전: 7시~9시, 오후: 1시~3시 사이 방문 선택)\n5)고객님 특이사항 :\n\n`;
-    text += `──────────────────\n`;
+    text += `────────────\n`;
     text += `6)서비스 종류 : ${svcList}\n`;
     text += `7)평수 : ${pyeong ? pyeong + "평" : ""}${buildType && buildType !== "선택" ? " " + buildType : ""}${pyeongNote ? " " + pyeongNote : ""}\n`;
 
@@ -303,7 +303,7 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
       const totalQuote = services.reduce((sum, s) => sum + (parseInt(s.quote) || 0), 0);
       const totalDeposit = services.reduce((sum, s) => sum + (parseInt(s.deposit) || 0), 0);
       const totalBalance = totalQuote - totalDeposit;
-      text += `──────────────────\n`;
+      text += `────────────\n`;
       text += `총 견적금액 : ${totalQuote > 0 ? totalQuote.toLocaleString() + "원" : ""}\n`;
       text += `총 예약금 : ${totalDeposit > 0 ? totalDeposit.toLocaleString() + "원" : ""}\n`;
       text += `총 잔금 : ${totalBalance > 0 ? totalBalance.toLocaleString() + "원" : ""}\n`;
@@ -590,7 +590,7 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
     msg += `1)성함 : ${n}\n2)주소 : ${addr || parsedAddr}\n3)연락처 : ${phone || parsedPhone}\n`;
     msg += `4)${dateLabel} : ${schedDateStr}\n`;
     msg += `5)고객님 특이사항 : ${note || parsedNote}\n\n`;
-    msg += `──────────────────\n`;
+    msg += `────────────\n`;
     msg += `6)서비스 종류 : ${svcList}\n7)평수 : ${pyeongVal ? pyeongVal + "평" : ""}${pyeongExtraVal ? " " + pyeongExtraVal : ""}\n`;
 
     svcs.forEach((s) => {
@@ -604,7 +604,7 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
       const totalQuote = svcs.reduce((sum, s) => sum + (parseInt(s.quote) || 0), 0);
       const totalDeposit = svcs.reduce((sum, s) => sum + (parseInt(s.deposit) || 0), 0);
       const totalBalance = totalQuote - totalDeposit;
-      msg += `──────────────────\n`;
+      msg += `────────────\n`;
       msg += `총 견적금액 : ${totalQuote > 0 ? totalQuote.toLocaleString() + "원" : ""}\n`;
       msg += `총 예약금 : ${totalDeposit > 0 ? totalDeposit.toLocaleString() + "원" : ""}\n`;
       msg += `총 잔금 : ${totalBalance > 0 ? totalBalance.toLocaleString() + "원" : ""}\n`;
