@@ -470,7 +470,7 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
     const dateLines = services.length > 0
       ? services.map(s => `4)${getDateLabel([s.name])}:`).join("\n")
       : `4)${getDateLabel([])}:`;
-    text += `1)성함 :\n2)주소 : (아파트명+동호수)\n3)연락처 :\n${dateLines}\n  (오전: 7시~9시, 오후: 1시~3시 사이 방문 선택)\n5)고객님 특이사항 :\n\n`;
+    text += `1)성함 :\n2)주소 :\n3)연락처 :\n${dateLines}\n  (오전: 7시~9시, 오후: 1시~3시 사이 방문 선택)\n5)고객님 특이사항 :\n\n`;
     text += `────────────\n`;
     text += `6)서비스 종류 : ${svcList}\n`;
     text += `7)평수 : ${pyeong ? pyeong + "평" : ""}${buildType && buildType !== "선택" ? " " + buildType : ""}${pyeongNote ? " " + pyeongNote : ""}\n`;
