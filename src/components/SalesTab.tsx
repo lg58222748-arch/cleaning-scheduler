@@ -502,7 +502,7 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
   // 예약금 안내 텍스트
   function getDepositText() {
     const totalDeposit = services.reduce((sum, s) => sum + (parseInt(s.deposit) || 0), 0);
-    return `우리은행1005 504 852384 주식회사 새집느낌 여기로 \n\n예약금 ${totalDeposit > 0 ? totalDeposit.toLocaleString() : ""}원\n\n보내주시면 예약 확정 도와드리겠습니다 :)\n\n예약자 성함으로 입금부탁드립니다, 예약자 성함이 아닌 경우 입금자명 따로 기재부탁드립니다,\n\n-----------------------------\n\n1번~5번 성함 주소 연락처만 한번더 체크해서 작성해주시면 예약 확정 해드리겠습니다 감사합니다 ^^`;
+    return `우리은행1005 504 852384 주식회사 새집느낌 여기로 \n\n예약금 ${totalDeposit > 0 ? totalDeposit.toLocaleString() : ""}원\n\n보내주시면 예약 확정 도와드리겠습니다 :)\n\n예약자 성함으로 입금부탁드립니다, 예약자 성함이 아닌 경우 입금자명 따로 기재부탁드립니다,\n\n-----------------------------\n\n번거롭고 바쁘시겠지만 양해 부탁드립니다^^\n\n주소 누락방지를 위해서 1~5번만 한번 더 체크 하고있습니다.\n성함 주소 연락처만 한번더 체크해서 작성해주시면 빠르게 예약 확정 도와드리겠습니다!`;
   }
 
   const [parsing, setParsing] = useState(false);
