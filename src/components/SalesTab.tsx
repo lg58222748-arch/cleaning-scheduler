@@ -88,12 +88,16 @@ function extractCustomerNote(text: string): string {
   const m = prefix.match(/(?:\d+[.)]\s*)?(?:고객(?:님)?\s*)?(?:신경쓰고\s*싶은\s*곳\s*및\s*)?특이사항\s*[:：]?\s*([\s\S]*)$/);
   if (!m) return "";
   let content = m[1];
-  content = content.split(/\n\s*────+/)[0];
+  // 구분선은 라인 시작(newline 또는 문자열 맨앞) 모두에서 끊어야 함 — 라벨 바로 뒤에 ──── 가 오는 경우 대비
+  content = content.split(/(?:^|\n)\s*────+/)[0];
   content = content.split(/\n\s*\d+[.)]\s*(?:서비스|평수|견적|예\s*약|잔)/)[0];
   content = content.split(/\n\s*►/)[0];
   content = content.split(/\n\s*[*※]/)[0];
   // 선행 콜론/공백 제거 — AI가 ":" 만 뱉거나 라벨 잔여 콜론 방어
-  return content.trim().replace(/^[:：\s]+/, "").trim();
+  const trimmed = content.trim().replace(/^[:：\s]+/, "").trim();
+  // 구분선 / 콜론 / 공백 만 남으면 빈 값
+  if (/^[:：\s─━\-=_]+$/.test(trimmed)) return "";
+  return trimmed;
 }
 
 function wishDateToISO(wish: string): string {
@@ -118,31 +122,41 @@ function detectFields(text: string, seed: { name?: string; phone?: string; addr?
   const lines = text.split("\n").map((l) => l.trim()).filter(Boolean);
 
   // Phase 1: 라벨 기반 매칭 (가장 신뢰도 높음, 번호 무관)
+  // 콜론 뒤 값이 공백/콜론만 있는 경우는 절대 캡처하지 않음 (내용 있어야 매칭)
+  const isRealContent = (v: string) => {
+    const s = v.trim().replace(/^[:：\s]+/, "").trim();
+    return s.length > 0 && !/^[:：\s─━\-=_]+$/.test(s);
+  };
   for (const line of lines) {
-    if (!name) { const m = line.match(/(?:^\d+[.)]\s*)?성함\s*[:：]\s*(.+)/); if (m && m[1].trim()) name = m[1].trim(); }
-    if (!phone) { const m = line.match(/(?:^\d+[.)]\s*)?(?:연락처|전화(?:번호)?)\s*[:：]\s*(.+)/); if (m && m[1].trim()) phone = m[1].trim(); }
-    if (!addr) { const m = line.match(/(?:^\d+[.)]\s*)?주소\s*[:：]\s*(.+)/); if (m && m[1].trim()) addr = m[1].trim(); }
-    if (!wish) { const m = line.match(/(?:^\d+[.)]\s*)?(?:[가-힣]*\s*)?희망날짜\s*[:：]?\s*(.+)/); if (m && m[1].trim()) wish = m[1].trim(); }
+    if (!name) { const m = line.match(/(?:^\d+[.)]\s*)?성함\s*[:：]\s*(.+)/); if (m && isRealContent(m[1])) name = m[1].trim(); }
+    if (!phone) { const m = line.match(/(?:^\d+[.)]\s*)?(?:연락처|전화(?:번호)?)\s*[:：]\s*(.+)/); if (m && isRealContent(m[1])) phone = m[1].trim(); }
+    if (!addr) { const m = line.match(/(?:^\d+[.)]\s*)?주소\s*[:：]\s*(.+)/); if (m && isRealContent(m[1])) addr = m[1].trim(); }
+    // 희망날짜/날짜 — 콜론 필수 (옵션 콜론이면 ":" 자체가 캡처돼버림)
+    if (!wish) { const m = line.match(/(?:^\d+[.)]\s*)?(?:[가-힣]*\s*)?희망날짜\s*[:：]\s*(.+)/); if (m && isRealContent(m[1])) wish = m[1].trim(); }
     if (!wish) {
       // "날짜 : ..." (희망 없이) — 특이사항 라인 제외
       if (!/특이사항/.test(line)) {
         const m = line.match(/(?:^\d+[.)]\s*)?날짜\s*[:：]\s*(.+)/);
-        if (m && m[1].trim()) wish = m[1].trim();
+        if (m && isRealContent(m[1])) wish = m[1].trim();
       }
     }
     if (!note) {
-      // "고객 특이사항" 은 매칭, "상담사 특이사항" 은 제외
+      // "고객 특이사항" 은 매칭, "상담사 특이사항" 은 제외 — 콜론 필수
       if (!/상담사/.test(line)) {
-        const m = line.match(/(?:^\d+[.)]\s*)?(?:고객(?:님)?\s*)?특이사항\s*[:：]?\s*(.+)/);
-        if (m && m[1].trim() && !/상담사/.test(m[1])) note = m[1].trim();
+        const m = line.match(/(?:^\d+[.)]\s*)?(?:고객(?:님)?\s*)?특이사항\s*[:：]\s*(.+)/);
+        if (m && isRealContent(m[1]) && !/상담사/.test(m[1])) note = m[1].trim();
       }
     }
   }
 
   // Phase 2: 라벨 없는 줄은 내용 패턴으로 분류 (번호만 있는 경우)
   for (const line of lines) {
+    // 꼬리말(*예약금은, *최종 정산은) / 섹션 헤더(► 서비스) / 구분선(────) 은 스킵
+    if (/^[*※►]/.test(line) || /^[─━\-=_]{3,}/.test(line)) continue;
     const body = line.replace(/^\d+[.)]\s*/, "").trim();
     if (!body) continue;
+    // body 가 구분선/공백/콜론만이면 스킵
+    if (/^[:：\s─━\-=_]+$/.test(body)) continue;
     // 이미 처리된 라벨 줄은 건너뜀
     if (/^(성함|연락처|전화|주소|평수|견적|예\s*약|잔\s*금|상담사|고객|서비스\s*종류|희망날짜|날짜\s*[:：])/.test(body)) continue;
 
@@ -163,6 +177,46 @@ function detectFields(text: string, seed: { name?: string; phone?: string; addr?
     // 주소 (시/도/군/구/읍/면/동/리/로/길 포함 또는 아파트명)
     if (!addr && (/[시도군구읍면동리]/.test(body) || /아파트|오피스텔|빌라|맨션|자이|푸르지오|래미안|힐스|센트럴|로얄|메르/.test(body))) {
       addr = body; continue;
+    }
+  }
+
+  // Phase 2b: 양식 꼬리말(*) 뒤의 번호 답변 — "1. 이름 / 2. 주소 / 3. 전화 / 4. 날짜 / 5. 특이사항"
+  // 고객이 양식 아래에 번호만 찍고 답변한 경우 번호별로 매핑 (note 는 여기서만 잡힐 수 있음)
+  {
+    const rawLines = text.split("\n").map((l) => l.trim());
+    let lastStarIdx = -1;
+    for (let i = rawLines.length - 1; i >= 0; i--) {
+      if (rawLines[i].startsWith("*")) { lastStarIdx = i; break; }
+    }
+    if (lastStarIdx >= 0) {
+      const customerLines: string[] = [];
+      for (let i = lastStarIdx + 1; i < rawLines.length; i++) {
+        if (rawLines[i]) customerLines.push(rawLines[i]);
+      }
+      // 번호 → 본문 맵
+      const answers: Record<number, string> = {};
+      for (let i = 0; i < customerLines.length; i++) {
+        const m = customerLines[i].match(/^(\d+)[.)]\s*(.*)$/);
+        if (m) {
+          const num = parseInt(m[1], 10);
+          let body = m[2].trim();
+          // 다음 번호까지 멀티라인 병합
+          for (let j = i + 1; j < customerLines.length; j++) {
+            if (/^\d+[.)]/.test(customerLines[j])) break;
+            if (customerLines[j]) body += " " + customerLines[j];
+          }
+          if (body && num >= 1 && num <= 10) answers[num] = body.trim();
+        }
+      }
+      // 위치 기반 매핑: 1=성함, 2=주소, 3=전화, 4=날짜, 5=특이사항
+      if (!name && answers[1] && /^[가-힣]{2,4}$/.test(answers[1])) name = answers[1];
+      if (!addr && answers[2]) addr = answers[2];
+      if (!phone && answers[3]) {
+        const p = answers[3].replace(/[-.\s]/g, "");
+        if (/^01[016789]\d{7,8}$/.test(p)) phone = p.replace(/(01[016789])(\d{3,4})(\d{4})/, "$1-$2-$3");
+      }
+      if (!wish && answers[4]) wish = answers[4];
+      if (!note && answers[5]) note = answers[5];
     }
   }
 
