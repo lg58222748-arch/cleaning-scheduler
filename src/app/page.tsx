@@ -1852,7 +1852,9 @@ export default function Home() {
             // realtime 리로드가 낙관적 업데이트 덮어쓰는 걸 4초간 차단
             scheduleReloadSuppressRef.current = Date.now() + 4000;
             if (detailSchedule) {
-              setSchedules(prev => prev.map(s => s.id === detailSchedule.id ? { ...detailSchedule } : s));
+              // detailSchedule 에 누적된 mutation(color, title, note 등)을 배열에도 반영
+              // 스프레드 대신 기존 s 와 detailSchedule 을 병합해서 missing field 방지
+              setSchedules(prev => prev.map(s => s.id === detailSchedule.id ? { ...s, ...detailSchedule } : s));
             }
           }}
         />
