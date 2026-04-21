@@ -115,8 +115,8 @@ export interface Settlement {
   quote: number; // 견적금액 (공급가액)
   deposit: number; // 예약금
   balance: number; // 잔금 = 견적 - 예약금
-  extraCharge: number; // 현장 추가금
-  subtotal: number; // 세전합계 = 잔금 + 추가금
+  extraCharge: number; // 현장 특이사항 비용
+  subtotal: number; // 세전합계 = 잔금 + 현장 특이사항 비용
   vat: number; // 부가세 = 세전합계 × 0.1
   totalAmount: number; // 최종결제 = 세전합계 + 부가세
   paymentMethod: PaymentMethod;

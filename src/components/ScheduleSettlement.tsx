@@ -108,7 +108,7 @@ export default function ScheduleSettlement({ scheduleId, scheduleTitle = "", sch
     lines.push(`공급가액: ${formatWon(q)}`);
     lines.push(`예약금(선납완료): -${formatWon(d)}`);
     lines.push(`잔금: ${formatWon(balance)}`);
-    if (e > 0) lines.push(`현장 추가금: +${formatWon(e)}`);
+    if (e > 0) lines.push(`현장 특이사항 비용: +${formatWon(e)}`);
     if (cashReceipt) lines.push(`부가세(10%): +${formatWon(vatTotal)}`);
     lines.push("");
     lines.push(`💰 최종 결제 금액: ${formatWon(total)}`);
@@ -191,7 +191,7 @@ export default function ScheduleSettlement({ scheduleId, scheduleTitle = "", sch
             <span className="text-xs font-bold text-blue-700">{formatWon(balance)}</span>
           </div>
           <div className="flex items-center px-3 py-2.5">
-            <span className="flex-1 text-xs text-gray-600">현장 추가금</span>
+            <span className="flex-1 text-xs text-gray-600">현장 특이사항 비용</span>
             <input type="tel" value={extraCharge} onChange={(e) => setExtraCharge(e.target.value)} placeholder="0"
               className="w-24 px-2 py-1.5 border border-gray-200 rounded text-xs text-right outline-none" />
           </div>
