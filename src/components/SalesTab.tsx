@@ -462,6 +462,8 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
         for (const line of lines) {
           if (line.includes(`► ${n}`)) { inSvc = true; continue; }
           if (inSvc && line.includes("►")) break;
+          // ──── 구분선 또는 "총" 시작 (총 견적금액/예약금/잔금) 이면 마지막 서비스 블록 종료
+          if (inSvc && (/^[─━\-=_\s]{3,}$/.test(line) || line.startsWith("총"))) break;
           if (inSvc) {
             const qm = line.match(/견적금액.*[:：]\s*([\d,]+)/); if (qm) quote = qm[1].replace(/,/g, "");
             const dm = line.match(/예\s*약\s*금.*[:：]\s*([\d,]+)/); if (dm) deposit = dm[1].replace(/,/g, "");
@@ -472,8 +474,10 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
     }
     // Top-level 견적/예약금/잔금 — ► 서비스 블록 없이 번호만 있는 경우 지원 (박금진 케이스)
     // "31만원", "82000원", "228,000원" 모두 처리
+    // "총 견적금액/예약금/잔금" 라인은 합계라서 top-level 값으로 쓰면 안 됨 (건너뜀)
     let topQuote = "", topDeposit = "", topBalance = "";
     for (const line of lines) {
+      if (line.startsWith("총")) continue;
       if (!topQuote) {
         const m = line.match(/(?:^\d+[.)]\s*)?견적금액[^\d]*([\d,]+)\s*(만원|원)?/);
         if (m) topQuote = parsePriceString(m[1], m[2]);
