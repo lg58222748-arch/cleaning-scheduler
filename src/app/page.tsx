@@ -1849,6 +1849,8 @@ export default function Home() {
           onClose={() => { setDetailSchedule(null); consumeHash(); }}
           onUpdated={() => {
             // 전체 리로드 대신 해당 일정만 로컬 갱신
+            // realtime 리로드가 낙관적 업데이트 덮어쓰는 걸 4초간 차단
+            scheduleReloadSuppressRef.current = Date.now() + 4000;
             if (detailSchedule) {
               setSchedules(prev => prev.map(s => s.id === detailSchedule.id ? { ...detailSchedule } : s));
             }

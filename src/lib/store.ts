@@ -199,7 +199,8 @@ export async function updateSchedule(id: string, input: Partial<Schedule>): Prom
   if (input.assignedToName !== undefined) update.assigned_to_name = input.assignedToName;
   if (input.note !== undefined) update.note = input.note;
   if (input.color !== undefined) update.color = input.color;
-  const { data } = await supabase.from("schedules").update(update).eq("id", id).select().single();
+  const { data, error } = await supabase.from("schedules").update(update).eq("id", id).select().single();
+  if (error) console.error("[updateSchedule] supabase error:", error);
   return data ? rowToSchedule(data) : null;
 }
 

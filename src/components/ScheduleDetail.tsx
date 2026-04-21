@@ -178,7 +178,11 @@ export default function ScheduleDetail({
   async function handleColorChange(color: string) {
     setSchedColor(color);
     schedule.color = color;
-    apiUpdateSchedule(schedule.id, { color }).catch(() => {});
+    // 부모 state 즉시 갱신 (달력 셀 색상 반영) + realtime 리로드 suppress 트리거
+    onUpdated?.();
+    apiUpdateSchedule(schedule.id, { color })
+      .then(() => onUpdated?.())
+      .catch((err) => { console.error("[color] 저장 실패:", err); });
   }
 
   function formatTime(dateStr: string): string {
