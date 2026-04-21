@@ -76,6 +76,26 @@ function extractSalesNote(text: string): string {
   return content.trim();
 }
 
+// 고객 특이사항 본문 전체(여러 줄) 추출 — "5)고객님 특이사항" 또는 "신경쓰고 싶은 곳 및 특이사항" 뒤부터
+// 다음 섹션(──── / ► / 6) / 11) 상담사 특이사항 / 꼬리말 *) 까지를 자르고 반환.
+// AI가 다음 줄 content 를 놓쳤을 때 보완용.
+function extractCustomerNote(text: string): string {
+  if (!text) return "";
+  // 먼저 "상담사 특이사항" 이 있으면 그 앞까지만 (고객 ≠ 상담사 섞이지 않게)
+  const cutoffIdx = text.search(/\d*[.)]?\s*상담사\s*특이사항/);
+  const prefix = cutoffIdx >= 0 ? text.slice(0, cutoffIdx) : text;
+
+  const m = prefix.match(/(?:\d+[.)]\s*)?(?:고객(?:님)?\s*)?(?:신경쓰고\s*싶은\s*곳\s*및\s*)?특이사항\s*[:：]?\s*([\s\S]*)$/);
+  if (!m) return "";
+  let content = m[1];
+  content = content.split(/\n\s*────+/)[0];
+  content = content.split(/\n\s*\d+[.)]\s*(?:서비스|평수|견적|예\s*약|잔)/)[0];
+  content = content.split(/\n\s*►/)[0];
+  content = content.split(/\n\s*[*※]/)[0];
+  // 선행 콜론/공백 제거 — AI가 ":" 만 뱉거나 라벨 잔여 콜론 방어
+  return content.trim().replace(/^[:：\s]+/, "").trim();
+}
+
 function wishDateToISO(wish: string): string {
   if (!wish) return "";
   if (/^\d{4}-\d{2}-\d{2}$/.test(wish)) return wish;
@@ -580,6 +600,14 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
         // 상담사 특이사항은 여러 줄일 수 있음 — 전체 텍스트에서 추출해서 더 긴 쪽 채택
         const fullSales = extractSalesNote(textSnapshot);
         if (fullSales && fullSales.length > rSalesNote.length) rSalesNote = fullSales;
+
+        // 고객 특이사항도 동일 — AI가 다음 줄 content 놓치거나 ":" 만 반환하면 regex로 보완
+        // ":" / 공백 만 있는 AI 응답은 비어있는 것으로 취급
+        const cleanAiNote = rNote.replace(/^[:：\s]+/, "").trim();
+        if (!cleanAiNote) rNote = "";
+        else rNote = cleanAiNote;
+        const fullNote = extractCustomerNote(textSnapshot);
+        if (fullNote && fullNote.length > rNote.length) rNote = fullNote;
         const hasInfo = !!(rName || rPhone || rAddr || rWish);
         if (!hasInfo) {
           finishError(`❌ 파싱 실패 — 주요 항목 모두 못 찾음\n인식 실패 항목: 1)성함, 2)주소, 3)연락처, 4)날짜\n형식 예) "1)이름" "2)주소" "3)연락처" "4)날짜" 로 작성해주세요`);
@@ -643,6 +671,10 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
     // 상담사 특이사항은 여러 줄 가능 — 전체 텍스트에서 추출
     const multiSales = extractSalesNote(t);
     if (multiSales) salesNote = multiSales;
+
+    // 고객 특이사항도 여러 줄 가능 — detectFields 는 첫 줄만 잡으므로 보완
+    const multiNote = extractCustomerNote(t);
+    if (multiNote && multiNote.length > note.length) note = multiNote;
 
     // 서비스/평수 추출
     const formData = extractFormData(t);
@@ -742,7 +774,9 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
     let msg = `안녕하세요 ${n}님 😊\n예약이 확정되었습니다!\n\n`;
     msg += `1)성함 : ${n}\n2)주소 : ${addr || parsedAddr}\n3)연락처 : ${phone || parsedPhone}\n`;
     msg += `${dateBlock}\n`;
-    msg += `5)고객님 특이사항 : ${note || parsedNote}\n\n`;
+    // 선행 콜론/공백 제거 — AI가 ":" 만 뱉은 경우 "5)고객님 특이사항 : :" 처럼 되는 것 방어
+    const displayNote = (note || parsedNote || "").replace(/^[:：\s]+/, "").trim();
+    msg += `5)고객님 특이사항 : ${displayNote}\n\n`;
     msg += `────────────\n`;
     msg += `6)서비스 종류 : ${svcList}\n7)평수 : ${pyeongVal ? pyeongVal + "평" : ""}${pyeongExtraVal ? " " + pyeongExtraVal : ""}\n`;
 
