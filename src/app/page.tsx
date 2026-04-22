@@ -1013,11 +1013,26 @@ export default function Home() {
   function handleUnassignSchedule(id: string, reason: string = "") {
     // 낙관적 업데이트 보호: 4초간 reload 무시 (stale fetch 가 이미 제거한 스케줄을 되돌리는 것 방지)
     scheduleReloadSuppressRef.current = Date.now() + 4000;
-    const target = schedules.find((s) => s.id === id);
+    // target 은 schedules 에 있을 수도 있고, 이미 unassigned 상태에서 재진입할 수도 있음 — 양쪽 다 뒤짐
+    const target = schedules.find((s) => s.id === id) || unassignedSchedules.find((s) => s.id === id);
     if (!target) return;
-    const unassigned = { ...target, memberId: "", memberName: "미배정", status: "unassigned" as const };
+    // assignedTo/assignedToName 도 반드시 지움 — 빠뜨리면 로컬에 유령 배정 상태로 남아서
+    // 이후 제목/내용 수정 + 리로드 때 이상하게 보임
+    const unassigned = {
+      ...target,
+      memberId: "",
+      memberName: "미배정",
+      status: "unassigned" as const,
+      assignedTo: undefined,
+      assignedToName: undefined,
+    };
     setSchedules((prev) => prev.filter((s) => s.id !== id));
-    setUnassignedSchedules((prev) => [...prev, unassigned]);
+    // 중복 방지: 이미 unassignedSchedules 에 있으면 덮어쓰고, 없을 때만 추가
+    setUnassignedSchedules((prev) => {
+      const idx = prev.findIndex((s) => s.id === id);
+      if (idx >= 0) { const next = [...prev]; next[idx] = unassigned; return next; }
+      return [...prev, unassigned];
+    });
     unassignScheduleApi(id, currentUser?.name || "", reason).catch((err) => {
       console.error("[unassign] 실패, 롤백:", err);
       setSchedules((prev) => prev.find((s) => s.id === id) ? prev : [...prev, target]);
@@ -1854,7 +1869,9 @@ export default function Home() {
             if (detailSchedule) {
               // detailSchedule 에 누적된 mutation(color, title, note 등)을 배열에도 반영
               // 스프레드 대신 기존 s 와 detailSchedule 을 병합해서 missing field 방지
+              // 양쪽 배열 모두 갱신 — 반환된 일정(배정 탭) 편집도 즉시 반영되게
               setSchedules(prev => prev.map(s => s.id === detailSchedule.id ? { ...s, ...detailSchedule } : s));
+              setUnassignedSchedules(prev => prev.map(s => s.id === detailSchedule.id ? { ...s, ...detailSchedule } : s));
             }
           }}
         />

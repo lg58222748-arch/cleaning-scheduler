@@ -149,12 +149,17 @@ export default function ScheduleDetail({
   }
 
   // 인라인 저장
+  // 즉시 onUpdated 호출해서 부모 상태 동기화 + suppress 윈도우 트리거
+  // (modal 빨리 닫거나 반환 누르면 PUT 완료 전에 상태 놓치는 문제 방지)
   async function handleSaveNote() {
     setSaving(true);
     schedule.note = noteText;
     setNoteChanged(false);
     setSaving(false);
-    apiUpdateSchedule(schedule.id, { note: noteText }).then(() => onUpdated?.()).catch(() => {});
+    onUpdated?.();
+    apiUpdateSchedule(schedule.id, { note: noteText })
+      .then(() => onUpdated?.())
+      .catch((err) => { console.error("[note] 저장 실패:", err); });
   }
 
   async function handleSaveTitle() {
@@ -162,7 +167,10 @@ export default function ScheduleDetail({
     schedule.title = titleText;
     setEditingTitle(false);
     setSaving(false);
-    apiUpdateSchedule(schedule.id, { title: titleText }).then(() => onUpdated?.()).catch(() => {});
+    onUpdated?.();
+    apiUpdateSchedule(schedule.id, { title: titleText })
+      .then(() => onUpdated?.())
+      .catch((err) => { console.error("[title] 저장 실패:", err); });
   }
 
   async function handleTimeSlotChange(slot: string) {
@@ -172,7 +180,10 @@ export default function ScheduleDetail({
     const newTitle = newSlot ? `[${newSlot}] ${bare}` : bare;
     schedule.title = newTitle;
     setTitleText(newTitle);
-    apiUpdateSchedule(schedule.id, { title: newTitle }).catch(() => {});
+    onUpdated?.();
+    apiUpdateSchedule(schedule.id, { title: newTitle })
+      .then(() => onUpdated?.())
+      .catch((err) => { console.error("[timeSlot] 저장 실패:", err); });
   }
 
   async function handleColorChange(color: string) {
@@ -582,7 +593,10 @@ export default function ScheduleDetail({
                     const newTitle = originalMatch ? originalMatch[1].trim() : titleText.replace(/\/미입금/g, "");
                     schedule.title = newTitle;
                     setTitleText(newTitle);
-                    apiUpdateSchedule(schedule.id, { title: newTitle }).catch(() => {});
+                    onUpdated?.();
+                    apiUpdateSchedule(schedule.id, { title: newTitle })
+                      .then(() => onUpdated?.())
+                      .catch((err) => { console.error("[입금확인] 저장 실패:", err); });
                   }
                 }}
                 className={`flex-1 py-3 rounded-xl text-sm font-bold active:opacity-90 ${titleText.includes("/미입금") ? "text-white" : "text-green-600 bg-green-50 border border-green-200"}`}
@@ -596,7 +610,10 @@ export default function ScheduleDetail({
                     const newTitle = `${titleText}/미입금`;
                     schedule.title = newTitle;
                     setTitleText(newTitle);
-                    apiUpdateSchedule(schedule.id, { title: newTitle }).catch(() => {});
+                    onUpdated?.();
+                    apiUpdateSchedule(schedule.id, { title: newTitle })
+                      .then(() => onUpdated?.())
+                      .catch((err) => { console.error("[미입금] 저장 실패:", err); });
                   }}
                   className="flex-1 py-3 rounded-xl text-sm font-bold text-red-500 bg-red-50 border border-red-200 active:opacity-90"
                 >
