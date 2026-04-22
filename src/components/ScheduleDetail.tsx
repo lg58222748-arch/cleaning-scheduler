@@ -149,17 +149,19 @@ export default function ScheduleDetail({
   }
 
   // 인라인 저장
-  // 즉시 onUpdated 호출해서 부모 상태 동기화 + suppress 윈도우 트리거
-  // (modal 빨리 닫거나 반환 누르면 PUT 완료 전에 상태 놓치는 문제 방지)
+  // 로컬 UI 는 즉시, 부모 상태/서버 동기화는 setTimeout(0) 으로 다음 tick 에 처리
+  // (리스트 수백 개 재렌더가 현재 상호작용을 블로킹하지 않게)
   async function handleSaveNote() {
     setSaving(true);
     schedule.note = noteText;
     setNoteChanged(false);
     setSaving(false);
-    onUpdated?.();
-    apiUpdateSchedule(schedule.id, { note: noteText })
-      .then(() => onUpdated?.())
-      .catch((err) => { console.error("[note] 저장 실패:", err); });
+    setTimeout(() => {
+      onUpdated?.();
+      apiUpdateSchedule(schedule.id, { note: noteText })
+        .then(() => onUpdated?.())
+        .catch((err) => { console.error("[note] 저장 실패:", err); });
+    }, 0);
   }
 
   async function handleSaveTitle() {
@@ -167,10 +169,12 @@ export default function ScheduleDetail({
     schedule.title = titleText;
     setEditingTitle(false);
     setSaving(false);
-    onUpdated?.();
-    apiUpdateSchedule(schedule.id, { title: titleText })
-      .then(() => onUpdated?.())
-      .catch((err) => { console.error("[title] 저장 실패:", err); });
+    setTimeout(() => {
+      onUpdated?.();
+      apiUpdateSchedule(schedule.id, { title: titleText })
+        .then(() => onUpdated?.())
+        .catch((err) => { console.error("[title] 저장 실패:", err); });
+    }, 0);
   }
 
   async function handleTimeSlotChange(slot: string) {
@@ -180,10 +184,12 @@ export default function ScheduleDetail({
     const newTitle = newSlot ? `[${newSlot}] ${bare}` : bare;
     schedule.title = newTitle;
     setTitleText(newTitle);
-    onUpdated?.();
-    apiUpdateSchedule(schedule.id, { title: newTitle })
-      .then(() => onUpdated?.())
-      .catch((err) => { console.error("[timeSlot] 저장 실패:", err); });
+    setTimeout(() => {
+      onUpdated?.();
+      apiUpdateSchedule(schedule.id, { title: newTitle })
+        .then(() => onUpdated?.())
+        .catch((err) => { console.error("[timeSlot] 저장 실패:", err); });
+    }, 0);
   }
 
   async function handleColorChange(color: string) {
@@ -591,12 +597,17 @@ export default function ScheduleDetail({
                   if (titleText.includes("/미입금")) {
                     const originalMatch = schedule.note?.match(/원래제목:\s*(.+)/);
                     const newTitle = originalMatch ? originalMatch[1].trim() : titleText.replace(/\/미입금/g, "");
+                    // 1) 로컬 UI 즉시 반응 — 이 render 에서는 버튼/제목만 바뀜
                     schedule.title = newTitle;
                     setTitleText(newTitle);
-                    onUpdated?.();
-                    apiUpdateSchedule(schedule.id, { title: newTitle })
-                      .then(() => onUpdated?.())
-                      .catch((err) => { console.error("[입금확인] 저장 실패:", err); });
+                    // 2) 부모 상태 + 서버 동기화는 다음 tick 으로 분리
+                    //    (리스트 수백 개 재렌더가 버튼 반응을 블로킹하지 않게)
+                    setTimeout(() => {
+                      onUpdated?.();
+                      apiUpdateSchedule(schedule.id, { title: newTitle })
+                        .then(() => onUpdated?.())
+                        .catch((err) => { console.error("[입금확인] 저장 실패:", err); });
+                    }, 0);
                   }
                 }}
                 className={`flex-1 py-3 rounded-xl text-sm font-bold active:opacity-90 ${titleText.includes("/미입금") ? "text-white" : "text-green-600 bg-green-50 border border-green-200"}`}
@@ -608,12 +619,16 @@ export default function ScheduleDetail({
                 <button
                   onClick={() => {
                     const newTitle = `${titleText}/미입금`;
+                    // 1) 로컬 UI 즉시 반응
                     schedule.title = newTitle;
                     setTitleText(newTitle);
-                    onUpdated?.();
-                    apiUpdateSchedule(schedule.id, { title: newTitle })
-                      .then(() => onUpdated?.())
-                      .catch((err) => { console.error("[미입금] 저장 실패:", err); });
+                    // 2) 부모 상태 + 서버 동기화는 다음 tick
+                    setTimeout(() => {
+                      onUpdated?.();
+                      apiUpdateSchedule(schedule.id, { title: newTitle })
+                        .then(() => onUpdated?.())
+                        .catch((err) => { console.error("[미입금] 저장 실패:", err); });
+                    }, 0);
                   }}
                   className="flex-1 py-3 rounded-xl text-sm font-bold text-red-500 bg-red-50 border border-red-200 active:opacity-90"
                 >
