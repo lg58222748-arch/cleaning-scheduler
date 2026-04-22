@@ -22,7 +22,7 @@ interface ScheduleDetailProps {
   onUnassign?: (id: string, reason: string) => void;
   onAssign?: (scheduleId: string, memberId: string, memberName: string) => void;
   onClose: () => void;
-  onUpdated?: () => void;
+  onUpdated?: (patch?: Partial<Schedule>) => void;
 }
 
 type DetailTab = "info" | "checklist" | "settlement";
@@ -152,27 +152,21 @@ export default function ScheduleDetail({
   // 로컬 UI 는 즉시, 부모 상태/서버 동기화는 setTimeout(0) 으로 다음 tick 에 처리
   // (리스트 수백 개 재렌더가 현재 상호작용을 블로킹하지 않게)
   async function handleSaveNote() {
-    setSaving(true);
     schedule.note = noteText;
     setNoteChanged(false);
-    setSaving(false);
     setTimeout(() => {
-      onUpdated?.();
+      onUpdated?.({ id: schedule.id, note: noteText });
       apiUpdateSchedule(schedule.id, { note: noteText })
-        .then(() => onUpdated?.())
         .catch((err) => { console.error("[note] 저장 실패:", err); });
     }, 0);
   }
 
   async function handleSaveTitle() {
-    setSaving(true);
     schedule.title = titleText;
     setEditingTitle(false);
-    setSaving(false);
     setTimeout(() => {
-      onUpdated?.();
+      onUpdated?.({ id: schedule.id, title: titleText });
       apiUpdateSchedule(schedule.id, { title: titleText })
-        .then(() => onUpdated?.())
         .catch((err) => { console.error("[title] 저장 실패:", err); });
     }, 0);
   }
@@ -185,9 +179,8 @@ export default function ScheduleDetail({
     schedule.title = newTitle;
     setTitleText(newTitle);
     setTimeout(() => {
-      onUpdated?.();
+      onUpdated?.({ id: schedule.id, title: newTitle });
       apiUpdateSchedule(schedule.id, { title: newTitle })
-        .then(() => onUpdated?.())
         .catch((err) => { console.error("[timeSlot] 저장 실패:", err); });
     }, 0);
   }
@@ -196,9 +189,8 @@ export default function ScheduleDetail({
     setSchedColor(color);
     schedule.color = color;
     // 부모 state 즉시 갱신 (달력 셀 색상 반영) + realtime 리로드 suppress 트리거
-    onUpdated?.();
+    onUpdated?.({ id: schedule.id, color });
     apiUpdateSchedule(schedule.id, { color })
-      .then(() => onUpdated?.())
       .catch((err) => { console.error("[color] 저장 실패:", err); });
   }
 
@@ -419,7 +411,7 @@ export default function ScheduleDetail({
                       // 즉시 반영: 로컬/공유 객체/부모 상태 모두 먼저 업데이트, API 는 백그라운드
                       setLocalDate(newDate);
                       schedule.date = newDate;
-                      onUpdated?.();
+                      onUpdated?.({ id: schedule.id, date: newDate });
                       apiUpdateSchedule(schedule.id, { date: newDate }).catch(() => {});
                     }}
                     className="absolute opacity-0 pointer-events-none w-0 h-0"
@@ -603,9 +595,8 @@ export default function ScheduleDetail({
                     // 2) 부모 상태 + 서버 동기화는 다음 tick 으로 분리
                     //    (리스트 수백 개 재렌더가 버튼 반응을 블로킹하지 않게)
                     setTimeout(() => {
-                      onUpdated?.();
+                      onUpdated?.({ id: schedule.id, title: newTitle });
                       apiUpdateSchedule(schedule.id, { title: newTitle })
-                        .then(() => onUpdated?.())
                         .catch((err) => { console.error("[입금확인] 저장 실패:", err); });
                     }, 0);
                   }
@@ -624,9 +615,8 @@ export default function ScheduleDetail({
                     setTitleText(newTitle);
                     // 2) 부모 상태 + 서버 동기화는 다음 tick
                     setTimeout(() => {
-                      onUpdated?.();
+                      onUpdated?.({ id: schedule.id, title: newTitle });
                       apiUpdateSchedule(schedule.id, { title: newTitle })
-                        .then(() => onUpdated?.())
                         .catch((err) => { console.error("[미입금] 저장 실패:", err); });
                     }, 0);
                   }}
@@ -639,16 +629,17 @@ export default function ScheduleDetail({
           )}
           <button
             onClick={() => {
-              const updates: Record<string, unknown> = {};
+              const updates: Partial<Schedule> = {};
               if (titleText !== schedule.title) { updates.title = titleText; schedule.title = titleText; setEditingTitle(false); }
               if (noteChanged) { updates.note = noteText; schedule.note = noteText; setNoteChanged(false); }
-              // ★ 핵심 순서: 부모 state 갱신 → 모달 닫기 → 백그라운드 서버 동기화
-              // onClose() 먼저 부르면 detailSchedule 이 null 되어 onUpdated 가 no-op.
-              // → 반환 일정 편집이 리스트에 반영 안 되고, realtime reload 올 때까지 "로딩" 지속.
+              // ★ 핵심: patch 를 인자로 넘겨서 부모가 detailSchedule 없이도 정확한 diff 로 리스트 갱신
+              // (closure 에 detailSchedule 의존하면 onClose 순서, 리렌더 타이밍에 취약)
               if (Object.keys(updates).length > 0) {
-                onUpdated?.(); // detailSchedule 살아있을 때 바로 반영 (suppress ref 도 여기서 세팅됨)
+                onUpdated?.({ ...updates, id: schedule.id } as Partial<Schedule>);
                 onClose();
-                apiUpdateSchedule(schedule.id, updates as Partial<import("@/types").Schedule>).catch(() => {});
+                apiUpdateSchedule(schedule.id, updates).catch((err) => {
+                  console.error("[저장] 서버 동기화 실패:", err);
+                });
               } else {
                 onClose();
               }

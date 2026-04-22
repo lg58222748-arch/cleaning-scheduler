@@ -1862,14 +1862,18 @@ export default function Home() {
             consumeHash();
           }}
           onClose={() => { setDetailSchedule(null); consumeHash(); }}
-          onUpdated={() => {
+          onUpdated={(patch) => {
             // 전체 리로드 대신 해당 일정만 로컬 갱신
             // realtime 리로드가 낙관적 업데이트 덮어쓰는 걸 4초간 차단
             scheduleReloadSuppressRef.current = Date.now() + 4000;
-            if (detailSchedule) {
-              // detailSchedule 에 누적된 mutation(color, title, note 등)을 배열에도 반영
-              // 스프레드 대신 기존 s 와 detailSchedule 을 병합해서 missing field 방지
-              // 양쪽 배열 모두 갱신 — 반환된 일정(배정 탭) 편집도 즉시 반영되게
+            // patch 우선 사용 — closure 의 detailSchedule 에 의존 X
+            // (onClose 먼저 불려서 null 되어도 patch 만 있으면 정확히 반영됨)
+            if (patch && patch.id) {
+              const id = patch.id;
+              setSchedules(prev => prev.map(s => s.id === id ? { ...s, ...patch } : s));
+              setUnassignedSchedules(prev => prev.map(s => s.id === id ? { ...s, ...patch } : s));
+            } else if (detailSchedule) {
+              // 인자 없이 호출된 legacy 경로 (색상 등) — 전체 detailSchedule 로 merge
               setSchedules(prev => prev.map(s => s.id === detailSchedule.id ? { ...s, ...detailSchedule } : s));
               setUnassignedSchedules(prev => prev.map(s => s.id === detailSchedule.id ? { ...s, ...detailSchedule } : s));
             }
