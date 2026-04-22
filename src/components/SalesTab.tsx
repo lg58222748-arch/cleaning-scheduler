@@ -61,6 +61,7 @@ interface ConfirmSession {
   confirmed: boolean;
   postDone: number[];
   copied: Set<string>;
+  saved: boolean; // 캘린더 저장 완료 여부 — true 면 버튼 회색 + "저장 완료" 표시
 }
 
 // 상담사 특이사항 본문 전체(여러 줄) 추출 — "11)상담사 특이사항" 또는 "상담사 특이사항" 뒤부터
@@ -249,7 +250,7 @@ function makeConfirmSession(name: string): ConfirmSession {
     services: [], customerText: "",
     parsedName: "", parsedPhone: "", parsedAddr: "", parsedWishDate: "",
     parsedPyeong: "", parsedPyeongExtra: "", parsedNote: "", parsedQuote: "", parsedDeposit: "", parsedBalance: "", parsedSalesNote: "",
-    calendarNote: "", schedules: [], confirmMsg: "", confirmed: false, postDone: [], copied: new Set(),
+    calendarNote: "", schedules: [], confirmMsg: "", confirmed: false, postDone: [], copied: new Set(), saved: false,
   };
 }
 
@@ -317,6 +318,7 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
   const confirmMsg = activeConfirm.confirmMsg;
   const confirmed = activeConfirm.confirmed;
   const postDone = activeConfirm.postDone;
+  const savedDone = activeConfirm.saved;
 
   // setter 래퍼 (기존 코드 호환)
   const setServices = (v: ServiceEntry[] | ((prev: ServiceEntry[]) => ServiceEntry[])) => updateForm({ services: typeof v === "function" ? v(activeForm.services) : v });
@@ -343,6 +345,7 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
   const setConfirmMsg = (v: string) => updateConfirm({ confirmMsg: v });
   const setConfirmed = (v: boolean) => updateConfirm({ confirmed: v });
   const setPostDone = (v: number[] | ((prev: number[]) => number[])) => updateConfirm({ postDone: typeof v === "function" ? v(activeConfirm.postDone) : v });
+  const setSavedDone = (v: boolean) => updateConfirm({ saved: v });
 
   // 전역 상태 (파싱 중/저장 중은 동시에 하나만)
   const [saving, setSaving] = useState(false);
@@ -1003,7 +1006,7 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
     }
     setSaving(false);
     setConfirmed(true);
-    setPostDone([]);
+    setSavedDone(true);
     setConfirmedToast(true);
     setTimeout(() => setConfirmedToast(false), 2000);
     onCreated();
@@ -1381,18 +1384,19 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
                     </div>
                   ))}
 
-                  {/* 6. 캘린더 저장 - 5개 모두 복사 후 활성화 */}
-                  <div className={`border rounded-xl p-3 ${postDone.length >= 5 ? "border-blue-300 bg-blue-50" : "border-gray-200 opacity-50"}`}>
-                    <button onClick={handleConfirm} disabled={saving || postDone.length < 5}
-                      className="w-full py-2.5 rounded-lg text-sm font-bold text-white disabled:opacity-50" style={{ background: "linear-gradient(135deg, #0f4c81, #1a6bb5)" }}>
-                      {saving ? "저장 중..." : `6. 📅 캘린더 저장 (${schedules.length}건)`}
+                  {/* 6. 캘린더 저장 - 5개 모두 복사 후 활성화, 저장 완료 시 회색 */}
+                  <div className={`border rounded-xl p-3 ${savedDone ? "border-gray-300 bg-gray-100" : postDone.length >= 5 ? "border-blue-300 bg-blue-50" : "border-gray-200 opacity-50"}`}>
+                    <button onClick={handleConfirm} disabled={saving || savedDone || postDone.length < 5}
+                      className="w-full py-2.5 rounded-lg text-sm font-bold text-white disabled:opacity-100"
+                      style={{ background: savedDone ? "#9ca3af" : "linear-gradient(135deg, #0f4c81, #1a6bb5)" }}>
+                      {savedDone ? "✅ 저장 완료" : saving ? "저장 중..." : `6. 📅 캘린더 저장 (${schedules.length}건)`}
                     </button>
-                    {postDone.length < 5 && <p className="text-xs text-gray-400 text-center mt-1">위 5개 항목을 모두 복사해야 저장이 활성화됩니다</p>}
+                    {!savedDone && postDone.length < 5 && <p className="text-xs text-gray-400 text-center mt-1">위 5개 항목을 모두 복사해야 저장이 활성화됩니다</p>}
                   </div>
 
-                  {postDone.length >= 5 && saving === false && (
+                  {savedDone && (
                     <div className="text-center text-xs text-green-600 font-bold py-2">
-                      🎉 모든 전송 완료!
+                      🎉 캘린더 저장 완료!
                     </div>
                   )}
                 </div>
