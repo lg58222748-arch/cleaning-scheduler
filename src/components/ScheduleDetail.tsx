@@ -639,23 +639,23 @@ export default function ScheduleDetail({
           )}
           <button
             onClick={() => {
-              setSaving(true);
               const updates: Record<string, unknown> = {};
               if (titleText !== schedule.title) { updates.title = titleText; schedule.title = titleText; setEditingTitle(false); }
               if (noteChanged) { updates.note = noteText; schedule.note = noteText; setNoteChanged(false); }
-              setSaving(false);
-              onClose();
-              // API + 리로드는 닫은 후 백그라운드
+              // ★ 핵심 순서: 부모 state 갱신 → 모달 닫기 → 백그라운드 서버 동기화
+              // onClose() 먼저 부르면 detailSchedule 이 null 되어 onUpdated 가 no-op.
+              // → 반환 일정 편집이 리스트에 반영 안 되고, realtime reload 올 때까지 "로딩" 지속.
               if (Object.keys(updates).length > 0) {
-                apiUpdateSchedule(schedule.id, updates as Partial<import("@/types").Schedule>).then(() => onUpdated?.()).catch(() => {});
+                onUpdated?.(); // detailSchedule 살아있을 때 바로 반영 (suppress ref 도 여기서 세팅됨)
+                onClose();
+                apiUpdateSchedule(schedule.id, updates as Partial<import("@/types").Schedule>).catch(() => {});
               } else {
-                onUpdated?.();
+                onClose();
               }
             }}
-            disabled={saving}
-            className="flex-1 py-2 bg-blue-500 text-white rounded-xl text-xs font-bold active:bg-blue-600 disabled:opacity-50"
+            className="flex-1 py-2 bg-blue-500 text-white rounded-xl text-xs font-bold active:bg-blue-600"
           >
-            {saving ? "저장 중..." : "저장"}
+            저장
           </button>
           <button
             onClick={onClose}
