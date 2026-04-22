@@ -632,16 +632,17 @@ export default function ScheduleDetail({
               const updates: Partial<Schedule> = {};
               if (titleText !== schedule.title) { updates.title = titleText; schedule.title = titleText; setEditingTitle(false); }
               if (noteChanged) { updates.note = noteText; schedule.note = noteText; setNoteChanged(false); }
-              // ★ 핵심: patch 를 인자로 넘겨서 부모가 detailSchedule 없이도 정확한 diff 로 리스트 갱신
-              // (closure 에 detailSchedule 의존하면 onClose 순서, 리렌더 타이밍에 취약)
+              // ★ UX 우선순위: 모달 즉시 닫기 → 리스트 갱신은 다음 tick → 서버는 백그라운드
+              // 리스트 re-render 가 무겁기 때문에 (수백 개) 모달 close 부터 먼저 paint 해야 반응 느낌
+              onClose();
               if (Object.keys(updates).length > 0) {
-                onUpdated?.({ ...updates, id: schedule.id } as Partial<Schedule>);
-                onClose();
-                apiUpdateSchedule(schedule.id, updates).catch((err) => {
-                  console.error("[저장] 서버 동기화 실패:", err);
-                });
-              } else {
-                onClose();
+                const patch = { ...updates, id: schedule.id } as Partial<Schedule>;
+                setTimeout(() => {
+                  onUpdated?.(patch);
+                  apiUpdateSchedule(schedule.id, updates).catch((err) => {
+                    console.error("[저장] 서버 동기화 실패:", err);
+                  });
+                }, 0);
               }
             }}
             className="flex-1 py-2 bg-blue-500 text-white rounded-xl text-xs font-bold active:bg-blue-600"

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, startTransition } from "react";
 import dynamic from "next/dynamic";
 import { Member, Schedule, SwapRequest, Notification as AppNotification, User, UserRole } from "@/types";
 type Notification = AppNotification;
@@ -1863,20 +1863,21 @@ export default function Home() {
           }}
           onClose={() => { setDetailSchedule(null); consumeHash(); }}
           onUpdated={(patch) => {
-            // 전체 리로드 대신 해당 일정만 로컬 갱신
-            // realtime 리로드가 낙관적 업데이트 덮어쓰는 걸 4초간 차단
+            // realtime 리로드 4초 차단 — suppress 는 즉시 설정 (transition 과 상관 없음)
             scheduleReloadSuppressRef.current = Date.now() + 4000;
-            // patch 우선 사용 — closure 의 detailSchedule 에 의존 X
-            // (onClose 먼저 불려서 null 되어도 patch 만 있으면 정확히 반영됨)
-            if (patch && patch.id) {
-              const id = patch.id;
-              setSchedules(prev => prev.map(s => s.id === id ? { ...s, ...patch } : s));
-              setUnassignedSchedules(prev => prev.map(s => s.id === id ? { ...s, ...patch } : s));
-            } else if (detailSchedule) {
-              // 인자 없이 호출된 legacy 경로 (색상 등) — 전체 detailSchedule 로 merge
-              setSchedules(prev => prev.map(s => s.id === detailSchedule.id ? { ...s, ...detailSchedule } : s));
-              setUnassignedSchedules(prev => prev.map(s => s.id === detailSchedule.id ? { ...s, ...detailSchedule } : s));
-            }
+            // 리스트 setState 는 startTransition 으로 낮은 우선순위 → 모달 close 등 즉시 상호작용이 페인트 먼저
+            // (수백 개 일정 리스트 map + 리렌더가 저장 반응을 블로킹하던 문제 해결)
+            startTransition(() => {
+              if (patch && patch.id) {
+                const id = patch.id;
+                setSchedules(prev => prev.map(s => s.id === id ? { ...s, ...patch } : s));
+                setUnassignedSchedules(prev => prev.map(s => s.id === id ? { ...s, ...patch } : s));
+              } else if (detailSchedule) {
+                // 인자 없이 호출된 legacy 경로 (색상 등) — 전체 detailSchedule 로 merge
+                setSchedules(prev => prev.map(s => s.id === detailSchedule.id ? { ...s, ...detailSchedule } : s));
+                setUnassignedSchedules(prev => prev.map(s => s.id === detailSchedule.id ? { ...s, ...detailSchedule } : s));
+              }
+            });
           }}
         />
       )}
