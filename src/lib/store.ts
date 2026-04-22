@@ -558,11 +558,28 @@ export async function updateChecklistItem(scheduleId: string, itemId: string, ch
   return cl;
 }
 
-export async function submitChecklist(scheduleId: string): Promise<ScheduleChecklist | null> {
+// 모든 아이템을 동일 상태로 atomically 세팅 (전체선택/전체해제 race 방지)
+// handleSelectAll 이 개별 토글을 수십 개 병렬 호출할 때 각 요청이 current state 를 읽고 덮어써
+// 마지막 write 만 반영되던 버그 수정 — 이제 단일 쿼리로 일괄 처리.
+export async function setAllChecklistItems(scheduleId: string, checked: boolean): Promise<ScheduleChecklist | null> {
   const cl = await getChecklist(scheduleId);
+  cl.categories = cl.categories.map(cat => ({
+    ...cat,
+    items: cat.items.map(item => ({ ...item, checked }))
+  }));
+  cl.completedCount = checked ? cl.totalCount : 0;
+  await supabase.from("checklists").update({ categories: cl.categories, completed_count: cl.completedCount }).eq("schedule_id", scheduleId);
+  return cl;
+}
+
+export async function submitChecklist(scheduleId: string, categories?: ChecklistCategory[], completedCount?: number): Promise<ScheduleChecklist | null> {
   const now = new Date().toISOString();
-  await supabase.from("checklists").update({ submitted_at: now }).eq("schedule_id", scheduleId);
-  cl.submittedAt = now;
+  const update: Record<string, unknown> = { submitted_at: now };
+  // 클라이언트에서 최신 카테고리/카운트 같이 넘기면 함께 저장 (race 복구용)
+  if (categories !== undefined) update.categories = categories;
+  if (completedCount !== undefined) update.completed_count = completedCount;
+  await supabase.from("checklists").update(update).eq("schedule_id", scheduleId);
+  const cl = await getChecklist(scheduleId);
   return cl;
 }
 

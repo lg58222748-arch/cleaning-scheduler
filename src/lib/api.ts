@@ -382,11 +382,25 @@ export async function toggleChecklistItem(scheduleId: string, itemId: string, ch
   return res.json();
 }
 
-export async function submitChecklistApi(scheduleId: string): Promise<import("@/types").ScheduleChecklist> {
+// 전체선택/해제: 개별 토글 병렬 호출로 인한 race 방지 — 단일 원자적 배치 업데이트
+export async function toggleAllChecklist(scheduleId: string, checked: boolean): Promise<import("@/types").ScheduleChecklist> {
   const res = await safeFetch(`${BASE}/api/checklist`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ action: "submit", scheduleId }),
+    body: JSON.stringify({ action: "toggleAll", scheduleId, checked }),
+  });
+  return res.json();
+}
+
+export async function submitChecklistApi(
+  scheduleId: string,
+  categories?: import("@/types").ChecklistCategory[],
+  completedCount?: number,
+): Promise<import("@/types").ScheduleChecklist> {
+  const res = await safeFetch(`${BASE}/api/checklist`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ action: "submit", scheduleId, categories, completedCount }),
   });
   return res.json();
 }

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { ScheduleChecklist as ChecklistType } from "@/types";
-import { fetchChecklist, toggleChecklistItem, submitChecklistApi } from "@/lib/api";
+import { fetchChecklist, toggleChecklistItem, toggleAllChecklist, submitChecklistApi } from "@/lib/api";
 
 interface ScheduleChecklistProps {
   scheduleId: string;
@@ -33,14 +33,12 @@ export default function ScheduleChecklist({ scheduleId, onComplete }: ScheduleCh
     };
     updated.completedCount = checked ? updated.totalCount : 0;
     setChecklist(updated);
-    // API 호출: 모든 아이템 토글
-    for (const cat of checklist.categories) {
-      for (const item of cat.items) {
-        if (item.checked !== checked) {
-          toggleChecklistItem(scheduleId, item.id, checked);
-        }
-      }
-    }
+    // 단일 배치 API 호출 — 과거엔 개별 토글 수십 개를 병렬 호출해서
+    // 각 요청이 DB JSON 을 read-modify-write 할 때 last-write-wins race 로
+    // 1개만 반영되던 버그가 있었음. 이제 서버에서 한번에 atomic 하게 처리.
+    toggleAllChecklist(scheduleId, checked).catch((err) => {
+      console.error("[checklist] 전체선택 동기화 실패:", err);
+    });
   }
 
   function handleToggle(itemId: string, checked: boolean) {
@@ -64,7 +62,13 @@ export default function ScheduleChecklist({ scheduleId, onComplete }: ScheduleCh
   }
 
   async function handleSubmit() {
-    const data = await submitChecklistApi(scheduleId);
+    // 현재 로컬 상태를 서버에 같이 넘김 — 전체선택 직후 toggleAll 응답 도착 전에
+    // 검수완료를 눌러도 DB 가 낡은 상태를 다시 불러오는 race 를 회피.
+    const data = await submitChecklistApi(
+      scheduleId,
+      checklist?.categories,
+      checklist?.completedCount,
+    );
     setChecklist(data);
   }
 
