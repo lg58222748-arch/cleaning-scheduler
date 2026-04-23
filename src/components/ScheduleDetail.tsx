@@ -382,41 +382,33 @@ export default function ScheduleDetail({
                 </div>
 
                 {/* 날짜 + 상태 - 모든 사용자 변경 가능 */}
+                {/* iOS Safari 는 showPicker() 미지원 + 프로그래매틱 click 도 불안정해서
+                    <label> 감싸기로 브라우저 기본 label→input activation 에 위임. */}
                 <div className="flex items-center gap-3 text-xs text-gray-700">
                   <svg className="w-5 h-5 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                   </svg>
-                  <span
-                    onClick={() => {
-                      const el = dateInputRef.current;
-                      if (!el) return;
-                      if (typeof (el as HTMLInputElement & { showPicker?: () => void }).showPicker === "function") {
-                        (el as HTMLInputElement & { showPicker: () => void }).showPicker();
-                      } else {
-                        el.focus();
-                        el.click();
-                      }
-                    }}
-                    className="font-medium cursor-pointer text-blue-600 active:text-blue-800 underline underline-offset-2 decoration-dotted"
-                  >
+                  <label className="relative inline-flex items-center font-medium cursor-pointer text-blue-600 active:text-blue-800 underline underline-offset-2 decoration-dotted">
                     {dateDisplay}
-                  </span>
-                  <input
-                    ref={dateInputRef}
-                    type="date"
-                    value={localDate}
-                    onChange={(e) => {
-                      const newDate = e.target.value;
-                      if (!newDate || newDate === localDate) return;
-                      // 즉시 반영: 로컬/공유 객체/부모 상태 모두 먼저 업데이트, API 는 백그라운드
-                      setLocalDate(newDate);
-                      schedule.date = newDate;
-                      onUpdated?.({ id: schedule.id, date: newDate });
-                      apiUpdateSchedule(schedule.id, { date: newDate }).catch(() => {});
-                    }}
-                    className="absolute opacity-0 pointer-events-none w-0 h-0"
-                    aria-hidden="true"
-                  />
+                    <input
+                      ref={dateInputRef}
+                      type="date"
+                      value={localDate}
+                      onChange={(e) => {
+                        const newDate = e.target.value;
+                        if (!newDate || newDate === localDate) return;
+                        // 즉시 반영: 로컬/공유 객체/부모 상태 모두 먼저 업데이트, API 는 백그라운드
+                        setLocalDate(newDate);
+                        schedule.date = newDate;
+                        onUpdated?.({ id: schedule.id, date: newDate });
+                        apiUpdateSchedule(schedule.id, { date: newDate }).catch((err) => {
+                          console.error("[날짜 수정] 서버 동기화 실패:", err);
+                        });
+                      }}
+                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                      aria-label="날짜 변경"
+                    />
+                  </label>
                   <span className={`text-xs px-2 py-0.5 rounded-full ml-auto ${statusClass}`}>{statusLabel}</span>
                 </div>
 
