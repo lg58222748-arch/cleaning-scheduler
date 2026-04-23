@@ -390,50 +390,56 @@ export default function ScheduleDetail({
                   <svg className="w-5 h-5 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                   </svg>
-                  <button
-                    type="button"
-                    onPointerDown={(e) => e.stopPropagation()}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      const input = dateInputRef.current;
-                      if (!input) return;
-                      try {
-                        const withPicker = input as HTMLInputElement & { showPicker?: () => void };
-                        if (typeof withPicker.showPicker === "function") {
-                          withPicker.showPicker();
-                          return;
+                  {/* 버튼 + input 을 같은 relative 컨테이너에 두어 PC 브라우저에서
+                      showPicker() 드롭다운이 버튼 근처에 자연스럽게 뜨도록 함.
+                      input 은 버튼과 같은 자리에 opacity-0 로 겹치되 pointer-events-none
+                      로 tap 을 안 받음 — 모든 상호작용은 button 의 onClick 에서 처리. */}
+                  <span className="relative inline-flex items-center">
+                    <button
+                      type="button"
+                      onPointerDown={(e) => e.stopPropagation()}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const input = dateInputRef.current;
+                        if (!input) return;
+                        try {
+                          const withPicker = input as HTMLInputElement & { showPicker?: () => void };
+                          if (typeof withPicker.showPicker === "function") {
+                            withPicker.showPicker();
+                            return;
+                          }
+                        } catch (err) {
+                          console.warn("[날짜 picker] showPicker 실패, fallback:", err);
                         }
-                      } catch (err) {
-                        console.warn("[날짜 picker] showPicker 실패, fallback:", err);
-                      }
-                      // 구형 브라우저 fallback
-                      input.focus();
-                      input.click();
-                    }}
-                    className="inline-flex items-center font-medium cursor-pointer text-blue-600 hover:bg-blue-50 active:text-blue-800 underline underline-offset-2 decoration-dotted text-sm px-2 py-1.5 -my-1 rounded-md active:bg-blue-50"
-                    aria-label="날짜 변경"
-                  >
-                    {dateDisplay}
-                  </button>
-                  <input
-                    ref={dateInputRef}
-                    type="date"
-                    value={localDate}
-                    onChange={(e) => {
-                      const newDate = e.target.value;
-                      if (!newDate || newDate === localDate) return;
-                      // 즉시 반영: 로컬/공유 객체/부모 상태 모두 먼저 업데이트, API 는 백그라운드
-                      setLocalDate(newDate);
-                      schedule.date = newDate;
-                      onUpdated?.({ id: schedule.id, date: newDate });
-                      apiUpdateSchedule(schedule.id, { date: newDate }).catch((err) => {
-                        console.error("[날짜 수정] 서버 동기화 실패:", err);
-                      });
-                    }}
-                    className="sr-only"
-                    tabIndex={-1}
-                    aria-hidden="true"
-                  />
+                        // 구형 브라우저 fallback
+                        input.focus();
+                        input.click();
+                      }}
+                      className="inline-flex items-center font-medium cursor-pointer text-blue-600 hover:bg-blue-50 active:text-blue-800 underline underline-offset-2 decoration-dotted text-sm px-2 py-1.5 -my-1 rounded-md active:bg-blue-50"
+                      aria-label="날짜 변경"
+                    >
+                      {dateDisplay}
+                    </button>
+                    <input
+                      ref={dateInputRef}
+                      type="date"
+                      value={localDate}
+                      onChange={(e) => {
+                        const newDate = e.target.value;
+                        if (!newDate || newDate === localDate) return;
+                        // 즉시 반영: 로컬/공유 객체/부모 상태 모두 먼저 업데이트, API 는 백그라운드
+                        setLocalDate(newDate);
+                        schedule.date = newDate;
+                        onUpdated?.({ id: schedule.id, date: newDate });
+                        apiUpdateSchedule(schedule.id, { date: newDate }).catch((err) => {
+                          console.error("[날짜 수정] 서버 동기화 실패:", err);
+                        });
+                      }}
+                      className="absolute inset-0 w-full h-full opacity-0 pointer-events-none"
+                      tabIndex={-1}
+                      aria-hidden="true"
+                    />
+                  </span>
                   <span className={`text-xs px-2 py-0.5 rounded-full ml-auto ${statusClass}`}>{statusLabel}</span>
                 </div>
 
