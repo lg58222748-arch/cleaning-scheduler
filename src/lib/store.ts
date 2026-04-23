@@ -7,12 +7,40 @@ const MEMBER_COLORS = [
   "#8B5CF6", "#EC4899", "#06B6D4", "#F97316",
 ];
 
+// note 내 HTML 태그/엔티티를 plain text 로 정리.
+// Google Calendar description 이 <p>…</p><br><br> 같은 HTML 로 내려오던 걸
+// 그대로 저장해서 textarea 에 태그가 문자열로 보이던 버그 방지.
+// read/write 양쪽에서 호출해 기존 DB 의 HTML 도 자연스럽게 정리됨.
+function sanitizeNote(s: string | null | undefined): string {
+  if (!s) return "";
+  let out = String(s);
+  // 구조 태그 → 줄바꿈
+  out = out.replace(/<br\s*\/?>/gi, "\n");
+  out = out.replace(/<\/p\s*>/gi, "\n");
+  out = out.replace(/<p[^>]*>/gi, "");
+  out = out.replace(/<div[^>]*>/gi, "");
+  out = out.replace(/<\/div\s*>/gi, "\n");
+  // 나머지 태그 모두 제거
+  out = out.replace(/<[^>]+>/g, "");
+  // 기본 HTML 엔티티 디코드
+  out = out
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'");
+  // 3줄 이상 빈줄 → 2줄로 압축
+  out = out.replace(/\n{3,}/g, "\n\n").trim();
+  return out;
+}
+
 // ===== Helper: DB row → App type 변환 =====
 function rowToMember(r: Record<string, unknown>): Member {
   return { id: String(r.id), name: String(r.name), color: String(r.color), phone: String(r.phone || ""), availableDays: (r.available_days as number[]) || [1,2,3,4,5], active: Boolean(r.active), linkedUsername: r.linked_username ? String(r.linked_username) : undefined };
 }
 function rowToSchedule(r: Record<string, unknown>): Schedule {
-  return { id: String(r.id), memberId: String(r.member_id || ""), memberName: String(r.member_name || "미배정"), title: String(r.title), location: String(r.location || ""), date: String(r.date), startTime: String(r.start_time), endTime: String(r.end_time), status: String(r.status) as Schedule["status"], assignedTo: r.assigned_to ? String(r.assigned_to) : undefined, assignedToName: r.assigned_to_name ? String(r.assigned_to_name) : undefined, googleEventId: r.google_event_id ? String(r.google_event_id) : undefined, note: String(r.note || ""), color: r.color ? String(r.color) : undefined };
+  return { id: String(r.id), memberId: String(r.member_id || ""), memberName: String(r.member_name || "미배정"), title: String(r.title), location: String(r.location || ""), date: String(r.date), startTime: String(r.start_time), endTime: String(r.end_time), status: String(r.status) as Schedule["status"], assignedTo: r.assigned_to ? String(r.assigned_to) : undefined, assignedToName: r.assigned_to_name ? String(r.assigned_to_name) : undefined, googleEventId: r.google_event_id ? String(r.google_event_id) : undefined, note: sanitizeNote(r.note as string | null | undefined), color: r.color ? String(r.color) : undefined };
 }
 function rowToSwapRequest(r: Record<string, unknown>): SwapRequest {
   return { id: String(r.id), fromScheduleId: String(r.from_schedule_id), toScheduleId: String(r.to_schedule_id), fromMemberId: String(r.from_member_id), toMemberId: String(r.to_member_id), status: String(r.status) as SwapRequest["status"], createdAt: String(r.created_at) };
@@ -98,7 +126,7 @@ export async function searchSchedules(query: string): Promise<Schedule[]> {
 
 export async function addSchedule(input: Omit<Schedule, "id" | "status">): Promise<{ schedule?: Schedule; error?: string }> {
   const row: Record<string, unknown> = {
-    member_id: input.memberId || "", member_name: input.memberName || "미배정", title: input.title, location: input.location || "", date: input.date, start_time: input.startTime, end_time: input.endTime, status: "confirmed", google_event_id: input.googleEventId || null, note: input.note || "",
+    member_id: input.memberId || "", member_name: input.memberName || "미배정", title: input.title, location: input.location || "", date: input.date, start_time: input.startTime, end_time: input.endTime, status: "confirmed", google_event_id: input.googleEventId || null, note: sanitizeNote(input.note),
   };
   if (input.assignedTo) row.assigned_to = input.assignedTo;
   if (input.assignedToName) row.assigned_to_name = input.assignedToName;
@@ -124,7 +152,7 @@ export async function addUnassignedSchedule(input: Omit<Schedule, "id" | "status
     const { data: dup } = await supabase.from("schedules").select("id").eq("title", input.title).eq("date", input.date).limit(1);
     if (dup && dup.length > 0) return null;
     const { data, error } = await supabase.from("schedules").insert({
-      member_id: "", member_name: "미배정", title: input.title, location: input.location || "", date: input.date, start_time: input.startTime, end_time: input.endTime, status: "unassigned", google_event_id: input.googleEventId || null, note: input.note || "",
+      member_id: "", member_name: "미배정", title: input.title, location: input.location || "", date: input.date, start_time: input.startTime, end_time: input.endTime, status: "unassigned", google_event_id: input.googleEventId || null, note: sanitizeNote(input.note),
     }).select().single();
     if (error || !data) return null;
     return rowToSchedule(data);
@@ -197,7 +225,7 @@ export async function updateSchedule(id: string, input: Partial<Schedule>): Prom
   if (input.status !== undefined) update.status = input.status;
   if (input.assignedTo !== undefined) update.assigned_to = input.assignedTo;
   if (input.assignedToName !== undefined) update.assigned_to_name = input.assignedToName;
-  if (input.note !== undefined) update.note = input.note;
+  if (input.note !== undefined) update.note = sanitizeNote(input.note);
   if (input.color !== undefined) update.color = input.color;
   const { data, error } = await supabase.from("schedules").update(update).eq("id", id).select().single();
   if (error) console.error("[updateSchedule] supabase error:", error);
