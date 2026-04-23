@@ -382,33 +382,58 @@ export default function ScheduleDetail({
                 </div>
 
                 {/* 날짜 + 상태 - 모든 사용자 변경 가능 */}
-                {/* iOS Safari 는 showPicker() 미지원 + 프로그래매틱 click 도 불안정해서
-                    <label> 감싸기로 브라우저 기본 label→input activation 에 위임. */}
+                {/* iOS 에서 <label> 로 input 감싸 활성화하던 방식이 다녀온 picker 이후나
+                    반환(미배정) 상태에서 간헐적으로 tap 묵음 되던 이슈 있었음.
+                    이제 button + showPicker() 직접 호출 — input 은 sr-only 로 숨김.
+                    iOS 16.4+/Chrome 99+ 에서 showPicker 지원, 그 이전엔 focus/click fallback. */}
                 <div className="flex items-center gap-3 text-xs text-gray-700">
                   <svg className="w-5 h-5 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                   </svg>
-                  <label className="relative inline-flex items-center font-medium cursor-pointer text-blue-600 active:text-blue-800 underline underline-offset-2 decoration-dotted text-sm px-2 py-1.5 -my-1 rounded-md active:bg-blue-50">
+                  <button
+                    type="button"
+                    onPointerDown={(e) => e.stopPropagation()}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      const input = dateInputRef.current;
+                      if (!input) return;
+                      try {
+                        const withPicker = input as HTMLInputElement & { showPicker?: () => void };
+                        if (typeof withPicker.showPicker === "function") {
+                          withPicker.showPicker();
+                          return;
+                        }
+                      } catch (err) {
+                        console.warn("[날짜 picker] showPicker 실패, fallback:", err);
+                      }
+                      // 구형 브라우저 fallback
+                      input.focus();
+                      input.click();
+                    }}
+                    className="inline-flex items-center font-medium cursor-pointer text-blue-600 hover:bg-blue-50 active:text-blue-800 underline underline-offset-2 decoration-dotted text-sm px-2 py-1.5 -my-1 rounded-md active:bg-blue-50"
+                    aria-label="날짜 변경"
+                  >
                     {dateDisplay}
-                    <input
-                      ref={dateInputRef}
-                      type="date"
-                      value={localDate}
-                      onChange={(e) => {
-                        const newDate = e.target.value;
-                        if (!newDate || newDate === localDate) return;
-                        // 즉시 반영: 로컬/공유 객체/부모 상태 모두 먼저 업데이트, API 는 백그라운드
-                        setLocalDate(newDate);
-                        schedule.date = newDate;
-                        onUpdated?.({ id: schedule.id, date: newDate });
-                        apiUpdateSchedule(schedule.id, { date: newDate }).catch((err) => {
-                          console.error("[날짜 수정] 서버 동기화 실패:", err);
-                        });
-                      }}
-                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                      aria-label="날짜 변경"
-                    />
-                  </label>
+                  </button>
+                  <input
+                    ref={dateInputRef}
+                    type="date"
+                    value={localDate}
+                    onChange={(e) => {
+                      const newDate = e.target.value;
+                      if (!newDate || newDate === localDate) return;
+                      // 즉시 반영: 로컬/공유 객체/부모 상태 모두 먼저 업데이트, API 는 백그라운드
+                      setLocalDate(newDate);
+                      schedule.date = newDate;
+                      onUpdated?.({ id: schedule.id, date: newDate });
+                      apiUpdateSchedule(schedule.id, { date: newDate }).catch((err) => {
+                        console.error("[날짜 수정] 서버 동기화 실패:", err);
+                      });
+                    }}
+                    className="sr-only"
+                    tabIndex={-1}
+                    aria-hidden="true"
+                  />
                   <span className={`text-xs px-2 py-0.5 rounded-full ml-auto ${statusClass}`}>{statusLabel}</span>
                 </div>
 
