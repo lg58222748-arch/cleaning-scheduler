@@ -25,8 +25,8 @@ export async function POST(req: NextRequest) {
   }
 
   if (body.action === "submit" && body.scheduleId) {
-    // 클라이언트가 최신 상태를 같이 보내면 함께 저장 (전체선택 직후 제출되어도 안전)
-    const cl = await submitChecklist(body.scheduleId, body.categories, body.completedCount);
+    // 서버가 원자적으로 전체 체크 + submitted_at 으로 덮어씀 — client race 와 무관하게 항상 정확.
+    const cl = await submitChecklist(body.scheduleId);
     if (!cl) return Response.json({ error: "Not found" }, { status: 404 });
     return Response.json(cl);
   }

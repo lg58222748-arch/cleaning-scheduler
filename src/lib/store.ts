@@ -572,15 +572,24 @@ export async function setAllChecklistItems(scheduleId: string, checked: boolean)
   return cl;
 }
 
-export async function submitChecklist(scheduleId: string, categories?: ChecklistCategory[], completedCount?: number): Promise<ScheduleChecklist | null> {
+// 검수 완료: submit 버튼은 progress 100% 에서만 활성화되므로 무조건 전체 체크로 최종 저장.
+// 과거엔 handleSelectAll 의 개별 toggle 병렬 호출이 DB JSON read-modify-write race 로
+// 1개만 살아남은 상태에서 submit 이 그걸 재조회해 그대로 UI 에 반영하던 버그 있었음.
+// 이제 서버가 submit 시 **atomic 하게 전체true + submitted_at** 으로 덮어써
+// 클라이언트 구 버전/race 와 무관하게 항상 올바른 최종 상태 보장.
+export async function submitChecklist(scheduleId: string): Promise<ScheduleChecklist | null> {
   const now = new Date().toISOString();
-  const update: Record<string, unknown> = { submitted_at: now };
-  // 클라이언트에서 최신 카테고리/카운트 같이 넘기면 함께 저장 (race 복구용)
-  if (categories !== undefined) update.categories = categories;
-  if (completedCount !== undefined) update.completed_count = completedCount;
-  await supabase.from("checklists").update(update).eq("schedule_id", scheduleId);
   const cl = await getChecklist(scheduleId);
-  return cl;
+  const categories = cl.categories.map((cat) => ({
+    ...cat,
+    items: cat.items.map((item) => ({ ...item, checked: true })),
+  }));
+  await supabase.from("checklists").update({
+    categories,
+    completed_count: cl.totalCount,
+    submitted_at: now,
+  }).eq("schedule_id", scheduleId);
+  return { ...cl, categories, completedCount: cl.totalCount, submittedAt: now };
 }
 
 // ===== Settlement =====

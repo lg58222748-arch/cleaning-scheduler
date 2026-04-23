@@ -392,15 +392,11 @@ export async function toggleAllChecklist(scheduleId: string, checked: boolean): 
   return res.json();
 }
 
-export async function submitChecklistApi(
-  scheduleId: string,
-  categories?: import("@/types").ChecklistCategory[],
-  completedCount?: number,
-): Promise<import("@/types").ScheduleChecklist> {
+export async function submitChecklistApi(scheduleId: string): Promise<import("@/types").ScheduleChecklist> {
   const res = await safeFetch(`${BASE}/api/checklist`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ action: "submit", scheduleId, categories, completedCount }),
+    body: JSON.stringify({ action: "submit", scheduleId }),
   });
   return res.json();
 }

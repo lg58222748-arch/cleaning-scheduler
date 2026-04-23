@@ -22,23 +22,25 @@ export default function ScheduleChecklist({ scheduleId, onComplete }: ScheduleCh
     setLoading(false);
   }
 
-  function handleSelectAll(checked: boolean) {
+  async function handleSelectAll(checked: boolean) {
     if (!checklist) return;
+    // 낙관적 UI 먼저 반영
     const updated = {
       ...checklist,
       categories: checklist.categories.map((cat) => ({
         ...cat,
         items: cat.items.map((item) => ({ ...item, checked })),
       })),
+      completedCount: checked ? checklist.totalCount : 0,
     };
-    updated.completedCount = checked ? updated.totalCount : 0;
     setChecklist(updated);
-    // 단일 배치 API 호출 — 과거엔 개별 토글 수십 개를 병렬 호출해서
-    // 각 요청이 DB JSON 을 read-modify-write 할 때 last-write-wins race 로
-    // 1개만 반영되던 버그가 있었음. 이제 서버에서 한번에 atomic 하게 처리.
-    toggleAllChecklist(scheduleId, checked).catch((err) => {
+    // 단일 배치 API — 서버에서 atomic 하게 처리 후 최종 상태로 재동기화.
+    try {
+      const data = await toggleAllChecklist(scheduleId, checked);
+      setChecklist(data);
+    } catch (err) {
       console.error("[checklist] 전체선택 동기화 실패:", err);
-    });
+    }
   }
 
   function handleToggle(itemId: string, checked: boolean) {
@@ -62,13 +64,9 @@ export default function ScheduleChecklist({ scheduleId, onComplete }: ScheduleCh
   }
 
   async function handleSubmit() {
-    // 현재 로컬 상태를 서버에 같이 넘김 — 전체선택 직후 toggleAll 응답 도착 전에
-    // 검수완료를 눌러도 DB 가 낡은 상태를 다시 불러오는 race 를 회피.
-    const data = await submitChecklistApi(
-      scheduleId,
-      checklist?.categories,
-      checklist?.completedCount,
-    );
+    // 서버가 atomic 하게 전체 체크 + submitted_at 으로 덮어쓰므로 단순 호출로 충분.
+    // (submit 버튼은 progress 100% 에서만 활성화되어 전체 체크 강제 저장이 안전.)
+    const data = await submitChecklistApi(scheduleId);
     setChecklist(data);
   }
 
