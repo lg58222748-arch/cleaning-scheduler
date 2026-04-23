@@ -994,7 +994,11 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
       const noteExtra = calendarNote ? `/${calendarNote}` : "";
       const originalTitle = `U${parsedName}/${parsedAddr?.split(" ").slice(0, 2).join("")}/${userName} [${i + 1}/${schedules.length}]/${svc.name}${noteExtra}`;
       const calOriginal = sched.time && sched.time !== "선택" ? `[${sched.time}] ${originalTitle}` : originalTitle;
-      const displayTitle = `u${userName}/미입금/${parsedName}`;
+      // 같은 고객 같은 날 여러 건(예: 입주청소+에어컨청소) 일 때 title 이 동일하면
+      // addUnassignedSchedule 의 중복 체크(title+date) 에 걸려 2번째가 저장 안 되는 버그.
+      // multi-service 이면 서비스명 suffix 붙여 캘린더에서도 구분 가능하게 + 저장도 보장.
+      const serviceSuffix = schedules.length > 1 ? `/${svc.name}` : "";
+      const displayTitle = `u${userName}/미입금/${parsedName}${serviceSuffix}`;
 
       await addUnassignedSchedule({
         title: displayTitle,
