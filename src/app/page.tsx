@@ -1816,6 +1816,10 @@ export default function Home() {
       )}
       {detailSchedule && (
         <ScheduleDetail
+          // 스케줄 id 바뀌면 완전히 새 컴포넌트로 remount → state/useEffect 전부 fresh.
+          // 반환(미배정) 후 배정탭 재진입 시 stale DOM ref 에 native listener 가 붙어
+          // 날짜 버튼 먹통되던 문제 원천 차단.
+          key={detailSchedule.id}
           schedule={detailSchedule}
           members={members}
           isAdmin={canAssign}

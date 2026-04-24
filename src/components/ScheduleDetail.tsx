@@ -85,18 +85,33 @@ export default function ScheduleDetail({
   // 이벤트를 못 막음. 직접 DOM 리스너로 붙여 capture 단계에서 차단.
   // 이걸 안 하면 iOS Safari 가 "tap 이 모달 swipe gesture 로 소실됐다" 고 판단해
   // 네이티브 date picker 를 안 띄움.
+  //
+  // [schedule.id] deps: 반환 후 배정탭 재진입 같은 플로우에서 schedule 이 바뀌어도
+  // listener 재부착. (상위에 key={schedule.id} 도 있지만 이중 안전망.)
+  // RAF 재시도: React 18 concurrent 렌더링에서 첫 effect 실행 시 ref.current 가
+  // 드물게 null 인 경우 대비 — 다음 페인트 프레임에 재시도.
   useEffect(() => {
-    const el = dateInputRef.current;
-    if (!el) return;
+    let attached: HTMLInputElement | null = null;
+    let raf = 0;
     const stop = (e: Event) => { e.stopPropagation(); };
-    el.addEventListener("touchstart", stop, { passive: true });
-    el.addEventListener("touchend", stop, { passive: true });
-    el.addEventListener("touchmove", stop, { passive: true });
-    el.addEventListener("pointerdown", stop);
-    el.addEventListener("pointerup", stop);
-    el.addEventListener("mousedown", stop);
-    el.addEventListener("click", stop);
+    const attach = () => {
+      const el = dateInputRef.current;
+      if (!el) return;
+      attached = el;
+      el.addEventListener("touchstart", stop, { passive: true });
+      el.addEventListener("touchend", stop, { passive: true });
+      el.addEventListener("touchmove", stop, { passive: true });
+      el.addEventListener("pointerdown", stop);
+      el.addEventListener("pointerup", stop);
+      el.addEventListener("mousedown", stop);
+      el.addEventListener("click", stop);
+    };
+    attach();
+    if (!attached) raf = requestAnimationFrame(attach);
     return () => {
+      if (raf) cancelAnimationFrame(raf);
+      const el = attached;
+      if (!el) return;
       el.removeEventListener("touchstart", stop);
       el.removeEventListener("touchend", stop);
       el.removeEventListener("touchmove", stop);
@@ -105,7 +120,7 @@ export default function ScheduleDetail({
       el.removeEventListener("mousedown", stop);
       el.removeEventListener("click", stop);
     };
-  }, []);
+  }, [schedule.id]);
 
   useEffect(() => {
     const handler = (): boolean => {
@@ -424,12 +439,26 @@ export default function ScheduleDetail({
                   <svg className="w-5 h-5 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                   </svg>
-                  <label className="relative inline-flex items-center font-medium cursor-pointer text-blue-600 hover:bg-blue-50 active:bg-blue-50 active:text-blue-800 underline underline-offset-2 decoration-dotted text-sm px-2 py-1.5 -my-1 rounded-md touch-manipulation">
+                  <label
+                    // label 여백 (input overlay 벗어난 영역) 을 탭했을 때도 Hammer.js
+                    // 가 먹지 못하도록 추가 차단. input 에 붙은 native listener 와 병행.
+                    onPointerDown={(e) => e.stopPropagation()}
+                    onTouchStart={(e) => e.stopPropagation()}
+                    className="relative inline-flex items-center font-medium cursor-pointer text-blue-600 hover:bg-blue-50 active:bg-blue-50 active:text-blue-800 underline underline-offset-2 decoration-dotted text-sm px-2 py-1.5 -my-1 rounded-md touch-manipulation"
+                  >
                     {dateDisplay}
                     <input
                       ref={dateInputRef}
                       type="date"
                       value={localDate}
+                      onClick={(e) => {
+                        // 보험: 투명 input 탭만으로 picker 가 안 뜨는 iOS 15 이하 Safari
+                        // 대비 showPicker() 명시 호출. 미지원 브라우저에선 조용히 무시.
+                        const el = e.currentTarget as HTMLInputElement & { showPicker?: () => void };
+                        if (typeof el.showPicker === "function") {
+                          try { el.showPicker(); } catch { /* user-gesture 손실 등 — 무시 */ }
+                        }
+                      }}
                       onChange={(e) => {
                         const newDate = e.target.value;
                         if (!newDate || newDate === localDate) return;
