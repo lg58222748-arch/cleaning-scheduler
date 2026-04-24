@@ -956,28 +956,41 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
     generateConfirmMsg(undefined, undefined, undefined, undefined, undefined, newServices, undefined, newSchedules);
   }
 
-  async function handleConfirm() {
-    // 일정이 하나도 없으면 거부
+  // 예약확정 유효성 검사 — "예약 확정" 버튼과 "캘린더 저장" 버튼 양쪽에서 공유.
+  // 사용자가 5개 복사 끝낸 뒤에야 막히는 것 방지하려고 가장 앞단에서도 호출함.
+  // 유효하면 true, 알럿 띄우고 false 반환.
+  async function validateSchedules(): Promise<boolean> {
     if (schedules.length === 0) {
-      showAlert("일정이 없습니다.\n우측 \"+ 일정 추가\" 버튼으로 일정을 추가해주세요.");
-      return;
+      await showAlert("일정이 없습니다.\n우측 \"+ 일정 추가\" 버튼으로 일정을 추가해주세요.");
+      return false;
     }
-    // 서비스/날짜/시간대 검증 — 하나라도 빠지면 캘린더 저장 금지
+    const validTimeSlots = ["오전", "오후", "시무", "사이"];
     for (let i = 0; i < schedules.length; i++) {
-      if (!schedules[i].service || schedules[i].service === "선택") {
-        showAlert(`${i + 1}번째 일정의 서비스가 선택되지 않았습니다.`);
-        return;
+      const s = schedules[i];
+      const svc = (s.service || "").trim();
+      const date = (s.date || "").trim();
+      const time = (s.time || "").trim();
+      if (!svc || svc === "선택") {
+        await showAlert(`${i + 1}번째 일정의 서비스가 선택되지 않았습니다.`);
+        return false;
       }
-      if (!schedules[i].date) {
-        showAlert(`${i + 1}번째 일정의 날짜가 설정되지 않았습니다.`);
-        return;
+      if (!date) {
+        await showAlert(`${i + 1}번째 일정의 날짜가 설정되지 않았습니다.`);
+        return false;
       }
-      // 시간대(오전/오후/시무/사이) 필수 — "선택" 상태면 저장 거부
-      if (!schedules[i].time || schedules[i].time === "선택") {
-        showAlert(`${i + 1}번째 일정의 시간대(오전/오후/시무/사이)가 선택되지 않았습니다.`);
-        return;
+      // 시간대는 정확히 4개 값 중 하나여야 함 — "선택" 또는 빈값, 그 외 이상값 모두 거부
+      if (!validTimeSlots.includes(time)) {
+        await showAlert(`${i + 1}번째 일정의 시간대(오전/오후/시무/사이)가 선택되지 않았습니다.`);
+        return false;
       }
     }
+    return true;
+  }
+
+  async function handleConfirm() {
+    // 캘린더 저장 직전에 다시 한 번 검증 (위 "예약 확정" 버튼에서 이미 통과했어도
+    // 사용자가 copy 5단계 도중에 시간대/날짜를 다시 "선택"으로 돌릴 수 있으므로)
+    if (!(await validateSchedules())) return;
 
     // 날짜 검증: 확정 메시지의 날짜와 일정 날짜 비교
     if (parsedWishDate && schedules.length > 0) {
@@ -1367,7 +1380,12 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
               {/* 버튼: 예약 확정 → 5개 복사 → 캘린더 저장 */}
               {!confirmed ? (
                 <div className="space-y-2">
-                  <button onClick={() => { setConfirmed(true); setPostDone([]); }}
+                  <button onClick={async () => {
+                    // "예약 확정" 버튼 눌렀을 때도 먼저 검증 — 5개 복사 단계까지 간 뒤에야
+                    // 막혀서 당황하는 상황 방지.
+                    if (!(await validateSchedules())) return;
+                    setConfirmed(true); setPostDone([]);
+                  }}
                     className="w-full py-3 rounded-xl text-sm font-bold text-white" style={{ background: "linear-gradient(135deg, #1a6b3c, #22874c)" }}>
                     예약 확정
                   </button>
