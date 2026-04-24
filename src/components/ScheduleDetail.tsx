@@ -80,11 +80,15 @@ export default function ScheduleDetail({
     el.style.height = el.scrollHeight + "px";
   }, [noteText]);
 
-  // 날짜 input native tap 이벤트 stopPropagation.
-  // React synthetic stopPropagation 은 Hammer.js(모달 root native 리스너)가 먼저 받는
-  // 이벤트를 못 막음. 직접 DOM 리스너로 붙여 capture 단계에서 차단.
-  // 이걸 안 하면 iOS Safari 가 "tap 이 모달 swipe gesture 로 소실됐다" 고 판단해
-  // 네이티브 date picker 를 안 띄움.
+  // 날짜 input native touch 이벤트 stopPropagation.
+  // Hammer.js(모달 root native 리스너)가 swipe 감지에 touch 이벤트를 씀.
+  // React synthetic stopPropagation 은 native 리스너보다 늦게 받아 못 막으므로
+  // 직접 DOM 리스너로 붙여 bubble 단계에서 차단.
+  //
+  // [중요] touch 이벤트만 차단한다. click/mousedown/pointerdown/pointerup 까지
+  // stopPropagation 하면 브라우저가 native date picker 기본 동작을 취소해버려서
+  // picker 가 열리지 않는 현상 발생 (PC/모바일 간헐적 먹통의 근본 원인).
+  // Hammer 는 touch 만 쓰고, click/pointer/mouse 는 picker 기본 동작에 필요.
   //
   // [schedule.id] deps: 반환 후 배정탭 재진입 같은 플로우에서 schedule 이 바뀌어도
   // listener 재부착. (상위에 key={schedule.id} 도 있지만 이중 안전망.)
@@ -101,10 +105,6 @@ export default function ScheduleDetail({
       el.addEventListener("touchstart", stop, { passive: true });
       el.addEventListener("touchend", stop, { passive: true });
       el.addEventListener("touchmove", stop, { passive: true });
-      el.addEventListener("pointerdown", stop);
-      el.addEventListener("pointerup", stop);
-      el.addEventListener("mousedown", stop);
-      el.addEventListener("click", stop);
     };
     attach();
     if (!attached) raf = requestAnimationFrame(attach);
@@ -115,10 +115,6 @@ export default function ScheduleDetail({
       el.removeEventListener("touchstart", stop);
       el.removeEventListener("touchend", stop);
       el.removeEventListener("touchmove", stop);
-      el.removeEventListener("pointerdown", stop);
-      el.removeEventListener("pointerup", stop);
-      el.removeEventListener("mousedown", stop);
-      el.removeEventListener("click", stop);
     };
   }, [schedule.id]);
 
