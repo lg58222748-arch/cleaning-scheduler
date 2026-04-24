@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useLayoutEffect, useRef, useCallback } from "react";
 import { Schedule, Member, Comment } from "@/types";
 import { fetchComments, createComment, deleteCommentApi, updateSchedule as apiUpdateSchedule } from "@/lib/api";
 import { showConfirm } from "@/lib/dialog";
@@ -90,28 +90,20 @@ export default function ScheduleDetail({
   // picker 가 열리지 않는 현상 발생 (PC/모바일 간헐적 먹통의 근본 원인).
   // Hammer 는 touch 만 쓰고, click/pointer/mouse 는 picker 기본 동작에 필요.
   //
+  // useLayoutEffect: paint 전에 동기적으로 listener 부착 → 첫 user interaction 전에
+  // 확실히 attach 보장. concurrent render 에서 effect 가 지연 실행되어 listener
+  // 미부착 상태로 클릭이 들어오는 race condition 방지.
+  //
   // [schedule.id] deps: 반환 후 배정탭 재진입 같은 플로우에서 schedule 이 바뀌어도
   // listener 재부착. (상위에 key={schedule.id} 도 있지만 이중 안전망.)
-  // RAF 재시도: React 18 concurrent 렌더링에서 첫 effect 실행 시 ref.current 가
-  // 드물게 null 인 경우 대비 — 다음 페인트 프레임에 재시도.
-  useEffect(() => {
-    let attached: HTMLInputElement | null = null;
-    let raf = 0;
+  useLayoutEffect(() => {
+    const el = dateInputRef.current;
+    if (!el) return;
     const stop = (e: Event) => { e.stopPropagation(); };
-    const attach = () => {
-      const el = dateInputRef.current;
-      if (!el) return;
-      attached = el;
-      el.addEventListener("touchstart", stop, { passive: true });
-      el.addEventListener("touchend", stop, { passive: true });
-      el.addEventListener("touchmove", stop, { passive: true });
-    };
-    attach();
-    if (!attached) raf = requestAnimationFrame(attach);
+    el.addEventListener("touchstart", stop, { passive: true });
+    el.addEventListener("touchend", stop, { passive: true });
+    el.addEventListener("touchmove", stop, { passive: true });
     return () => {
-      if (raf) cancelAnimationFrame(raf);
-      const el = attached;
-      if (!el) return;
       el.removeEventListener("touchstart", stop);
       el.removeEventListener("touchend", stop);
       el.removeEventListener("touchmove", stop);
@@ -448,11 +440,12 @@ export default function ScheduleDetail({
                       type="date"
                       value={localDate}
                       onClick={(e) => {
-                        // 보험: 투명 input 탭만으로 picker 가 안 뜨는 iOS 15 이하 Safari
-                        // 대비 showPicker() 명시 호출. 미지원 브라우저에선 조용히 무시.
+                        // 투명 input 탭만으로 picker 가 안 뜨는 브라우저 (iOS 15 이하 Safari,
+                        // opacity:0 input 에 picker UI anchor 실패하는 Chrome 구버전 등) 대비.
+                        // 정상 동작하는 브라우저에선 default 와 중복 호출되지만 두 번째는 no-op.
                         const el = e.currentTarget as HTMLInputElement & { showPicker?: () => void };
                         if (typeof el.showPicker === "function") {
-                          try { el.showPicker(); } catch { /* user-gesture 손실 등 — 무시 */ }
+                          try { el.showPicker(); } catch { /* 이미 열렸거나 gesture 손실 — 무시 */ }
                         }
                       }}
                       onChange={(e) => {
