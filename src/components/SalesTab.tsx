@@ -962,7 +962,7 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
       showAlert("일정이 없습니다.\n우측 \"+ 일정 추가\" 버튼으로 일정을 추가해주세요.");
       return;
     }
-    // 서비스/날짜 검증
+    // 서비스/날짜/시간대 검증 — 하나라도 빠지면 캘린더 저장 금지
     for (let i = 0; i < schedules.length; i++) {
       if (!schedules[i].service || schedules[i].service === "선택") {
         showAlert(`${i + 1}번째 일정의 서비스가 선택되지 않았습니다.`);
@@ -970,6 +970,11 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
       }
       if (!schedules[i].date) {
         showAlert(`${i + 1}번째 일정의 날짜가 설정되지 않았습니다.`);
+        return;
+      }
+      // 시간대(오전/오후/시무/사이) 필수 — "선택" 상태면 저장 거부
+      if (!schedules[i].time || schedules[i].time === "선택") {
+        showAlert(`${i + 1}번째 일정의 시간대(오전/오후/시무/사이)가 선택되지 않았습니다.`);
         return;
       }
     }
