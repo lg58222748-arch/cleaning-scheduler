@@ -83,16 +83,26 @@ export default function ManageTab({ isAdmin, userRole, userName = "", allUsers =
         <SalesStatsSection userName={userName} userRole={userRole} allUsers={allUsers} schedules={schedules} />
       )}
 
-      {/* 현장팀 탭 */}
+      {/* 현장팀 탭 — 통계는 일정관리 탭으로 이동 */}
       {activeSubTab === "field" && (
-        <FieldStatsSection allUsers={allUsers} schedules={schedules} />
+        <div className="px-4 py-12 text-center text-xs text-gray-400">
+          현장팀 통계는 <span className="font-medium text-gray-500">일정관리</span> 탭으로 이동했습니다.
+        </div>
       )}
 
-      {/* 일정관리 탭 */}
+      {/* 일정관리 탭 — 일정관리자/대표/관리자 전용 */}
       {activeSubTab === "scheduler" && (
-        <div className="px-4 py-6 space-y-2">
-          <div className="text-xs font-bold text-gray-500 mb-2">일정 통계</div>
-          <SchedulerStats />
+        <div className="px-4 py-6 space-y-6">
+          {/* 일정 통계 */}
+          <div>
+            <div className="text-xs font-bold text-gray-500 mb-2">일정 통계</div>
+            <SchedulerStats />
+          </div>
+          {/* 팀원별 건수 (구 현장팀 탭) */}
+          <div>
+            <div className="text-xs font-bold text-gray-500 mb-2">팀원별 등록된 일정</div>
+            <FieldStatsSection allUsers={allUsers} schedules={schedules} />
+          </div>
         </div>
       )}
     </div>
