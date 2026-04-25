@@ -1333,8 +1333,17 @@ export default function Home() {
                 </button>
               );
             })()}
-            {/* 현장팀 사용자 목록 */}
-            {allUsers.filter(u => u.role === "field").map((u) => {
+            {/* 현장팀 사용자 목록 — 지역(branch) 기준으로 묶어 정렬 */}
+            {(() => {
+              const fieldUsers = allUsers.filter(u => u.role === "field");
+              const branchOf = (u: typeof fieldUsers[number]) => (u.branch || "").replace(/\[관리점\]/g, "").trim();
+              return [...fieldUsers].sort((a, b) => {
+                const ab = branchOf(a) || "ZZZ"; // 지역 없으면 맨 뒤
+                const bb = branchOf(b) || "ZZZ";
+                if (ab !== bb) return ab.localeCompare(bb, "ko");
+                return (a.name || "").localeCompare(b.name || "", "ko");
+              });
+            })().map((u) => {
               const uid = u.id;
               const isSelected = selectedMemberIds.has(uid);
               const colors = ["#3B82F6", "#EF4444", "#10B981", "#F59E0B", "#8B5CF6", "#EC4899", "#06B6D4", "#F97316"];
