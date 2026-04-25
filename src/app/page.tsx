@@ -1296,7 +1296,7 @@ export default function Home() {
               닫기
             </button>
           </div>
-          <div className="grid grid-cols-7 sm:grid-cols-8 md:grid-cols-10 lg:grid-cols-12 gap-0.5">
+          <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-7 lg:grid-cols-9 gap-0.5">
             {/* 전체 토글 버튼 (개별 클릭처럼 동작) */}
             {(() => {
               const fieldUsers = allUsers.filter(u => u.role === "field");
@@ -1340,6 +1340,8 @@ export default function Home() {
               const colors = ["#3B82F6", "#EF4444", "#10B981", "#F59E0B", "#8B5CF6", "#EC4899", "#06B6D4", "#F97316"];
               const colorIdx = allUsers.filter(x => x.role === "field").indexOf(u);
               const userColor = colors[colorIdx % colors.length];
+              const branchShort = (u.branch || "").replace(/\[관리점\]/g, "").trim();
+              const displayName = branchShort ? `${u.name}(${branchShort})` : u.name;
               return (
                 <button
                   key={uid}
@@ -1367,7 +1369,7 @@ export default function Home() {
                       </svg>
                     )}
                   </div>
-                  <span className="text-[11px] text-gray-800 truncate">{u.name}</span>
+                  <span className="text-[11px] text-gray-800 truncate" title={displayName}>{displayName}</span>
                 </button>
               );
             })}
