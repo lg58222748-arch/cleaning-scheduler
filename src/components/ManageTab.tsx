@@ -428,9 +428,9 @@ function normalizeMemberName(raw: string): string[] {
   return cleaned.split(",").map((s) => s.trim()).filter(Boolean);
 }
 
-// 휴무 일정 판별 (제목에 "휴무" 포함)
+// 카운트에서 제외할 일정 판별 (제목에 "휴무" 또는 "마감" 포함)
 function isOffDay(title: string | null | undefined): boolean {
-  return !!title && /휴무/.test(title);
+  return !!title && /휴무|마감/.test(title);
 }
 
 function FieldStatsSection({ allUsers }: {
@@ -466,7 +466,7 @@ function FieldStatsSection({ allUsers }: {
 
   useEffect(() => { load(); }, [load]);
 
-  // 달력에 있는 일정 (미배정 + 휴무 제외 = 실제 작업 일정)
+  // 달력에 있는 일정 (미배정 + 휴무/마감 제외 = 실제 작업 일정)
   const inCalendar = useMemo(
     () => monthSchedules.filter((s) => s.status !== "unassigned" && !isOffDay(s.title)),
     [monthSchedules]
@@ -519,7 +519,7 @@ function FieldStatsSection({ allUsers }: {
         <div className="text-2xl font-extrabold text-gray-800 mt-1">
           {loading ? "..." : `${total.toLocaleString("ko-KR")}건`}
         </div>
-        <div className="text-[11px] text-gray-400 mt-0.5">달력에 등록된 일정 (휴무 제외)</div>
+        <div className="text-[11px] text-gray-400 mt-0.5">달력에 등록된 일정 (휴무·마감 제외)</div>
       </div>
 
       {/* 팀원별 건수 */}
