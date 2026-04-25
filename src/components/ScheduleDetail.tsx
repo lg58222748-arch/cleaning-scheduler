@@ -610,15 +610,35 @@ export default function ScheduleDetail({
             <button
               onClick={() => {
                 if (!assignMemberId || !onAssign) return;
+
+                // 1) 배정 실행
+                let assigned = false;
                 if (assignMemberId.startsWith("user:")) {
                   const parts = assignMemberId.split(":");
                   const userId = parts[1];
                   const userName = parts.slice(2).join(":");
                   onAssign(schedule.id, userId, userName);
-                  onClose();
+                  assigned = true;
                 } else {
                   const member = members.find(m => m.id === assignMemberId);
-                  if (member) { onAssign(schedule.id, member.id, member.name); onClose(); }
+                  if (member) { onAssign(schedule.id, member.id, member.name); assigned = true; }
+                }
+                if (!assigned) return;
+
+                // 2) 펜딩 편집(제목/본문) 자동 저장 — 사용자가 저장 따로 누르지 않아도 반영
+                const updates: Partial<Schedule> = {};
+                if (titleText !== schedule.title) { updates.title = titleText; schedule.title = titleText; setEditingTitle(false); }
+                if (noteChanged) { updates.note = noteText; schedule.note = noteText; setNoteChanged(false); }
+
+                onClose();
+                if (Object.keys(updates).length > 0) {
+                  const patch = { ...updates, id: schedule.id } as Partial<Schedule>;
+                  setTimeout(() => {
+                    onUpdated?.(patch);
+                    apiUpdateSchedule(schedule.id, updates).catch((err) => {
+                      console.error("[배정+저장] 서버 동기화 실패:", err);
+                    });
+                  }, 0);
                 }
               }}
               disabled={!assignMemberId}
