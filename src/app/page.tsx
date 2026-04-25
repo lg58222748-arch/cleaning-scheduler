@@ -1285,7 +1285,7 @@ export default function Home() {
 
       {/* 팀원 필터 패널 - 달력에서만 */}
       {showMemberFilter && canAssign && activeTab === "calendar" && (
-        <div className="bg-white border-b border-gray-200 px-4 pb-3 z-30 max-h-[50vh] overflow-y-auto">
+        <div className="bg-white border-b border-gray-200 px-4 pb-3 z-30 max-h-[35vh] overflow-y-auto">
           {/* 헤더(팀원 필터 라벨 + 닫기 버튼) 를 스크롤 시에도 고정되게 sticky */}
           <div className="sticky top-0 bg-white pt-3 pb-2 -mx-4 px-4 mb-2 flex items-center justify-between border-b border-gray-100 z-10">
             <span className="text-xs font-bold text-gray-700">팀원 필터</span>
@@ -1296,8 +1296,8 @@ export default function Home() {
               닫기
             </button>
           </div>
-          <div className="space-y-1">
-            {/* 전체 토글 버튼 (개별 클릭처럼 동작) */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-1">
+            {/* 전체 토글 버튼 (개별 클릭처럼 동작) — 모든 열에 걸쳐 한 줄 차지 */}
             {(() => {
               const fieldUsers = allUsers.filter(u => u.role === "field");
               const allSelected = fieldUsers.length > 0 && fieldUsers.every(u => selectedMemberIds.has(u.id));
@@ -1314,7 +1314,7 @@ export default function Home() {
                       setFilterActive(true);
                     }
                   }}
-                  className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg active:bg-gray-50 ${allSelected ? "bg-blue-50" : ""}`}
+                  className={`col-span-full w-full flex items-center gap-2 px-2 py-1.5 rounded-lg active:bg-gray-50 ${allSelected ? "bg-blue-50" : ""}`}
                 >
                   <div
                     className="w-5 h-5 rounded flex items-center justify-center border-2 shrink-0"
