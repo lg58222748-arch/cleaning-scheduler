@@ -1285,7 +1285,7 @@ export default function Home() {
 
       {/* 팀원 필터 패널 - 달력에서만 */}
       {showMemberFilter && canAssign && activeTab === "calendar" && (
-        <div className="bg-white border-b border-gray-200 px-2 pb-2 z-30 max-h-[12vh] overflow-y-auto">
+        <div className="bg-white border-b border-gray-200 px-2 pb-2 z-30 max-h-[16vh] overflow-y-auto">
           {/* 헤더(팀원 필터 라벨 + 닫기 버튼) 를 스크롤 시에도 고정되게 sticky */}
           <div className="sticky top-0 bg-white pt-2 pb-1.5 -mx-2 px-2 mb-1.5 flex items-center justify-between border-b border-gray-100 z-10">
             <span className="text-xs font-bold text-gray-700">팀원 필터</span>
@@ -1333,14 +1333,27 @@ export default function Home() {
                 </button>
               );
             })()}
-            {/* 현장팀 사용자 목록 — 지역(branch) 기준으로 묶어 정렬 */}
+            {/* 현장팀 사용자 목록 — 지역(branch) 기준 묶음, 멤버 많은 지역부터 */}
             {(() => {
               const fieldUsers = allUsers.filter(u => u.role === "field");
-              const branchOf = (u: typeof fieldUsers[number]) => (u.branch || "").replace(/\[관리점\]/g, "").trim();
+              const branchOf = (u: typeof fieldUsers[number]) => (u.branch || "").replace(/\[관리점\]/g, "").trim() || "ZZZ";
+              // 지역별 멤버 수 집계 (멤버 많은 지역이 먼저 보이도록)
+              const branchCount: Record<string, number> = {};
+              for (const u of fieldUsers) {
+                const b = branchOf(u);
+                branchCount[b] = (branchCount[b] || 0) + 1;
+              }
               return [...fieldUsers].sort((a, b) => {
-                const ab = branchOf(a) || "ZZZ"; // 지역 없으면 맨 뒤
-                const bb = branchOf(b) || "ZZZ";
-                if (ab !== bb) return ab.localeCompare(bb, "ko");
+                const ab = branchOf(a);
+                const bb = branchOf(b);
+                if (ab !== bb) {
+                  // 1차: 같은 지역의 멤버 수 desc
+                  const diff = (branchCount[bb] || 0) - (branchCount[ab] || 0);
+                  if (diff !== 0) return diff;
+                  // 동률이면 지역명 가나다순
+                  return ab.localeCompare(bb, "ko");
+                }
+                // 같은 지역 내에서는 이름 가나다순
                 return (a.name || "").localeCompare(b.name || "", "ko");
               });
             })().map((u) => {
