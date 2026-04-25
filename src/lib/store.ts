@@ -104,6 +104,11 @@ export async function getSchedules(): Promise<Schedule[]> {
   return (data || []).map(rowToSchedule);
 }
 
+export async function getSchedule(id: string): Promise<Schedule | undefined> {
+  const { data } = await supabase.from("schedules").select("*").eq("id", id).single();
+  return data ? rowToSchedule(data) : undefined;
+}
+
 export async function getSchedulesByRange(start: string, end: string): Promise<Schedule[]> {
   // 배정된 일정만 (unassigned, deleted 제외)
   const { data } = await supabase.from("schedules").select("*").gte("date", start).lte("date", end).not("status", "in", '("deleted","unassigned")').order("date");
