@@ -393,6 +393,21 @@ function CeoSection({ onRefresh, allUsers, members, schedules }: {
 
 
 /* ════════════ 현장팀 통계 섹션 ════════════ */
+// 팀장별 월간 희망 배정 갯수 (이름 끝부분으로 매칭 — 예: "이동환" → "동환" → 250)
+const DESIRED_COUNTS: Record<string, number> = {
+  "동환": 250, "기열": 50, "지혜": 50, "성원": 50, "승우": 50,
+  "진관": 50, "예완": 40, "형욱": 40, "상태": 50, "규민": 44,
+  "두용": 50, "인범": 44, "진희": 44, "인혁": 30, "인홍": 50,
+  "로운": 50, "조용": 50,
+};
+function getDesiredCount(fullName: string): number {
+  if (DESIRED_COUNTS[fullName] !== undefined) return DESIRED_COUNTS[fullName];
+  for (const short of Object.keys(DESIRED_COUNTS)) {
+    if (fullName.endsWith(short)) return DESIRED_COUNTS[short];
+  }
+  return 0;
+}
+
 function FieldStatsSection({ allUsers }: {
   allUsers: { id?: string; name: string; username?: string; role?: string; address?: string; branch?: string }[];
   schedules: Schedule[];
@@ -444,6 +459,7 @@ function FieldStatsSection({ allUsers }: {
       name: u.name,
       branch: (u.branch || "").replace(/\[관리점\]/, "").trim() || "미지정",
       count: counts[u.name] || 0,
+      desired: getDesiredCount(u.name),
     }));
     return rows.sort((a, b) => b.count - a.count);
   }, [inCalendar, allUsers]);
@@ -480,7 +496,10 @@ function FieldStatsSection({ allUsers }: {
 
       {/* 팀원별 건수 */}
       <div className="rounded-xl border border-gray-200 bg-white overflow-hidden">
-        <div className="px-3 py-2 border-b border-gray-100 text-xs font-bold text-gray-700">팀원별 건수</div>
+        <div className="px-3 py-2 border-b border-gray-100 flex items-center justify-between">
+          <span className="text-xs font-bold text-gray-700">팀원별 건수</span>
+          <span className="text-[10px] text-gray-400">희망 / 현재배정</span>
+        </div>
         {loading ? (
           <div className="py-6 text-center text-gray-400 text-sm">불러오는 중...</div>
         ) : memberRows.length === 0 ? (
@@ -493,9 +512,15 @@ function FieldStatsSection({ allUsers }: {
                   <span className="text-sm font-medium text-gray-800 truncate">{m.name}</span>
                   <span className="text-[10px] text-gray-400 shrink-0">{m.branch}</span>
                 </div>
-                <span className={`text-sm font-bold shrink-0 ${m.count > 0 ? "text-blue-600" : "text-gray-300"}`}>
-                  {m.count}건
-                </span>
+                <div className="flex items-baseline gap-2 shrink-0">
+                  <span className="text-xs text-gray-400 tabular-nums w-10 text-right">
+                    {m.desired > 0 ? m.desired : "-"}
+                  </span>
+                  <span className="text-gray-300 text-xs">/</span>
+                  <span className={`text-sm font-bold tabular-nums w-12 text-right ${m.count > 0 ? "text-blue-600" : "text-gray-300"}`}>
+                    {m.count}건
+                  </span>
+                </div>
               </div>
             ))}
           </div>
