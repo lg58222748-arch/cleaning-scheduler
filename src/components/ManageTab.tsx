@@ -418,6 +418,21 @@ function getDesiredCount(fullName: string): number {
   return 0;
 }
 
+// 일정의 memberName 을 회원 이름으로 정규화
+// 예: "A서승우(화성)" → ["서승우"], "A김상준,김지혜(의정부)" → ["김상준","김지혜"], "이동환(충경)" → ["이동환"]
+function normalizeMemberName(raw: string): string[] {
+  const cleaned = raw
+    .replace(/^[A-Z]\s*/, "")     // 선두 영문 prefix (A/T/Z 등) 제거
+    .replace(/\([^)]*\)/g, "")     // 괄호 안 지역 표기 제거
+    .trim();
+  return cleaned.split(",").map((s) => s.trim()).filter(Boolean);
+}
+
+// 휴무 일정 판별 (제목에 "휴무" 포함)
+function isOffDay(title: string | null | undefined): boolean {
+  return !!title && /휴무/.test(title);
+}
+
 function FieldStatsSection({ allUsers }: {
   allUsers: { id?: string; name: string; username?: string; role?: string; address?: string; branch?: string }[];
   schedules: Schedule[];
@@ -451,18 +466,21 @@ function FieldStatsSection({ allUsers }: {
 
   useEffect(() => { load(); }, [load]);
 
-  // 달력에 있는 일정 (미배정 제외 = 배정 탭이 아닌 달력에 보이는 것)
+  // 달력에 있는 일정 (미배정 + 휴무 제외 = 실제 작업 일정)
   const inCalendar = useMemo(
-    () => monthSchedules.filter((s) => s.status !== "unassigned"),
+    () => monthSchedules.filter((s) => s.status !== "unassigned" && !isOffDay(s.title)),
     [monthSchedules]
   );
 
-  // 현장팀 팀원별 달력 건수
+  // 현장팀 팀원별 달력 건수 (이름 표기 정규화 — "A서승우(화성)" 등 변형도 같은 사람으로 카운트)
   const memberRows = useMemo(() => {
     const counts: Record<string, number> = {};
     for (const s of inCalendar) {
       if (!s.memberName) continue;
-      counts[s.memberName] = (counts[s.memberName] || 0) + 1;
+      const names = normalizeMemberName(s.memberName);
+      for (const n of names) {
+        counts[n] = (counts[n] || 0) + 1;
+      }
     }
     const fieldUsers = allUsers.filter((u) => u.role === "field");
     const rows = fieldUsers.map((u) => ({
@@ -501,7 +519,7 @@ function FieldStatsSection({ allUsers }: {
         <div className="text-2xl font-extrabold text-gray-800 mt-1">
           {loading ? "..." : `${total.toLocaleString("ko-KR")}건`}
         </div>
-        <div className="text-[11px] text-gray-400 mt-0.5">달력에 등록된 일정</div>
+        <div className="text-[11px] text-gray-400 mt-0.5">달력에 등록된 일정 (휴무 제외)</div>
       </div>
 
       {/* 팀원별 건수 */}
