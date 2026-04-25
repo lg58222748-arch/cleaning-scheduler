@@ -1296,7 +1296,7 @@ export default function Home() {
               닫기
             </button>
           </div>
-          <div className="grid grid-cols-5 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 gap-0.5">
+          <div className="grid grid-cols-7 sm:grid-cols-8 md:grid-cols-10 lg:grid-cols-12 gap-0.5">
             {/* 전체 토글 버튼 (개별 클릭처럼 동작) */}
             {(() => {
               const fieldUsers = allUsers.filter(u => u.role === "field");
@@ -1329,7 +1329,7 @@ export default function Home() {
                       </svg>
                     )}
                   </div>
-                  <span className="text-xs text-gray-800 font-medium truncate">전체</span>
+                  <span className="text-[11px] text-gray-800 font-medium truncate">전체</span>
                 </button>
               );
             })()}
@@ -1367,7 +1367,7 @@ export default function Home() {
                       </svg>
                     )}
                   </div>
-                  <span className="text-xs text-gray-800 truncate">{u.name}</span>
+                  <span className="text-[11px] text-gray-800 truncate">{u.name}</span>
                 </button>
               );
             })}
