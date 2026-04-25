@@ -1123,7 +1123,7 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
                   <span className="w-5 h-5 bg-green-700 text-white rounded-full text-xs font-bold flex items-center justify-center">{i + 1}</span>
                   <span className="text-sm font-bold text-green-800">{s.name}</span>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex flex-col sm:flex-row gap-2">
                   <div className="flex-1">
                     <label className="text-xs text-gray-400 block">견적금액</label>
                     <input value={s.quote} onChange={(e) => updateService(s.name, "quote", e.target.value)} placeholder="예) 418000원" type="tel"
