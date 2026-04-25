@@ -1285,9 +1285,9 @@ export default function Home() {
 
       {/* 팀원 필터 패널 - 달력에서만 */}
       {showMemberFilter && canAssign && activeTab === "calendar" && (
-        <div className="bg-white border-b border-gray-200 px-3 pb-2 z-30 max-h-[25vh] overflow-y-auto">
+        <div className="bg-white border-b border-gray-200 px-2 pb-2 z-30 max-h-[22vh] overflow-y-auto">
           {/* 헤더(팀원 필터 라벨 + 닫기 버튼) 를 스크롤 시에도 고정되게 sticky */}
-          <div className="sticky top-0 bg-white pt-2 pb-1.5 -mx-3 px-3 mb-1.5 flex items-center justify-between border-b border-gray-100 z-10">
+          <div className="sticky top-0 bg-white pt-2 pb-1.5 -mx-2 px-2 mb-1.5 flex items-center justify-between border-b border-gray-100 z-10">
             <span className="text-xs font-bold text-gray-700">팀원 필터</span>
             <button
               onClick={() => { setShowMemberFilter(false); consumeHash(); }}
@@ -1296,7 +1296,7 @@ export default function Home() {
               닫기
             </button>
           </div>
-          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-0.5">
+          <div className="grid grid-cols-5 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 gap-0.5">
             {/* 전체 토글 버튼 (개별 클릭처럼 동작) */}
             {(() => {
               const fieldUsers = allUsers.filter(u => u.role === "field");
@@ -1314,7 +1314,7 @@ export default function Home() {
                       setFilterActive(true);
                     }
                   }}
-                  className={`w-full flex items-center gap-1.5 px-1.5 py-1 rounded-md active:bg-gray-50 ${allSelected ? "bg-blue-50" : ""}`}
+                  className={`w-full flex items-center gap-1 px-1 py-1 rounded-md active:bg-gray-50 ${allSelected ? "bg-blue-50" : ""}`}
                 >
                   <div
                     className="w-4 h-4 rounded flex items-center justify-center border-2 shrink-0"
@@ -1352,7 +1352,7 @@ export default function Home() {
                       return next;
                     });
                   }}
-                  className={`w-full flex items-center gap-1.5 px-1.5 py-1 rounded-md active:bg-gray-50 ${isSelected ? "bg-gray-50" : ""}`}
+                  className={`w-full flex items-center gap-1 px-1 py-1 rounded-md active:bg-gray-50 ${isSelected ? "bg-gray-50" : ""}`}
                 >
                   <div
                     className="w-4 h-4 rounded flex items-center justify-center border-2 shrink-0"
