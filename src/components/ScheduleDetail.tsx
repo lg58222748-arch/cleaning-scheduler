@@ -611,7 +611,12 @@ export default function ScheduleDetail({
               onClick={() => {
                 if (!assignMemberId || !onAssign) return;
 
-                // 1) 배정 실행
+                // 1) 펜딩 편집(제목/본문) 먼저 로컬 반영 — 부모가 새 제목으로 리스트 렌더하도록
+                const updates: Partial<Schedule> = {};
+                if (titleText !== schedule.title) { updates.title = titleText; schedule.title = titleText; setEditingTitle(false); }
+                if (noteChanged) { updates.note = noteText; schedule.note = noteText; setNoteChanged(false); }
+
+                // 2) 배정 실행
                 let assigned = false;
                 if (assignMemberId.startsWith("user:")) {
                   const parts = assignMemberId.split(":");
@@ -625,11 +630,7 @@ export default function ScheduleDetail({
                 }
                 if (!assigned) return;
 
-                // 2) 펜딩 편집(제목/본문) 자동 저장 — 사용자가 저장 따로 누르지 않아도 반영
-                const updates: Partial<Schedule> = {};
-                if (titleText !== schedule.title) { updates.title = titleText; schedule.title = titleText; setEditingTitle(false); }
-                if (noteChanged) { updates.note = noteText; schedule.note = noteText; setNoteChanged(false); }
-
+                // 3) 모달 닫기 + 제목/본문 서버 동기화 (배정 API 와 다른 컬럼이라 충돌 없음)
                 onClose();
                 if (Object.keys(updates).length > 0) {
                   const patch = { ...updates, id: schedule.id } as Partial<Schedule>;
