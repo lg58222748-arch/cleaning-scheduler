@@ -1285,19 +1285,19 @@ export default function Home() {
 
       {/* 팀원 필터 패널 - 달력에서만 */}
       {showMemberFilter && canAssign && activeTab === "calendar" && (
-        <div className="bg-white border-b border-gray-200 px-4 pb-3 z-30 max-h-[35vh] overflow-y-auto">
+        <div className="bg-white border-b border-gray-200 px-3 pb-2 z-30 max-h-[25vh] overflow-y-auto">
           {/* 헤더(팀원 필터 라벨 + 닫기 버튼) 를 스크롤 시에도 고정되게 sticky */}
-          <div className="sticky top-0 bg-white pt-3 pb-2 -mx-4 px-4 mb-2 flex items-center justify-between border-b border-gray-100 z-10">
+          <div className="sticky top-0 bg-white pt-2 pb-1.5 -mx-3 px-3 mb-1.5 flex items-center justify-between border-b border-gray-100 z-10">
             <span className="text-xs font-bold text-gray-700">팀원 필터</span>
             <button
               onClick={() => { setShowMemberFilter(false); consumeHash(); }}
-              className="px-3 py-1.5 bg-blue-500 text-white rounded-lg text-xs font-bold active:bg-blue-600"
+              className="px-3 py-1 bg-blue-500 text-white rounded-lg text-xs font-bold active:bg-blue-600"
             >
               닫기
             </button>
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-1">
-            {/* 전체 토글 버튼 (개별 클릭처럼 동작) — 모든 열에 걸쳐 한 줄 차지 */}
+          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-0.5">
+            {/* 전체 토글 버튼 (개별 클릭처럼 동작) */}
             {(() => {
               const fieldUsers = allUsers.filter(u => u.role === "field");
               const allSelected = fieldUsers.length > 0 && fieldUsers.every(u => selectedMemberIds.has(u.id));
@@ -1314,22 +1314,22 @@ export default function Home() {
                       setFilterActive(true);
                     }
                   }}
-                  className={`col-span-full w-full flex items-center gap-2 px-2 py-1.5 rounded-lg active:bg-gray-50 ${allSelected ? "bg-blue-50" : ""}`}
+                  className={`w-full flex items-center gap-1.5 px-1.5 py-1 rounded-md active:bg-gray-50 ${allSelected ? "bg-blue-50" : ""}`}
                 >
                   <div
-                    className="w-5 h-5 rounded flex items-center justify-center border-2 shrink-0"
+                    className="w-4 h-4 rounded flex items-center justify-center border-2 shrink-0"
                     style={{
                       borderColor: "#3B82F6",
                       backgroundColor: allSelected ? "#3B82F6" : "transparent",
                     }}
                   >
                     {allSelected && (
-                      <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                      <svg className="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={4} d="M5 13l4 4L19 7" />
                       </svg>
                     )}
                   </div>
-                  <span className="text-sm text-gray-800 font-medium">전체</span>
+                  <span className="text-xs text-gray-800 font-medium truncate">전체</span>
                 </button>
               );
             })()}
@@ -1352,22 +1352,22 @@ export default function Home() {
                       return next;
                     });
                   }}
-                  className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg active:bg-gray-50 ${isSelected ? "bg-gray-50" : ""}`}
+                  className={`w-full flex items-center gap-1.5 px-1.5 py-1 rounded-md active:bg-gray-50 ${isSelected ? "bg-gray-50" : ""}`}
                 >
                   <div
-                    className="w-5 h-5 rounded flex items-center justify-center border-2 shrink-0"
+                    className="w-4 h-4 rounded flex items-center justify-center border-2 shrink-0"
                     style={{
                       borderColor: userColor,
                       backgroundColor: isSelected ? userColor : "transparent",
                     }}
                   >
                     {isSelected && (
-                      <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                      <svg className="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={4} d="M5 13l4 4L19 7" />
                       </svg>
                     )}
                   </div>
-                  <span className="text-sm text-gray-800">{u.name}</span>
+                  <span className="text-xs text-gray-800 truncate">{u.name}</span>
                 </button>
               );
             })}
