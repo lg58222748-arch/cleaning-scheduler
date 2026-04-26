@@ -1,5 +1,5 @@
-// 버전 올리면 구 캐시 전부 자동 정리. 롤백 필요 시 v8 → v7 로 내리면 됨.
-const CACHE_VERSION = 'v8';
+// 버전 올리면 구 캐시 전부 자동 정리. 롤백 필요 시 v9 → v8 로 내리면 됨.
+const CACHE_VERSION = 'v9';
 const STATIC_CACHE = `static-${CACHE_VERSION}`;
 const SHELL_CACHE = `shell-${CACHE_VERSION}`;
 const SHELL_URLS = ['/', '/manifest.json', '/logo.jpg'];

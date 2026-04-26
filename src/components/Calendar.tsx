@@ -46,11 +46,11 @@ const DayCell = memo(function DayCell({
   return (
     <button
       onClick={() => !isSnapping && onSelectDate(day)}
-      className={`px-0.5 pt-0.5 pb-0 relative flex flex-col items-center ${
+      className={`px-0.5 pt-0 pb-0 relative flex flex-col items-center ${
         isSelected ? "bg-blue-50 ring-2 ring-blue-400 ring-inset" : "active:bg-gray-50"
       } ${!isCurrentMonth ? "opacity-40" : ""}`}
     >
-      <span className={`inline-flex items-center justify-center w-5 h-5 text-xs rounded-full ${
+      <span className={`inline-flex items-center justify-center w-4 h-4 text-[11px] rounded-full ${
         isTodayDay ? "bg-blue-500 text-white font-bold"
           : dayOfWeek === 0 ? "text-red-500"
           : dayOfWeek === 6 ? "text-blue-500"
@@ -63,8 +63,8 @@ const DayCell = memo(function DayCell({
           const fullName = s.title;
           const schedColor = s.color || "#FDDCCC";
           return (
-            <div key={s.id} className="text-[9px] md:text-[11px] leading-[1.2] md:leading-[1.4] px-0.5 py-0.5 rounded font-medium overflow-hidden mb-0.5 md:cursor-pointer md:hover:opacity-80"
-              style={{ backgroundColor: s.status === "completed" ? "#D1FAE5" : schedColor, color: "#555", maxHeight: "2.6em", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const }}
+            <div key={s.id} className="text-[9px] md:text-[11px] leading-[1.1] md:leading-[1.3] px-0.5 py-0 rounded font-medium overflow-hidden mb-px md:cursor-pointer md:hover:opacity-80"
+              style={{ backgroundColor: s.status === "completed" ? "#D1FAE5" : schedColor, color: "#555", maxHeight: "2.3em", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const }}
               onClick={(e) => { if (onScheduleClick && window.innerWidth >= 768) { e.stopPropagation(); onScheduleClick(s); } }}>
               {fullName}
             </div>
