@@ -212,8 +212,8 @@ function AssignTab({ members, schedules, onAssigned, onDeleted, onOpenDetail, on
                         return (
                           <div
                             key={s.id}
-                            className="text-[9px] md:text-[11px] leading-[1.2] md:leading-[1.4] px-0.5 py-0 rounded font-medium overflow-hidden mb-px"
-                            style={{ backgroundColor: schedColor, color: "#9a3412", maxHeight: "2.4em", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const }}
+                            className="text-[9px] md:text-[11px] leading-[1.2] md:leading-[1.4] max-h-[2.4em] md:max-h-[3em] px-0.5 py-0 md:py-0.5 rounded font-medium overflow-hidden mb-px"
+                            style={{ backgroundColor: schedColor, color: "#9a3412", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const }}
                           >
                             {fullName}
                           </div>

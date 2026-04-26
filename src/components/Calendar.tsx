@@ -63,8 +63,8 @@ const DayCell = memo(function DayCell({
           const fullName = s.title;
           const schedColor = s.color || "#FDDCCC";
           return (
-            <div key={s.id} className="text-[9px] md:text-[11px] leading-[1.2] md:leading-[1.4] px-0.5 py-0 rounded font-medium overflow-hidden mb-px md:cursor-pointer md:hover:opacity-80"
-              style={{ backgroundColor: s.status === "completed" ? "#D1FAE5" : schedColor, color: "#555", maxHeight: "2.4em", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const }}
+            <div key={s.id} className="text-[9px] md:text-[11px] leading-[1.2] md:leading-[1.4] max-h-[2.4em] md:max-h-[3em] px-0.5 py-0 md:py-0.5 rounded font-medium overflow-hidden mb-px md:cursor-pointer md:hover:opacity-80"
+              style={{ backgroundColor: s.status === "completed" ? "#D1FAE5" : schedColor, color: "#555", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const }}
               onClick={(e) => { if (onScheduleClick && window.innerWidth >= 768) { e.stopPropagation(); onScheduleClick(s); } }}>
               {fullName}
             </div>
