@@ -202,7 +202,7 @@ function AssignTab({ members, schedules, onAssigned, onDeleted, onOpenDetail, on
                       isSelected ? "bg-orange-50 ring-2 ring-orange-400 ring-inset" : "active:bg-gray-50"
                     } ${!isCurrentMonth ? "opacity-40" : ""}`}
                   >
-                    <span className={`inline-flex items-center justify-center w-4 h-4 text-[11px] rounded-full ${
+                    <span className={`inline-flex items-center justify-center w-5 h-5 text-xs rounded-full ${
                       isToday(d) ? "bg-orange-500 text-white font-bold"
                         : dayOfWeek === 0 ? "text-red-500"
                         : dayOfWeek === 6 ? "text-blue-500"
@@ -217,8 +217,8 @@ function AssignTab({ members, schedules, onAssigned, onDeleted, onOpenDetail, on
                         return (
                           <div
                             key={s.id}
-                            className="text-[9px] md:text-[11px] leading-[1.1] md:leading-[1.3] px-0.5 py-0 rounded font-medium overflow-hidden mb-px"
-                            style={{ backgroundColor: schedColor, color: "#9a3412", maxHeight: "2.3em", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const }}
+                            className="text-[9px] md:text-[11px] leading-[1.2] md:leading-[1.4] px-0.5 py-0 rounded font-medium overflow-hidden mb-px"
+                            style={{ backgroundColor: schedColor, color: "#9a3412", maxHeight: "2.4em", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const }}
                           >
                             {fullName}
                           </div>
