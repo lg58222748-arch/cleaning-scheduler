@@ -162,14 +162,9 @@ function AssignTab({ members, schedules, onAssigned, onDeleted, onOpenDetail, on
             <h2 className="text-base font-bold text-gray-800">{format(currentMonth, "yyyy년 M월", { locale: ko })}</h2>
             <p className="text-xs text-orange-500 font-medium">미배정 {unassigned.length}건</p>
           </div>
-          <div className="flex items-center gap-1">
-            <button onClick={() => { setShowTrash(true); loadTrash(); }} className="p-1.5 active:bg-gray-100 rounded-lg">
-              <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-            </button>
-            <button onClick={() => animateMonth("left", addMonths(currentMonth, 1))} className="p-1.5 active:bg-gray-100 rounded-lg">
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
-            </button>
-          </div>
+          <button onClick={() => animateMonth("left", addMonths(currentMonth, 1))} className="p-1.5 active:bg-gray-100 rounded-lg">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+          </button>
         </div>
 
         {/* 요일 — 달력 탭과 동일 사이즈 */}
@@ -186,7 +181,7 @@ function AssignTab({ members, schedules, onAssigned, onDeleted, onOpenDetail, on
           slideDir === "left" ? "-translate-x-4 opacity-0" : slideDir === "right" ? "translate-x-4 opacity-0" : "translate-x-0 opacity-100"
         }`}>
           {weeks.map((week, wi) => (
-            <div key={wi} className="grid grid-cols-7 divide-x divide-gray-50 flex-1 min-h-[58px] max-h-[78px]">
+            <div key={wi} className="grid grid-cols-7 divide-x divide-gray-50 flex-1 min-h-[58px] max-h-[78px] md:max-h-none">
               {week.map((d) => {
                 const dateStr = format(d, "yyyy-MM-dd");
                 const dayScheds = scheduleMap.get(dateStr) || [];
