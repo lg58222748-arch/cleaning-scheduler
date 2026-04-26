@@ -71,7 +71,7 @@ const DayCell = memo(function DayCell({
           );
         })}
         {daySchedules.length > 2 && (
-          <div className="absolute bottom-0 right-0 text-[10px] md:text-[12px] text-blue-600 font-bold bg-blue-100 px-1.5 py-0.5 rounded-full leading-none border border-blue-300">+{daySchedules.length - 2}</div>
+          <div className="absolute bottom-0 right-0 text-[8px] md:text-[10px] text-blue-600 font-bold bg-blue-100 px-1 py-0 rounded-full leading-none border border-blue-300">+{daySchedules.length - 2}</div>
         )}
       </div>
     </button>
@@ -260,7 +260,7 @@ export default memo(function Calendar({
       {/* Day names */}
       <div className="grid grid-cols-7 border-b border-gray-100">
         {dayNames.map((name, i) => (
-          <div key={name} className={`py-2 text-center text-sm font-medium ${i === 0 ? "text-red-500" : i === 6 ? "text-blue-500" : "text-gray-500"}`}>
+          <div key={name} className={`py-1 text-center text-xs font-medium ${i === 0 ? "text-red-500" : i === 6 ? "text-blue-500" : "text-gray-500"}`}>
             {name}
           </div>
         ))}

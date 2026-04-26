@@ -153,9 +153,9 @@ function AssignTab({ members, schedules, onAssigned, onDeleted, onOpenDetail, on
     <div className="h-full flex flex-col" onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
       {/* 미배정 캘린더 */}
       <div className="bg-white flex-1 flex flex-col">
-        {/* 헤더 */}
-        <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100">
-          <button onClick={() => animateMonth("right", subMonths(currentMonth, 1))} className="p-2 active:bg-gray-100 rounded-lg">
+        {/* 헤더 — 달력 탭과 동일 사이즈 */}
+        <div className="flex items-center justify-between px-6 py-2 border-b border-gray-100">
+          <button onClick={() => animateMonth("right", subMonths(currentMonth, 1))} className="p-1.5 active:bg-gray-100 rounded-lg">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
           </button>
           <div className="text-center">
@@ -163,19 +163,19 @@ function AssignTab({ members, schedules, onAssigned, onDeleted, onOpenDetail, on
             <p className="text-xs text-orange-500 font-medium">미배정 {unassigned.length}건</p>
           </div>
           <div className="flex items-center gap-1">
-            <button onClick={() => { setShowTrash(true); loadTrash(); }} className="p-2 active:bg-gray-100 rounded-lg">
+            <button onClick={() => { setShowTrash(true); loadTrash(); }} className="p-1.5 active:bg-gray-100 rounded-lg">
               <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
             </button>
-            <button onClick={() => animateMonth("left", addMonths(currentMonth, 1))} className="p-2 active:bg-gray-100 rounded-lg">
+            <button onClick={() => animateMonth("left", addMonths(currentMonth, 1))} className="p-1.5 active:bg-gray-100 rounded-lg">
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
             </button>
           </div>
         </div>
 
-        {/* 요일 */}
+        {/* 요일 — 달력 탭과 동일 사이즈 */}
         <div className="grid grid-cols-7 border-b border-gray-100">
           {dayNames.map((name, i) => (
-            <div key={name} className={`py-2 text-center text-sm font-medium ${i === 0 ? "text-red-500" : i === 6 ? "text-blue-500" : "text-gray-500"}`}>
+            <div key={name} className={`py-1 text-center text-xs font-medium ${i === 0 ? "text-red-500" : i === 6 ? "text-blue-500" : "text-gray-500"}`}>
               {name}
             </div>
           ))}
@@ -218,14 +218,14 @@ function AssignTab({ members, schedules, onAssigned, onDeleted, onOpenDetail, on
                           <div
                             key={s.id}
                             className="text-[9px] md:text-[11px] leading-[1.2] md:leading-[1.4] px-0.5 py-0.5 rounded font-medium overflow-hidden mb-0.5"
-                            style={{ backgroundColor: schedColor, color: "#9a3412", maxHeight: "4em", display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical" as const }}
+                            style={{ backgroundColor: schedColor, color: "#9a3412", maxHeight: "2.6em", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const }}
                           >
                             {fullName}
                           </div>
                         );
                       })}
                       {dayScheds.length > 2 && (
-                        <div className="absolute bottom-0 right-0 text-[10px] md:text-[12px] text-blue-600 font-bold bg-blue-100 px-1.5 py-0.5 rounded-full leading-none border border-blue-300">+{dayScheds.length - 2}</div>
+                        <div className="absolute bottom-0 right-0 text-[8px] md:text-[10px] text-blue-600 font-bold bg-blue-100 px-1 py-0 rounded-full leading-none border border-blue-300">+{dayScheds.length - 2}</div>
                       )}
                     </div>
                   </button>
