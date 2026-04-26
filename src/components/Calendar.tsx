@@ -64,7 +64,7 @@ const DayCell = memo(function DayCell({
           const schedColor = s.color || "#FDDCCC";
           return (
             <div key={s.id} className="text-[9px] md:text-[11px] leading-[1.2] md:leading-[1.4] px-0.5 py-0.5 rounded font-medium overflow-hidden mb-0.5 md:cursor-pointer md:hover:opacity-80"
-              style={{ backgroundColor: s.status === "completed" ? "#D1FAE5" : schedColor, color: "#555", maxHeight: "4em", display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical" as const }}
+              style={{ backgroundColor: s.status === "completed" ? "#D1FAE5" : schedColor, color: "#555", maxHeight: "2.6em", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const }}
               onClick={(e) => { if (onScheduleClick && window.innerWidth >= 768) { e.stopPropagation(); onScheduleClick(s); } }}>
               {fullName}
             </div>
@@ -234,14 +234,14 @@ export default memo(function Calendar({
       style={{ touchAction: isDragging && isHorizontal.current ? "none" : "pan-y" }}
     >
       {/* Header */}
-      <div className="flex items-center justify-between px-6 py-3 border-b border-gray-100">
-        <button onClick={handlePrev} className="p-2 active:bg-gray-100 rounded-lg">
+      <div className="flex items-center justify-between px-6 py-2 border-b border-gray-100">
+        <button onClick={handlePrev} className="p-1.5 active:bg-gray-100 rounded-lg">
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
           </svg>
         </button>
         <h2
-          className="text-lg font-bold text-gray-800 will-change-transform"
+          className="text-base font-bold text-gray-800 will-change-transform"
           style={{
             transform: `translateX(${dragX * 0.5}px)`,
             opacity,
@@ -250,7 +250,7 @@ export default memo(function Calendar({
         >
           {format(currentMonth, "yyyy년 M월", { locale: ko })}
         </h2>
-        <button onClick={handleNext} className="p-2 active:bg-gray-100 rounded-lg">
+        <button onClick={handleNext} className="p-1.5 active:bg-gray-100 rounded-lg">
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
           </svg>
