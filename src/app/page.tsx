@@ -1099,8 +1099,8 @@ export default function Home() {
   // Derived - 역할별 일정 필터 (타인 일정 안 보이게)
   const myLinkedMember = members.find((m) => m.linkedUsername === currentUser.username);
   const baseCalendarSchedules = (() => {
-    // 관리자(대표/admin/일정관리자): 전체 일정 조회
-    if (role === "ceo" || role === "admin" || role === "scheduler") return schedules;
+    // 관리자/영업팀: 전체 일정 조회 (현장팀만 서로 일정 못 보게 제한)
+    if (role === "ceo" || role === "admin" || role === "scheduler" || role === "sales") return schedules;
     // 현장팀: 본인 일정만
     if (role === "field") {
       return schedules.filter((s) =>
@@ -1110,26 +1110,13 @@ export default function Home() {
         (myLinkedMember && s.memberId === myLinkedMember.id)
       );
     }
-    // 영업팀: 본인이 상담/등록한 일정만 (제목에 username 포함)
-    if (role === "sales") {
-      const u = currentUser.username;
-      const name = currentUser.name;
-      return schedules.filter((s) =>
-        s.title.includes(`/${u}/`) ||
-        s.title.includes(`/${u}[`) ||
-        s.title.endsWith(`/${u}`) ||
-        s.title.startsWith(`u${u}/`) ||
-        s.memberName === name ||
-        s.assignedToName === name
-      );
-    }
     return [];
   })();
-  // 팀원 필터 적용 (현장팀/영업팀은 이미 자기 일정만 보이므로 필터 무시)
+  // 팀원 필터 적용 (현장팀은 이미 자기 일정만 보이므로 필터 무시)
   // 본인 일정은 항상 표시, 필터에 선택된 팀원 일정도 추가 표시
   // 선택 0명이면 본인 일정만 표시 — "전체" 체크박스 해제 시 일정 다 사라지는 게 의도된 동작.
   const calendarSchedules = (() => {
-    if (!filterActive || role === "field" || role === "sales") return baseCalendarSchedules;
+    if (!filterActive || role === "field") return baseCalendarSchedules;
     const filterNames = new Set<string>();
     allUsers.filter(u => u.role === "field").forEach(u => {
       if (selectedMemberIds.has(u.id)) filterNames.add(u.name);
