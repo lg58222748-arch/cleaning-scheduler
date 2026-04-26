@@ -186,7 +186,7 @@ function AssignTab({ members, schedules, onAssigned, onDeleted, onOpenDetail, on
           slideDir === "left" ? "-translate-x-4 opacity-0" : slideDir === "right" ? "translate-x-4 opacity-0" : "translate-x-0 opacity-100"
         }`}>
           {weeks.map((week, wi) => (
-            <div key={wi} className="grid grid-cols-7 divide-x divide-gray-50 flex-1">
+            <div key={wi} className="grid grid-cols-7 divide-x divide-gray-50 flex-1 min-h-[58px] max-h-[78px]">
               {week.map((d) => {
                 const dateStr = format(d, "yyyy-MM-dd");
                 const dayScheds = scheduleMap.get(dateStr) || [];
