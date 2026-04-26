@@ -276,7 +276,7 @@ export default memo(function Calendar({
         }}
       >
         {weeks.map((week, wi) => (
-          <div key={wi} className="grid grid-cols-7 divide-x divide-gray-50 flex-1 min-h-[58px] max-h-[78px] md:max-h-none">
+          <div key={wi} className="grid grid-cols-7 divide-x divide-gray-50 flex-1 min-h-[58px]">
             {week.map((d) => {
               const dateStr = format(d, "yyyy-MM-dd");
               const daySchedules = scheduleMap.get(dateStr) || EMPTY_SCHEDULES;
