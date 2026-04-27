@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef, startTransition } from "react";
 import dynamic from "next/dynamic";
+import { AnimatePresence, motion } from "framer-motion";
 import { Member, Schedule, SwapRequest, Notification as AppNotification, User, UserRole } from "@/types";
 type Notification = AppNotification;
 import Calendar from "@/components/Calendar";
@@ -1773,46 +1774,63 @@ export default function Home() {
         </div>
       </nav>
 
-      {/* Modals */}
-      {showScheduleForm && (
-        <ScheduleForm
-          members={members}
-          selectedDate={selectedDate}
-          editingSchedule={editingSchedule}
-          onSave={handleSaveSchedule}
-          onCancel={() => { setShowScheduleForm(false); setEditingSchedule(null); consumeHash(); }}
-        />
-      )}
-      {showMemberManager && (
-        <MemberManager
-          members={members}
-          onAdd={handleAddMember}
-          onUpdate={handleUpdateMember}
-          onDelete={handleDeleteMember}
-          onClose={() => { setShowMemberManager(false); consumeHash(); }}
-        />
-      )}
-      {showSwapPanel && (
-        <SwapPanel
-          swapRequests={swapRequests}
-          schedules={schedules}
-          members={members}
-          onApprove={handleApproveSwap}
-          onReject={handleRejectSwap}
-          onClose={() => { setShowSwapPanel(false); consumeHash(); }}
-        />
-      )}
-      {showNotifications && (
-        <NotificationPanel
-          notifications={notifications}
-          onMarkRead={handleMarkRead}
-          onClearAll={handleClearAllNotifications}
-          onClose={() => { setShowNotifications(false); consumeHash(); }}
-        />
-      )}
+      {/* Modals — 닫힘 애니메이션은 framer-motion AnimatePresence, 열림은 기존 CSS keyframe 유지 */}
+      <AnimatePresence>
+        {showScheduleForm && (
+          <motion.div key="schedule-form" initial={false} exit={{ opacity: 0 }} transition={{ duration: 0.15 }}>
+            <ScheduleForm
+              members={members}
+              selectedDate={selectedDate}
+              editingSchedule={editingSchedule}
+              onSave={handleSaveSchedule}
+              onCancel={() => { setShowScheduleForm(false); setEditingSchedule(null); consumeHash(); }}
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
+      <AnimatePresence>
+        {showMemberManager && (
+          <motion.div key="member-manager" initial={false} exit={{ opacity: 0 }} transition={{ duration: 0.15 }}>
+            <MemberManager
+              members={members}
+              onAdd={handleAddMember}
+              onUpdate={handleUpdateMember}
+              onDelete={handleDeleteMember}
+              onClose={() => { setShowMemberManager(false); consumeHash(); }}
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
+      <AnimatePresence>
+        {showSwapPanel && (
+          <motion.div key="swap-panel" initial={false} exit={{ opacity: 0 }} transition={{ duration: 0.15 }}>
+            <SwapPanel
+              swapRequests={swapRequests}
+              schedules={schedules}
+              members={members}
+              onApprove={handleApproveSwap}
+              onReject={handleRejectSwap}
+              onClose={() => { setShowSwapPanel(false); consumeHash(); }}
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
+      <AnimatePresence>
+        {showNotifications && (
+          <motion.div key="notification-panel" initial={false} exit={{ opacity: 0 }} transition={{ duration: 0.15 }}>
+            <NotificationPanel
+              notifications={notifications}
+              onMarkRead={handleMarkRead}
+              onClearAll={handleClearAllNotifications}
+              onClose={() => { setShowNotifications(false); consumeHash(); }}
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
       {/* 날짜 클릭 팝업 - 삼성 캘린더 스타일 (달력탭에서만) */}
+      <AnimatePresence>
       {showDayPopup && activeTab === "calendar" && (
-        <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50 px-5" style={{ paddingTop: "env(safe-area-inset-top, 0px)", paddingBottom: "env(safe-area-inset-bottom, 0px)" }} onClick={(e) => { if (e.target === e.currentTarget) { setShowDayPopup(false); consumeHash(); } }}>
+        <motion.div key="day-popup" initial={false} exit={{ opacity: 0 }} transition={{ duration: 0.15 }} className="fixed inset-0 bg-black/30 flex items-center justify-center z-50 px-5" style={{ paddingTop: "env(safe-area-inset-top, 0px)", paddingBottom: "env(safe-area-inset-bottom, 0px)" }} onClick={(e) => { if (e.target === e.currentTarget) { setShowDayPopup(false); consumeHash(); } }}>
           <div className="bg-white rounded-3xl shadow-2xl w-full max-w-[380px] animate-[modalIn_0.15s_ease-out]">
             {/* 날짜 헤더 */}
             <div className="px-5 pt-5 pb-3 flex items-center justify-between">
@@ -1863,8 +1881,9 @@ export default function Home() {
               )}
             </div>
           </div>
-        </div>
+        </motion.div>
       )}
+      </AnimatePresence>
       {detailSchedule && (
         <ScheduleDetail
           // 스케줄 id 바뀌면 완전히 새 컴포넌트로 remount → state/useEffect 전부 fresh.
