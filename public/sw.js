@@ -1,8 +1,8 @@
-// 버전 올리면 구 캐시 전부 자동 정리. 롤백 필요 시 v9 → v8 로 내리면 됨.
-const CACHE_VERSION = 'v9';
+// 버전 올리면 구 캐시 전부 자동 정리. 롤백 필요 시 v10 → v9 로 내리면 됨.
+const CACHE_VERSION = 'v10';
 const STATIC_CACHE = `static-${CACHE_VERSION}`;
 const SHELL_CACHE = `shell-${CACHE_VERSION}`;
-const SHELL_URLS = ['/', '/manifest.json', '/logo.jpg'];
+const SHELL_URLS = ['/manifest.json', '/logo.jpg'];
 
 self.addEventListener('install', (event) => {
   self.skipWaiting();
@@ -26,10 +26,11 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-// Fetch 전략:
+// Fetch 전략 (v10 — stale chunk 문제 해결):
 //  - /api/* : network-only (데이터는 항상 최신)
 //  - /_next/static/* : cache-first (콘텐츠 해시라 영구 캐시 안전)
-//  - GET HTML/manifest : stale-while-revalidate (즉시 표시 + 백그라운드 업데이트)
+//  - HTML ('/') : network-first (옛 HTML 이 사라진 chunk 참조해서 ScheduleDetail 등 dynamic 로드 실패하던 버그 차단)
+//  - /manifest.json : stale-while-revalidate
 //  - 그 외 GET : network-first, 실패 시 캐시
 self.addEventListener('fetch', (event) => {
   const req = event.request;
@@ -42,14 +43,20 @@ self.addEventListener('fetch', (event) => {
   // /api/* — 데이터 요청은 SW 우회
   if (url.pathname.startsWith('/api/')) return;
 
-  // /_next/static/* — 영구 자산
+  // /_next/static/* — 영구 자산 (콘텐츠 해시 기반이라 안전)
   if (url.pathname.startsWith('/_next/static/')) {
     event.respondWith(cacheFirst(req, STATIC_CACHE));
     return;
   }
 
-  // 앱셸
-  if (url.pathname === '/' || url.pathname === '/manifest.json') {
+  // HTML — 항상 최신 (stale HTML 이 삭제된 chunk 참조하는 버그 방지)
+  if (url.pathname === '/') {
+    event.respondWith(networkFirst(req, SHELL_CACHE));
+    return;
+  }
+
+  // manifest 는 자주 안 바뀌므로 stale-while-revalidate
+  if (url.pathname === '/manifest.json') {
     event.respondWith(staleWhileRevalidate(req, SHELL_CACHE));
     return;
   }
@@ -59,6 +66,18 @@ self.addEventListener('fetch', (event) => {
     fetch(req).catch(() => caches.match(req).then((r) => r || Response.error()))
   );
 });
+
+async function networkFirst(req, cacheName) {
+  const cache = await caches.open(cacheName);
+  try {
+    const res = await fetch(req);
+    if (res && res.status === 200) cache.put(req, res.clone());
+    return res;
+  } catch (e) {
+    const cached = await cache.match(req);
+    return cached || Response.error();
+  }
+}
 
 async function cacheFirst(req, cacheName) {
   const cache = await caches.open(cacheName);
