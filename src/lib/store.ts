@@ -100,8 +100,16 @@ export async function deleteMember(id: string): Promise<boolean> {
 
 // ===== Schedules =====
 export async function getSchedules(): Promise<Schedule[]> {
-  const { data } = await supabase.from("schedules").select("*").neq("status", "deleted").order("date");
-  return (data || []).map(rowToSchedule);
+  // 자동 페이지네이션 — Supabase 1000건 cap 우회
+  const all: Schedule[] = [];
+  const pageSize = 1000;
+  for (let offset = 0; offset < 50000; offset += pageSize) {
+    const { data, error } = await supabase.from("schedules").select("*").neq("status", "deleted").order("date").range(offset, offset + pageSize - 1);
+    if (error || !data) break;
+    all.push(...data.map(rowToSchedule));
+    if (data.length < pageSize) break;
+  }
+  return all;
 }
 
 export async function getSchedule(id: string): Promise<Schedule | undefined> {
@@ -111,13 +119,33 @@ export async function getSchedule(id: string): Promise<Schedule | undefined> {
 
 export async function getSchedulesByRange(start: string, end: string): Promise<Schedule[]> {
   // 배정된 일정만 (unassigned, deleted 제외)
-  const { data } = await supabase.from("schedules").select("*").gte("date", start).lte("date", end).not("status", "in", '("deleted","unassigned")').order("date");
-  return (data || []).map(rowToSchedule);
+  // 자동 페이지네이션 — Supabase 서버측 1000건 cap 우회. 일정이 1000개 넘으면 미래분 잘리던 버그 방지.
+  const all: Schedule[] = [];
+  const pageSize = 1000;
+  for (let offset = 0; offset < 50000; offset += pageSize) {
+    const { data, error } = await supabase.from("schedules").select("*")
+      .gte("date", start).lte("date", end)
+      .not("status", "in", '("deleted","unassigned")')
+      .order("date")
+      .range(offset, offset + pageSize - 1);
+    if (error || !data) break;
+    all.push(...data.map(rowToSchedule));
+    if (data.length < pageSize) break;
+  }
+  return all;
 }
 
 export async function getUnassignedSchedules(): Promise<Schedule[]> {
-  const { data } = await supabase.from("schedules").select("*").eq("status", "unassigned").order("date");
-  return (data || []).map(rowToSchedule);
+  // 자동 페이지네이션
+  const all: Schedule[] = [];
+  const pageSize = 1000;
+  for (let offset = 0; offset < 50000; offset += pageSize) {
+    const { data, error } = await supabase.from("schedules").select("*").eq("status", "unassigned").order("date").range(offset, offset + pageSize - 1);
+    if (error || !data) break;
+    all.push(...data.map(rowToSchedule));
+    if (data.length < pageSize) break;
+  }
+  return all;
 }
 
 export async function searchSchedules(query: string): Promise<Schedule[]> {
@@ -183,8 +211,16 @@ export async function softDeleteSchedule(id: string): Promise<Schedule | null> {
 
 // 휴지통 목록
 export async function getDeletedSchedules(): Promise<Schedule[]> {
-  const { data } = await supabase.from("schedules").select("*").eq("status", "deleted").order("date", { ascending: false });
-  return (data || []).map(rowToSchedule);
+  // 자동 페이지네이션
+  const all: Schedule[] = [];
+  const pageSize = 1000;
+  for (let offset = 0; offset < 50000; offset += pageSize) {
+    const { data, error } = await supabase.from("schedules").select("*").eq("status", "deleted").order("date", { ascending: false }).range(offset, offset + pageSize - 1);
+    if (error || !data) break;
+    all.push(...data.map(rowToSchedule));
+    if (data.length < pageSize) break;
+  }
+  return all;
 }
 
 // 휴지통에서 복원
@@ -195,7 +231,7 @@ export async function restoreSchedule(id: string): Promise<Schedule | null> {
 
 // 휴지통 비우기
 export async function emptyTrash(): Promise<number> {
-  const { data } = await supabase.from("schedules").select("id").eq("status", "deleted");
+  const { data } = await supabase.from("schedules").select("id").eq("status", "deleted").range(0, 9999);
   const count = data?.length || 0;
   if (count > 0) {
     const ids = data!.map((r: { id: string }) => r.id);
@@ -244,8 +280,16 @@ export async function deleteSchedule(id: string): Promise<boolean> {
 
 // ===== Swap Requests =====
 export async function getSwapRequests(): Promise<SwapRequest[]> {
-  const { data } = await supabase.from("swap_requests").select("*").order("created_at", { ascending: false });
-  return (data || []).map(rowToSwapRequest);
+  // 자동 페이지네이션
+  const all: SwapRequest[] = [];
+  const pageSize = 1000;
+  for (let offset = 0; offset < 50000; offset += pageSize) {
+    const { data, error } = await supabase.from("swap_requests").select("*").order("created_at", { ascending: false }).range(offset, offset + pageSize - 1);
+    if (error || !data) break;
+    all.push(...data.map(rowToSwapRequest));
+    if (data.length < pageSize) break;
+  }
+  return all;
 }
 
 export async function addSwapRequest(fromScheduleId: string, toScheduleId: string): Promise<SwapRequest | null> {
@@ -277,8 +321,16 @@ export async function rejectSwap(swapId: string): Promise<boolean> {
 
 // ===== Notifications =====
 export async function getNotifications(): Promise<Notification[]> {
-  const { data } = await supabase.from("notifications").select("*").order("created_at", { ascending: false });
-  return (data || []).map(rowToNotification);
+  // 자동 페이지네이션 — 알림 누적 시 잘리는 것 방지
+  const all: Notification[] = [];
+  const pageSize = 1000;
+  for (let offset = 0; offset < 50000; offset += pageSize) {
+    const { data, error } = await supabase.from("notifications").select("*").order("created_at", { ascending: false }).range(offset, offset + pageSize - 1);
+    if (error || !data) break;
+    all.push(...data.map(rowToNotification));
+    if (data.length < pageSize) break;
+  }
+  return all;
 }
 
 export async function getUnreadCount(): Promise<number> {
@@ -330,7 +382,7 @@ export async function markAllNotificationsRead(): Promise<void> {
 }
 
 export async function deleteAllNotifications(): Promise<number> {
-  const { data } = await supabase.from("notifications").select("id");
+  const { data } = await supabase.from("notifications").select("id").range(0, 9999);
   const count = data?.length || 0;
   if (count > 0) {
     await supabase.from("notifications").delete().gte("id", "00000000-0000-0000-0000-000000000000");
