@@ -159,9 +159,13 @@ export default function Home() {
       const d = monthDate || viewingMonthRef.current || selectedDate;
       // 다음 reload 들도 동일 월 기준으로 찾게 ref 업데이트
       viewingMonthRef.current = d;
-      // ±3개월 range — 월 스와이프 시 대부분의 탐색이 캐시 히트. 첫 로드는 조금 더 받지만 이후 즉시.
+      // 과거 -3개월 / 미래 +12개월 — 청소업은 몇 달 앞 일정 많이 잡으므로 미래 넓게.
+      // 보고 있는 달 기준 ±3개월 OR 오늘 기준 +12개월 중 더 먼 쪽까지 fetch (어떤 달 보고 있어도 미래 1년치 항상 포함)
+      const today = new Date();
       const start = format(startOfMonth(subMonths(d, 3)), "yyyy-MM-dd");
-      const end = format(endOfMonth(addMonths(d, 3)), "yyyy-MM-dd");
+      const futureFromViewing = endOfMonth(addMonths(d, 3));
+      const futureFromToday = endOfMonth(addMonths(today, 12));
+      const end = format(futureFromViewing > futureFromToday ? futureFromViewing : futureFromToday, "yyyy-MM-dd");
 
       if (fullRefresh) {
         const [m, rangeScheds, unassignedScheds, sw, notif, usersData] = await Promise.all([
@@ -221,10 +225,10 @@ export default function Home() {
           try {
             localStorage.setItem("cached_members", JSON.stringify(m));
             localStorage.setItem("cached_users", JSON.stringify(usersData));
-            // schedules 캐시는 최근 3개월분만 (과거 1달 / 미래 2달) — WebView JSON.parse 부담 경감
+            // schedules 캐시: 과거 1달 / 미래 1년 — 청소업은 미래 일정 많이 잡으므로 미래 넓게.
             const todayMs = Date.now();
             const minMs = todayMs - 31 * 24 * 60 * 60 * 1000;
-            const maxMs = todayMs + 62 * 24 * 60 * 60 * 1000;
+            const maxMs = todayMs + 365 * 24 * 60 * 60 * 1000;
             const trimmed = rangeScheds.filter((s) => {
               const t = Date.parse(s.date);
               return !Number.isNaN(t) && t >= minMs && t <= maxMs;
@@ -420,10 +424,13 @@ export default function Home() {
       // 일정 액션(반환/배정/생성/수정/삭제) 중엔 억제 - 낙관적 업데이트가 stale fetch 에 덮이는 것 방지
       if (Date.now() < scheduleReloadSuppressRef.current) return;
       // 현재 보고 있는 달력 월 기준 (스크롤해서 먼 달 보고 있어도 해당 월 데이터 유지)
-      // loadData 와 동일하게 ±3개월 range — realtime reload 가 범위를 좁혀서 캐시가 축소되는 것 방지
+      // loadData 와 동일: 과거 -3개월 / 미래 +12개월 (또는 보고 있는 달 +3 중 더 먼 쪽)
       const d = viewingMonthRef.current || selectedDate;
+      const today = new Date();
       const start = format(startOfMonth(subMonths(d, 3)), "yyyy-MM-dd");
-      const end = format(endOfMonth(addMonths(d, 3)), "yyyy-MM-dd");
+      const futureFromViewing = endOfMonth(addMonths(d, 3));
+      const futureFromToday = endOfMonth(addMonths(today, 12));
+      const end = format(futureFromViewing > futureFromToday ? futureFromViewing : futureFromToday, "yyyy-MM-dd");
       const seq = ++loadSeqRef.current;
       fetchSchedules(start, end).then(s => {
         if (seq !== loadSeqRef.current) return; // 더 최근 fetch 가 있으면 stale 응답 버림
