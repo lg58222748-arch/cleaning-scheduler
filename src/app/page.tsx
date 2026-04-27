@@ -56,6 +56,20 @@ export default function Home() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [appReady, setAppReady] = useState(false);
   const [showSplash, setShowSplash] = useState(true);
+  // 오프라인 감지 — 끊기면 상단 배너 표시
+  const [isOnline, setIsOnline] = useState(true);
+  useEffect(() => {
+    if (typeof navigator === "undefined") return;
+    setIsOnline(navigator.onLine);
+    const onOnline = () => setIsOnline(true);
+    const onOffline = () => setIsOnline(false);
+    window.addEventListener("online", onOnline);
+    window.addEventListener("offline", onOffline);
+    return () => {
+      window.removeEventListener("online", onOnline);
+      window.removeEventListener("offline", onOffline);
+    };
+  }, []);
 
   // 클라이언트에서만 localStorage 복원 + 캐시 즉시 로드
   useEffect(() => {
@@ -1185,6 +1199,23 @@ export default function Home() {
 
   return (
     <div className="h-[100dvh] bg-white pb-14 flex flex-col overflow-hidden" style={{ paddingTop: "env(safe-area-inset-top, 0px)" }}>
+      {/* 오프라인 배너 — 인터넷 끊김 알림 (action 시도 전에 사용자가 인지) */}
+      <AnimatePresence>
+        {!isOnline && (
+          <motion.div
+            key="offline-banner"
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            transition={{ duration: 0.2 }}
+            className="fixed top-0 left-0 right-0 z-[200] bg-red-500 text-white text-center text-xs font-medium py-1.5 shadow-md"
+            style={{ paddingTop: "calc(env(safe-area-inset-top, 0px) + 6px)" }}
+          >
+            ⚠️ 인터넷 연결이 끊겼어요. 작업이 저장되지 않을 수 있습니다.
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* 업데이트 배너·모달 비활성 — 팀원 재설치 부담 때문에 잠정 숨김.
           appUpdate 상태와 체크 로직은 그대로 둠 (나중에 다시 켤 때 UI 만 복구). */}
 
