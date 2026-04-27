@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { Settlement, PaymentMethod } from "@/types";
 import { fetchSettlement, saveSettlement, updateSchedule as apiUpdateSchedule } from "@/lib/api";
+import { showAlert } from "@/lib/dialog";
 import { Share } from "@capacitor/share";
 
 interface ScheduleSettlementProps {
@@ -253,8 +254,28 @@ export default function ScheduleSettlement({ scheduleId, scheduleTitle = "", sch
         <div className="text-xs text-white/50 mt-1">{cashReceipt ? "부가세 포함" : "부가세 미포함 (공급가액)"}</div>
       </div>
 
-      {/* 정산서 발행 */}
-      <button onClick={() => setShowShareModal(true)}
+      {/* 정산서 발행 — DB 저장 후 공유 모달 오픈 (저장 실패해도 공유는 가능하게 함) */}
+      <button onClick={async () => {
+        try {
+          await saveSettlement(scheduleId, {
+            quote: q,
+            deposit: d,
+            extraCharge: e,
+            paymentMethod,
+            cashReceipt,
+            bankInfo: bankName && accountNumber ? `${bankName} ${accountNumber}` : "",
+            customerName,
+            customerPhone,
+            note,
+            status: "completed",
+          });
+          onCompleted?.();
+        } catch (err) {
+          console.error("[saveSettlement] 실패:", err);
+          showAlert("정산 저장 실패. 인터넷을 확인하고 다시 시도해주세요.");
+        }
+        setShowShareModal(true);
+      }}
         className="w-full py-4 rounded-xl text-base font-bold text-white active:opacity-90"
         style={{ background: "linear-gradient(135deg, #0f4c81, #1a6bb5)" }}>
         정산서 발행
