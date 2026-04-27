@@ -80,6 +80,8 @@ export default function Home() {
       if (cm) { setMembers(JSON.parse(cm)); hasCachedData = true; }
       const cs = localStorage.getItem("cached_schedules");
       if (cs) { setSchedules(JSON.parse(cs)); hasCachedData = true; }
+      const cunas = localStorage.getItem("cached_unassigned");
+      if (cunas) { setUnassignedSchedules(JSON.parse(cunas)); hasCachedData = true; }
       const cu = localStorage.getItem("cached_users");
       if (cu) { const d = JSON.parse(cu); setAllUsers(d.users || []); setPendingUsers(d.pendingUsers || []); hasCachedData = true; }
     } catch {}
@@ -246,6 +248,8 @@ export default function Home() {
               return !Number.isNaN(t) && t >= minMs && t <= maxMs;
             });
             localStorage.setItem("cached_schedules", JSON.stringify(trimmed));
+            // 미배정 일정도 캐시 — 배정탭 진입 시 즉시 표시
+            localStorage.setItem("cached_unassigned", JSON.stringify(unassignedScheds));
           } catch {}
         }, 0);
       } else {
