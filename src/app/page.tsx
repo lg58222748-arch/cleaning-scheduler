@@ -1012,7 +1012,11 @@ export default function Home() {
             return [...withoutTemp, ns];
           });
         })
-        .catch(() => {});
+        .catch((err) => {
+          console.error("[addUnassignedSchedule] 실패, 롤백:", err);
+          setUnassignedSchedules(prev => prev.filter(s => s.id !== tempId));
+          showAlert("일정 등록 실패. 다시 시도해주세요.");
+        });
     }
   }
   function handleDeleteSchedule(id: string) {
