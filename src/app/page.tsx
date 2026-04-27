@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback, useRef, startTransition } from "react";
 import dynamic from "next/dynamic";
-import { AnimatePresence, motion } from "framer-motion";
 import { Member, Schedule, SwapRequest, Notification as AppNotification, User, UserRole } from "@/types";
 type Notification = AppNotification;
 import Calendar from "@/components/Calendar";
@@ -1200,21 +1199,14 @@ export default function Home() {
   return (
     <div className="h-[100dvh] bg-white pb-14 flex flex-col overflow-hidden" style={{ paddingTop: "env(safe-area-inset-top, 0px)" }}>
       {/* 오프라인 배너 — 인터넷 끊김 알림 (action 시도 전에 사용자가 인지) */}
-      <AnimatePresence>
-        {!isOnline && (
-          <motion.div
-            key="offline-banner"
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            transition={{ duration: 0.2 }}
-            className="fixed top-0 left-0 right-0 z-[200] bg-red-500 text-white text-center text-xs font-medium py-1.5 shadow-md"
-            style={{ paddingTop: "calc(env(safe-area-inset-top, 0px) + 6px)" }}
-          >
-            ⚠️ 인터넷 연결이 끊겼어요. 작업이 저장되지 않을 수 있습니다.
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {!isOnline && (
+        <div
+          className="fixed top-0 left-0 right-0 z-[200] bg-red-500 text-white text-center text-xs font-medium py-1.5 shadow-md"
+          style={{ paddingTop: "calc(env(safe-area-inset-top, 0px) + 6px)" }}
+        >
+          ⚠️ 인터넷 연결이 끊겼어요. 작업이 저장되지 않을 수 있습니다.
+        </div>
+      )}
 
       {/* 업데이트 배너·모달 비활성 — 팀원 재설치 부담 때문에 잠정 숨김.
           appUpdate 상태와 체크 로직은 그대로 둠 (나중에 다시 켤 때 UI 만 복구). */}
@@ -1805,63 +1797,46 @@ export default function Home() {
         </div>
       </nav>
 
-      {/* Modals — 닫힘 애니메이션은 framer-motion AnimatePresence, 열림은 기존 CSS keyframe 유지 */}
-      <AnimatePresence>
-        {showScheduleForm && (
-          <motion.div key="schedule-form" initial={false} exit={{ opacity: 0 }} transition={{ duration: 0.15 }}>
-            <ScheduleForm
-              members={members}
-              selectedDate={selectedDate}
-              editingSchedule={editingSchedule}
-              onSave={handleSaveSchedule}
-              onCancel={() => { setShowScheduleForm(false); setEditingSchedule(null); consumeHash(); }}
-            />
-          </motion.div>
-        )}
-      </AnimatePresence>
-      <AnimatePresence>
-        {showMemberManager && (
-          <motion.div key="member-manager" initial={false} exit={{ opacity: 0 }} transition={{ duration: 0.15 }}>
-            <MemberManager
-              members={members}
-              onAdd={handleAddMember}
-              onUpdate={handleUpdateMember}
-              onDelete={handleDeleteMember}
-              onClose={() => { setShowMemberManager(false); consumeHash(); }}
-            />
-          </motion.div>
-        )}
-      </AnimatePresence>
-      <AnimatePresence>
-        {showSwapPanel && (
-          <motion.div key="swap-panel" initial={false} exit={{ opacity: 0 }} transition={{ duration: 0.15 }}>
-            <SwapPanel
-              swapRequests={swapRequests}
-              schedules={schedules}
-              members={members}
-              onApprove={handleApproveSwap}
-              onReject={handleRejectSwap}
-              onClose={() => { setShowSwapPanel(false); consumeHash(); }}
-            />
-          </motion.div>
-        )}
-      </AnimatePresence>
-      <AnimatePresence>
-        {showNotifications && (
-          <motion.div key="notification-panel" initial={false} exit={{ opacity: 0 }} transition={{ duration: 0.15 }}>
-            <NotificationPanel
-              notifications={notifications}
-              onMarkRead={handleMarkRead}
-              onClearAll={handleClearAllNotifications}
-              onClose={() => { setShowNotifications(false); consumeHash(); }}
-            />
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {/* Modals */}
+      {showScheduleForm && (
+        <ScheduleForm
+          members={members}
+          selectedDate={selectedDate}
+          editingSchedule={editingSchedule}
+          onSave={handleSaveSchedule}
+          onCancel={() => { setShowScheduleForm(false); setEditingSchedule(null); consumeHash(); }}
+        />
+      )}
+      {showMemberManager && (
+        <MemberManager
+          members={members}
+          onAdd={handleAddMember}
+          onUpdate={handleUpdateMember}
+          onDelete={handleDeleteMember}
+          onClose={() => { setShowMemberManager(false); consumeHash(); }}
+        />
+      )}
+      {showSwapPanel && (
+        <SwapPanel
+          swapRequests={swapRequests}
+          schedules={schedules}
+          members={members}
+          onApprove={handleApproveSwap}
+          onReject={handleRejectSwap}
+          onClose={() => { setShowSwapPanel(false); consumeHash(); }}
+        />
+      )}
+      {showNotifications && (
+        <NotificationPanel
+          notifications={notifications}
+          onMarkRead={handleMarkRead}
+          onClearAll={handleClearAllNotifications}
+          onClose={() => { setShowNotifications(false); consumeHash(); }}
+        />
+      )}
       {/* 날짜 클릭 팝업 - 삼성 캘린더 스타일 (달력탭에서만) */}
-      <AnimatePresence>
       {showDayPopup && activeTab === "calendar" && (
-        <motion.div key="day-popup" initial={false} exit={{ opacity: 0 }} transition={{ duration: 0.15 }} className="fixed inset-0 bg-black/30 flex items-center justify-center z-50 px-5" style={{ paddingTop: "env(safe-area-inset-top, 0px)", paddingBottom: "env(safe-area-inset-bottom, 0px)" }} onClick={(e) => { if (e.target === e.currentTarget) { setShowDayPopup(false); consumeHash(); } }}>
+        <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50 px-5" style={{ paddingTop: "env(safe-area-inset-top, 0px)", paddingBottom: "env(safe-area-inset-bottom, 0px)" }} onClick={(e) => { if (e.target === e.currentTarget) { setShowDayPopup(false); consumeHash(); } }}>
           <div className="bg-white rounded-3xl shadow-2xl w-full max-w-[380px] animate-[modalIn_0.15s_ease-out]">
             {/* 날짜 헤더 */}
             <div className="px-5 pt-5 pb-3 flex items-center justify-between">
@@ -1912,9 +1887,8 @@ export default function Home() {
               )}
             </div>
           </div>
-        </motion.div>
+        </div>
       )}
-      </AnimatePresence>
       {detailSchedule && (
         <ScheduleDetail
           // 스케줄 id 바뀌면 완전히 새 컴포넌트로 remount → state/useEffect 전부 fresh.
