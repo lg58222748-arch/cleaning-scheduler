@@ -950,9 +950,14 @@ export default function Home() {
     scheduleReloadSuppressRef.current = Date.now() + 4000;
 
     if (editingSchedule) {
-      // 수정: UI 즉시 반영
+      // 수정: UI 즉시 반영 + 실패 시 롤백
+      const original = editingSchedule;
       setSchedules((prev) => prev.map((s) => s.id === editingSchedule.id ? { ...s, ...data } : s));
-      apiUpdateSchedule(editingSchedule.id, data).catch(() => {});
+      apiUpdateSchedule(editingSchedule.id, data).catch((err) => {
+        console.error("[updateSchedule] 실패, 롤백:", err);
+        setSchedules((prev) => prev.map((s) => s.id === original.id ? original : s));
+        showAlert("일정 수정 실패. 다시 시도해주세요.");
+      });
     } else if (activeTab === "calendar") {
       // 달력탭에서 생성 → 현재 사용자 정보로 설정
       const tempId = "temp-" + Date.now();
@@ -1012,9 +1017,17 @@ export default function Home() {
   }
   function handleDeleteSchedule(id: string) {
     scheduleReloadSuppressRef.current = Date.now() + 4000;
+    // 삭제 실패 대비: 원본 보관 → 실패 시 복구
+    const originalSch = schedules.find((s) => s.id === id);
+    const originalUnassigned = unassignedSchedules.find((s) => s.id === id);
     setSchedules((prev) => prev.filter((s) => s.id !== id));
     setUnassignedSchedules((prev) => prev.filter((s) => s.id !== id));
-    softDeleteSchedule(id).catch(() => {});
+    softDeleteSchedule(id).catch((err) => {
+      console.error("[softDeleteSchedule] 실패, 복구:", err);
+      if (originalSch) setSchedules((prev) => prev.find(s => s.id === id) ? prev : [...prev, originalSch]);
+      if (originalUnassigned) setUnassignedSchedules((prev) => prev.find(s => s.id === id) ? prev : [...prev, originalUnassigned]);
+      showAlert("일정 삭제 실패. 다시 시도해주세요.");
+    });
   }
 
   function handleUnassignSchedule(id: string, reason: string = "") {
@@ -1599,8 +1612,24 @@ export default function Home() {
                     )}
                     {u.status === "pending" && canApprovePending && (
                       <div className="flex gap-2 mt-2 pt-2 border-t border-gray-100">
-                        <button onClick={() => { setPendingUsers(prev => prev.filter(x => x.id !== u.id)); setAllUsers(prev => [...prev, { ...u, status: "approved" as const, role: "field" as const }]); approveUserApi(u.id).catch(() => {}); }} className="flex-1 py-2 bg-green-500 text-white rounded-lg text-xs font-bold active:bg-green-600">승인</button>
-                        <button onClick={() => { setPendingUsers(prev => prev.filter(x => x.id !== u.id)); deleteUserApi(u.id).catch(() => {}); }} className="flex-1 py-2 bg-red-500 text-white rounded-lg text-xs font-bold active:bg-red-600">거절</button>
+                        <button onClick={() => {
+                          setPendingUsers(prev => prev.filter(x => x.id !== u.id));
+                          setAllUsers(prev => [...prev, { ...u, status: "approved" as const, role: "field" as const }]);
+                          approveUserApi(u.id).catch((err) => {
+                            console.error("[approveUser] 실패, 롤백:", err);
+                            setAllUsers(prev => prev.filter(x => x.id !== u.id));
+                            setPendingUsers(prev => prev.find(x => x.id === u.id) ? prev : [...prev, u]);
+                            showAlert("승인 실패. 다시 시도해주세요.");
+                          });
+                        }} className="flex-1 py-2 bg-green-500 text-white rounded-lg text-xs font-bold active:bg-green-600">승인</button>
+                        <button onClick={() => {
+                          setPendingUsers(prev => prev.filter(x => x.id !== u.id));
+                          deleteUserApi(u.id).catch((err) => {
+                            console.error("[rejectUser] 실패, 복구:", err);
+                            setPendingUsers(prev => prev.find(x => x.id === u.id) ? prev : [...prev, u]);
+                            showAlert("거절 실패. 다시 시도해주세요.");
+                          });
+                        }} className="flex-1 py-2 bg-red-500 text-white rounded-lg text-xs font-bold active:bg-red-600">거절</button>
                       </div>
                     )}
                   </div>
