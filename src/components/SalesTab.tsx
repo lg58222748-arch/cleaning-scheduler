@@ -839,9 +839,19 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
 
     svcs.forEach((s) => {
       msg += `► ${s.name}\n`;
-      msg += `8)견적금액(공급가액) : ${s.quote ? parseInt(s.quote).toLocaleString() + "원" : ""}\n`;
-      msg += `9)예 약 금 : ${s.deposit ? parseInt(s.deposit).toLocaleString() + "원" : ""}\n`;
-      msg += `10)잔 금 : ${getBalance(s) > 0 ? getBalance(s).toLocaleString() + "원" : ""}\n`;
+      // 서비스 1개고 per-service 금액이 비어있으면 top-level 값으로 보강
+      // (예: "6)서비스 종류 : 입주청소" + ► 블록 없이 8/9/10만 작성한 케이스)
+      const useQuote = s.quote || (svcs.length === 1 ? topQ : "") || "";
+      const useDeposit = s.deposit || (svcs.length === 1 ? topD : "") || "";
+      const qNum = parseInt(useQuote) || 0;
+      const dNum = parseInt(useDeposit) || 0;
+      // 잔금: 명시된 topB(단일 서비스 한정) > getBalance(s) > qNum-dNum 자동 계산
+      const useBalance = (svcs.length === 1 && topB)
+        ? parseInt(topB) || 0
+        : (s.quote && s.deposit ? getBalance(s) : (qNum > 0 && dNum > 0 ? qNum - dNum : 0));
+      msg += `8)견적금액(공급가액) : ${qNum > 0 ? qNum.toLocaleString() + "원" : ""}\n`;
+      msg += `9)예 약 금 : ${dNum > 0 ? dNum.toLocaleString() + "원" : ""}\n`;
+      msg += `10)잔 금 : ${useBalance > 0 ? useBalance.toLocaleString() + "원" : ""}\n`;
     });
 
     // 서비스 블록 없지만 top-level 금액이 있으면 단독 블록으로 출력 (박금진 케이스 등)
