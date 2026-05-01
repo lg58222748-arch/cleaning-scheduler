@@ -1473,6 +1473,7 @@ export default function Home() {
             allUsers={allUsers.map(u => ({ id: u.id, name: u.name, username: u.username, role: u.role, address: u.address, branch: u.branch }))}
             members={members.map(m => ({ id: m.id, name: m.name, linkedUsername: m.linkedUsername }))}
             schedules={schedules}
+            unassignedSchedules={unassignedSchedules}
             onRefresh={() => loadData(undefined, true)}
             onNavigateToAssign={() => switchTab("assign")}
             onNavigateToCalendar={() => switchTab("calendar")}

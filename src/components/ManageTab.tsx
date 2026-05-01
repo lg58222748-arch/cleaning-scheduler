@@ -17,12 +17,13 @@ interface ManageTabProps {
   allUsers?: { id?: string; name: string; username?: string; role?: string; address?: string; branch?: string }[];
   members?: { id: string; name: string; linkedUsername?: string }[];
   schedules?: Schedule[];
+  unassignedSchedules?: Schedule[];
   onRefresh: () => void;
   onNavigateToAssign?: () => void;
   onNavigateToCalendar?: () => void;
 }
 
-export default function ManageTab({ isAdmin, userRole, userName = "", allUsers = [], members = [], schedules = [], onRefresh, onNavigateToAssign, onNavigateToCalendar }: ManageTabProps) {
+export default function ManageTab({ isAdmin, userRole, userName = "", allUsers = [], members = [], schedules = [], unassignedSchedules = [], onRefresh, onNavigateToAssign, onNavigateToCalendar }: ManageTabProps) {
   // 역할별 기본 탭
   const isTopAdmin = userRole === "ceo" || userRole === "admin";
   const defaultTab: ManageSubTab =
@@ -80,7 +81,7 @@ export default function ManageTab({ isAdmin, userRole, userName = "", allUsers =
 
       {/* 영업팀 탭 */}
       {activeSubTab === "sales-stats" && (
-        <SalesStatsSection userName={userName} userRole={userRole} allUsers={allUsers} schedules={schedules} />
+        <SalesStatsSection userName={userName} userRole={userRole} allUsers={allUsers} schedules={schedules} unassignedSchedules={unassignedSchedules} />
       )}
 
       {/* 현장팀 탭 — 통계는 일정관리 탭으로 이동 */}
@@ -560,11 +561,12 @@ function FieldStatsSection({ allUsers }: {
 
 
 /* ════════════ 영업팀 미입금 섹션 ════════════ */
-function SalesStatsSection({ userName, userRole, allUsers, schedules }: {
+function SalesStatsSection({ userName, userRole, allUsers, schedules, unassignedSchedules = [] }: {
   userName: string;
   userRole: string;
   allUsers: { id?: string; name: string; username?: string; role?: string; address?: string; branch?: string }[];
   schedules: Schedule[];
+  unassignedSchedules?: Schedule[];
 }) {
   const now = new Date();
   const curMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
@@ -572,10 +574,10 @@ function SalesStatsSection({ userName, userRole, allUsers, schedules }: {
 
   const isCeo = userRole === "ceo" || userRole === "admin";
 
-  // 이번달 일정만
+  // 이번달 일정 — 배정된 것 + 미배정 모두 (미입금은 미배정 상태로도 존재 가능)
   const monthScheds = useMemo(
-    () => schedules.filter((s) => s.date.startsWith(curMonth)),
-    [schedules, curMonth]
+    () => [...schedules, ...unassignedSchedules].filter((s) => s.date.startsWith(curMonth)),
+    [schedules, unassignedSchedules, curMonth]
   );
 
   // 영업사원 이름으로 본인 일정 추출
