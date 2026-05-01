@@ -275,10 +275,31 @@ export default function ScheduleDetail({
           </button>
           {editingTitle ? (
             <div className="flex-1 mx-2">
-              <input
+              <textarea
                 value={titleText}
-                onChange={(e) => { setTitleText(e.target.value); setNoteChanged(true); }}
-                className="w-full text-sm font-bold text-gray-800 text-center border-b-2 border-blue-400 outline-none bg-transparent"
+                onChange={(e) => {
+                  setTitleText(e.target.value);
+                  setNoteChanged(true);
+                  // 자동 높이 조정 — 내용에 맞춰 줄 수 늘어남
+                  const t = e.target;
+                  t.style.height = "auto";
+                  t.style.height = t.scrollHeight + "px";
+                }}
+                ref={(el) => {
+                  if (el) {
+                    el.style.height = "auto";
+                    el.style.height = el.scrollHeight + "px";
+                  }
+                }}
+                onKeyDown={(e) => {
+                  // Enter 누르면 줄바꿈 대신 저장 (blur)
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    e.currentTarget.blur();
+                  }
+                }}
+                rows={1}
+                className="w-full text-sm font-bold text-gray-800 text-left border-b-2 border-blue-400 outline-none bg-transparent resize-none overflow-hidden leading-snug py-1"
                 autoFocus
                 onBlur={() => setEditingTitle(false)}
               />
