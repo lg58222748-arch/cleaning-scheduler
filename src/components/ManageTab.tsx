@@ -561,37 +561,14 @@ function FieldStatsSection({ allUsers }: {
 
 
 /* ════════════ 영업팀 미입금 섹션 ════════════ */
-function SalesStatsSection({ userName, userRole, allUsers, schedules, unassignedSchedules = [] }: {
+function SalesStatsSection({ userName, userRole, schedules, unassignedSchedules = [] }: {
   userName: string;
   userRole: string;
   allUsers: { id?: string; name: string; username?: string; role?: string; address?: string; branch?: string }[];
   schedules: Schedule[];
   unassignedSchedules?: Schedule[];
 }) {
-  const now = new Date();
-  const curMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-  const curMonthLabel = `${now.getFullYear()}년 ${now.getMonth() + 1}월`;
-
   const isCeo = userRole === "ceo" || userRole === "admin";
-
-  // 이번달 일정 — 배정된 것 + 미배정 모두 (미입금은 미배정 상태로도 존재 가능)
-  const monthScheds = useMemo(
-    () => [...schedules, ...unassignedSchedules].filter((s) => s.date.startsWith(curMonth)),
-    [schedules, unassignedSchedules, curMonth]
-  );
-
-  // 영업사원 이름으로 본인 일정 추출
-  const getUserSchedules = useCallback((name: string, source: Schedule[]) => {
-    return source.filter((s) => {
-      const title = s.title.replace(/^\[.+?\]\s*/, "");
-      return (
-        title.includes(`/${name}/`) ||
-        title.includes(`/${name}[`) ||
-        title.endsWith(`/${name}`) ||
-        title.startsWith(`u${name}/`)
-      );
-    });
-  }, []);
 
   // 미입금 = 제목에 "/미입금" 포함
   const isUnpaid = (title: string) => title.includes("/미입금");
@@ -601,7 +578,6 @@ function SalesStatsSection({ userName, userRole, allUsers, schedules, unassigned
   const extractCustomer = (title: string): string => {
     const clean = title.replace(/^\[.+?\]\s*/, "");
     const parts = clean.split("/").map((p) => p.trim()).filter(Boolean);
-    // 앞쪽 마커(시간대, 미입금, 팀장)를 건너뛰고 첫 "고객 같은" 토큰 찾기
     const skipTokens = new Set([
       "A", "U", "A오전", "A오후", "U오전", "U오후",
       "오전", "오후", "미입금", "휴무",
@@ -609,113 +585,63 @@ function SalesStatsSection({ userName, userRole, allUsers, schedules, unassigned
     for (const p of parts) {
       if (skipTokens.has(p)) continue;
       if (/^[AU]$/.test(p)) continue;
-      // 숫자만 / 특수기호만 인 경우 skip
       if (!/[가-힣]/.test(p) && !/[a-zA-Z]{3,}/.test(p)) continue;
-      // 너무 짧은 (1글자) 팀장 이름도 skip (하지만 한글 1자는 이름일 수 있어 유지)
       return p;
     }
     return clean.slice(0, 30);
   };
 
-  // 대표: 전체 영업사원 / 그 외: 본인만
-  const salesUsers = useMemo(() => {
-    if (isCeo) {
-      return allUsers
-        .filter((u) => u.role === "sales" || u.role === "ceo")
-        .map((u) => ({ name: u.name, role: u.role || "" }));
-    }
-    return [{ name: userName, role: userRole }];
-  }, [isCeo, allUsers, userName, userRole]);
-
-  // 각 영업사원의 미입금 일정
-  const rows = useMemo(() => {
-    return salesUsers
-      .map((u) => {
-        const mine = getUserSchedules(u.name, monthScheds);
-        const unpaid = mine.filter((s) => isUnpaid(s.title));
-        return { name: u.name, role: u.role, unpaidCount: unpaid.length, unpaid };
-      })
-      .sort((a, b) => b.unpaidCount - a.unpaidCount);
-  }, [salesUsers, monthScheds, getUserSchedules]);
-
-  const [expanded, setExpanded] = useState<Set<string>>(new Set());
-  const toggle = (name: string) => {
-    setExpanded((prev) => {
-      const next = new Set(prev);
-      if (next.has(name)) next.delete(name);
-      else next.add(name);
-      return next;
+  // 미입금 일정 — 배정/미배정 합쳐서 전부 (날짜 제한 없음)
+  // 영업 role 이면 본인 명의(/이름/, u이름/)만 필터, 그 외(대표/admin)는 전체
+  const unpaidSchedules = useMemo(() => {
+    const allUnpaid = [...schedules, ...unassignedSchedules].filter((s) => isUnpaid(s.title));
+    // 중복 제거 (혹시 schedules + unassigned 둘 다 들어간 경우)
+    const seen = new Set<string>();
+    const dedup = allUnpaid.filter((s) => {
+      if (seen.has(s.id)) return false;
+      seen.add(s.id);
+      return true;
     });
-  };
-
-  const totalUnpaid = rows.reduce((sum, r) => sum + r.unpaidCount, 0);
+    if (isCeo) return dedup.sort((a, b) => (a.date < b.date ? -1 : 1));
+    // 영업: 본인 명의만
+    return dedup.filter((s) => {
+      const title = s.title.replace(/^\[.+?\]\s*/, "");
+      return (
+        title.includes(`/${userName}/`) ||
+        title.includes(`/${userName}[`) ||
+        title.endsWith(`/${userName}`) ||
+        title.startsWith(`u${userName}/`)
+      );
+    }).sort((a, b) => (a.date < b.date ? -1 : 1));
+  }, [schedules, unassignedSchedules, isCeo, userName]);
 
   return (
     <div className="px-4 py-4 space-y-3">
       {/* 헤더 */}
       <div className="text-center">
-        <div className="text-xs text-gray-400">{curMonthLabel}</div>
         <div className="mt-1 text-2xl font-extrabold text-gray-800">
-          미입금 <span className="text-red-500">{totalUnpaid}</span>건
+          미입금 <span className="text-red-500">{unpaidSchedules.length}</span>건
         </div>
       </div>
 
-      {/* 영업사원별 미입금 */}
+      {/* 미입금 일정 목록 */}
       <div className="rounded-xl border border-gray-200 bg-white overflow-hidden">
         <div className="px-3 py-2 border-b border-gray-100 text-xs font-bold text-gray-700">
-          {isCeo ? "영업사원별 미입금" : "내 미입금"}
+          {isCeo ? "전체 미입금" : "내 미입금"}
         </div>
-        {rows.length === 0 ? (
-          <div className="py-6 text-center text-gray-400 text-sm">영업팀 사용자가 없습니다</div>
+        {unpaidSchedules.length === 0 ? (
+          <div className="py-6 text-center text-gray-400 text-sm">미입금 없음</div>
         ) : (
           <div className="divide-y divide-gray-100">
-            {rows.map((r) => {
-              const isOpen = expanded.has(r.name);
-              return (
-                <div key={r.name}>
-                  <button
-                    onClick={() => toggle(r.name)}
-                    className="w-full flex items-center justify-between px-3 py-2.5 active:bg-gray-50"
-                    disabled={r.unpaidCount === 0}
-                  >
-                    <span className="text-sm font-medium text-gray-800">{r.name}</span>
-                    <span className="flex items-center gap-2 shrink-0">
-                      {r.unpaidCount > 0 ? (
-                        <>
-                          <span className="text-sm font-bold text-red-500">미입금 {r.unpaidCount}건</span>
-                          <svg
-                            className={`w-3.5 h-3.5 text-gray-400 transition-transform ${isOpen ? "rotate-90" : ""}`}
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                          >
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                          </svg>
-                        </>
-                      ) : (
-                        <span className="text-xs text-gray-300">-</span>
-                      )}
-                    </span>
-                  </button>
-                  {isOpen && r.unpaidCount > 0 && (
-                    <div className="bg-red-50/50 px-3 py-2 space-y-1">
-                      {r.unpaid
-                        .slice()
-                        .sort((a, b) => (a.date < b.date ? -1 : 1))
-                        .map((s) => (
-                          <div key={s.id} className="flex items-center justify-between text-xs py-1">
-                            <div className="flex-1 min-w-0">
-                              <div className="text-gray-800 font-medium truncate">{extractCustomer(s.title)}</div>
-                              <div className="text-[10px] text-gray-400 truncate">{s.title}</div>
-                            </div>
-                            <span className="text-[10px] text-gray-500 shrink-0 ml-2">{s.date.slice(5)}</span>
-                          </div>
-                        ))}
-                    </div>
-                  )}
+            {unpaidSchedules.map((s) => (
+              <div key={s.id} className="px-3 py-2.5">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-gray-500 shrink-0 font-medium">{s.date.slice(5)}</span>
+                  <span className="text-sm font-medium text-gray-800 truncate">{extractCustomer(s.title)}</span>
                 </div>
-              );
-            })}
+                <div className="text-[10px] text-gray-400 truncate mt-0.5">{s.title}</div>
+              </div>
+            ))}
           </div>
         )}
       </div>
