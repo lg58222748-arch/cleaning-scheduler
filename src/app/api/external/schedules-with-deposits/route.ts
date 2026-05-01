@@ -23,6 +23,33 @@ async function supaGet<T>(path: string): Promise<T> {
   return res.json() as Promise<T>;
 }
 
+// Supabase REST 는 max-rows(기본 1000) 제한이 강제 적용됨 — limit 파라미터로 우회 불가.
+// Range 헤더로 페이지네이션해서 모든 행 수집. 무한루프 방지 안전장치 30회(=30,000행) 상한.
+async function supaGetAll<T>(path: string, pageSize = 1000): Promise<T[]> {
+  const out: T[] = [];
+  for (let page = 0; page < 30; page++) {
+    const from = page * pageSize;
+    const to = from + pageSize - 1;
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
+      headers: {
+        apikey: SUPABASE_KEY,
+        Authorization: `Bearer ${SUPABASE_KEY}`,
+        Accept: "application/json",
+        Range: `${from}-${to}`,
+        "Range-Unit": "items",
+      },
+      cache: "no-store",
+    });
+    if (!res.ok && res.status !== 206) {
+      throw new Error(`Supabase ${res.status}: ${await res.text().then((t) => t.slice(0, 200))}`);
+    }
+    const chunk = (await res.json()) as T[];
+    out.push(...chunk);
+    if (chunk.length < pageSize) break; // 마지막 페이지 도달
+  }
+  return out;
+}
+
 export async function GET(req: NextRequest) {
   const expectedKey = process.env.EXTERNAL_API_KEY;
   if (!expectedKey) {
@@ -67,12 +94,13 @@ export async function GET(req: NextRequest) {
   let rangeRows: ScheduleRow[] = [];
   let unassignedRows: ScheduleRow[] = [];
   try {
+    // supaGetAll: Supabase max-rows 1000 제한 우회. Range 헤더 페이지네이션으로 전체 수집.
     [rangeRows, unassignedRows] = await Promise.all([
-      supaGet<ScheduleRow[]>(
-        `schedules?date=gte.${from}&date=lte.${to}&status=not.in.(deleted,unassigned)&order=date&limit=20000&select=${selectCols}`
+      supaGetAll<ScheduleRow>(
+        `schedules?date=gte.${from}&date=lte.${to}&status=not.in.(deleted,unassigned)&order=date&select=${selectCols}`
       ),
-      supaGet<ScheduleRow[]>(
-        `schedules?status=eq.unassigned&order=date&limit=20000&select=${selectCols}`
+      supaGetAll<ScheduleRow>(
+        `schedules?status=eq.unassigned&order=date&select=${selectCols}`
       ),
     ]);
   } catch (e) {
