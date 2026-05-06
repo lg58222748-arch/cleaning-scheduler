@@ -114,8 +114,8 @@ export default function SearchPanel({ onSelectSchedule, onClose }: SearchPanelPr
                 </div>
                 {schedules.map((s) => {
                   const titleDisplay = s.title.replace(/^\[.+?\]\s*/, "");
-                  // 미입금 일정은 2번째 색상(하늘 #DBEAFE)으로 자동 표시
-                  const schedColor = s.title.includes("/미입금") ? "#DBEAFE" : (s.color || "#FDDCCC");
+                  // 미입금 일정은 보라 #E9D5FF (4번째) 으로 자동 표시
+                  const schedColor = s.title.includes("/미입금") ? "#E9D5FF" : (s.color || "#FDDCCC");
                   return (
                     <div
                       key={s.id}
