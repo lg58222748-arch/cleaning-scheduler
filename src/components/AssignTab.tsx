@@ -208,7 +208,8 @@ function AssignTab({ members, schedules, onAssigned, onDeleted, onOpenDetail, on
                     <div className="overflow-hidden flex-1 w-full relative">
                       {dayScheds.slice(0, 2).map((s) => {
                         const fullName = s.title;
-                        const schedColor = s.color || "#FFEDD5"; // 미배정 기본 주황 (달력탭과 동일 스타일)
+                        // 미입금 일정은 2번째 색상(하늘 #DBEAFE)으로 자동 표시 — 그 외 미배정 기본 주황
+                        const schedColor = s.title.includes("/미입금") ? "#DBEAFE" : (s.color || "#FFEDD5");
                         return (
                           <div
                             key={s.id}

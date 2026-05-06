@@ -61,7 +61,8 @@ const DayCell = memo(function DayCell({
       <div className="overflow-hidden flex-1 w-full relative">
         {daySchedules.slice(0, 2).map((s) => {
           const fullName = s.title;
-          const schedColor = s.color || "#FDDCCC";
+          // 미입금 일정은 2번째 색상(하늘 #DBEAFE)으로 자동 표시 — 저장된 color 와 무관하게 시각적 우선
+          const schedColor = s.title.includes("/미입금") ? "#DBEAFE" : (s.color || "#FDDCCC");
           return (
             <div key={s.id} className="text-[9px] md:text-[11px] leading-[1.2] md:leading-[1.4] max-h-[2.4em] md:max-h-[3em] px-0.5 py-0 md:py-0.5 rounded font-medium overflow-hidden mb-px md:cursor-pointer md:hover:opacity-80"
               style={{ backgroundColor: s.status === "completed" ? "#D1FAE5" : schedColor, color: "#555", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const }}

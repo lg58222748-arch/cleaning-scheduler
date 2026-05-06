@@ -1863,7 +1863,8 @@ export default function Home() {
               ) : (
                 daySchedules.map((s) => {
                   const titleDisplay = s.title.replace(/^\[.+?\]\s*/, "").replace(/^U/, "") || s.title;
-                  const schedColor = s.color || "#FDDCCC";
+                  // 미입금 일정은 2번째 색상(하늘 #DBEAFE)으로 자동 표시
+                  const schedColor = s.title.includes("/미입금") ? "#DBEAFE" : (s.color || "#FDDCCC");
                   return (
                     <div
                       key={s.id}
