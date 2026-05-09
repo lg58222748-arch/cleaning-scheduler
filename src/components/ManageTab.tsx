@@ -410,6 +410,7 @@ const DESIRED_COUNTS: Record<string, number> = {
   "진관": 50, "예완": 40, "형욱": 40, "상태": 50, "규민": 44,
   "두용": 50, "인범": 44, "진희": 44, "인혁": 30, "인홍": 50,
   "로운": 50, "조용": 50,
+  "요석": 50, "근환": 50, "재준": 50,
 };
 function getDesiredCount(fullName: string): number {
   if (DESIRED_COUNTS[fullName] !== undefined) return DESIRED_COUNTS[fullName];
