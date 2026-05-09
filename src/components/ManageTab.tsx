@@ -445,6 +445,8 @@ function FieldStatsSection({ allUsers }: {
   });
   const [loading, setLoading] = useState(false);
   const [monthSchedules, setMonthSchedules] = useState<Schedule[]>([]);
+  // 정렬 모드: count(현재배정 많은 순) | branch(지역 가나다 순)
+  const [sortMode, setSortMode] = useState<"count" | "branch">("count");
 
   const monthLabel = `${selectedMonth.slice(0, 4)}년 ${Number(selectedMonth.slice(5))}월`;
 
@@ -491,8 +493,16 @@ function FieldStatsSection({ allUsers }: {
       count: counts[u.name] || 0,
       desired: getDesiredCount(u.name),
     }));
+    if (sortMode === "branch") {
+      // 지역(가나다) 순 → 같은 지역은 건수 많은 순
+      return rows.sort((a, b) => {
+        const c = a.branch.localeCompare(b.branch, "ko");
+        return c !== 0 ? c : b.count - a.count;
+      });
+    }
+    // 기본: 건수 많은 순
     return rows.sort((a, b) => b.count - a.count);
-  }, [inCalendar, allUsers]);
+  }, [inCalendar, allUsers, sortMode]);
 
   const total = inCalendar.length;
 
@@ -526,9 +536,18 @@ function FieldStatsSection({ allUsers }: {
 
       {/* 팀원별 건수 */}
       <div className="rounded-xl border border-gray-200 bg-white overflow-hidden">
-        <div className="px-3 py-2 border-b border-gray-100 flex items-center justify-between">
-          <span className="text-xs font-bold text-gray-700">팀원별 건수</span>
-          <span className="text-[10px] text-gray-400">희망 / 현재배정</span>
+        <div className="px-3 py-2 border-b border-gray-100 flex items-center justify-between gap-2">
+          <span className="text-xs font-bold text-gray-700 shrink-0">팀원별 건수</span>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              onClick={() => setSortMode((m) => (m === "count" ? "branch" : "count"))}
+              className="text-[10px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 font-medium active:bg-blue-100"
+              aria-label="정렬 방식 변경"
+            >
+              {sortMode === "count" ? "건수순" : "지역순"}
+            </button>
+            <span className="text-[10px] text-gray-400">희망 / 현재배정</span>
+          </div>
         </div>
         {loading ? (
           <div className="py-6 text-center text-gray-400 text-sm">불러오는 중...</div>
