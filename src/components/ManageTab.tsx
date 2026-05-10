@@ -653,30 +653,59 @@ function FieldStatsSection({ allUsers }: {
                         </svg>
                       </div>
                     </button>
-                    {isOpen && (
-                      <div className="bg-blue-50/40 px-3 py-2 space-y-2">
-                        {/* 팀원별 분포 */}
-                        {memberList.length > 0 && (
-                          <div className="flex flex-wrap gap-1">
-                            {memberList.map(([name, cnt]) => (
-                              <span key={name} className="text-[11px] px-2 py-0.5 rounded-full bg-white border border-gray-200 text-gray-700">
-                                {name} <span className="font-bold text-blue-600">{cnt}</span>
-                              </span>
+                    {isOpen && (() => {
+                      // 시간을 오전/오후/그외로 라벨링 (07~09=오전, 13~15=오후)
+                      const timeLabel = (t?: string): string => {
+                        if (!t) return "-";
+                        const h = parseInt(t.split(":")[0]);
+                        if (Number.isNaN(h)) return t;
+                        if (h >= 7 && h <= 9) return "오전";
+                        if (h >= 13 && h <= 15) return "오후";
+                        return t;
+                      };
+                      // 팀원별 그룹 (건수 많은 순)
+                      const byMember = new Map<string, typeof d.schedules>();
+                      for (const s of d.schedules) {
+                        const name = s.memberName || "미배정";
+                        const arr = byMember.get(name) || [];
+                        arr.push(s);
+                        byMember.set(name, arr);
+                      }
+                      const grouped = Array.from(byMember.entries()).sort((a, b) => b[1].length - a[1].length);
+                      return (
+                        <div className="bg-blue-50/40 px-3 py-2 space-y-3">
+                          {/* 팀원별 분포 칩 */}
+                          {memberList.length > 0 && (
+                            <div className="flex flex-wrap gap-1">
+                              {memberList.map(([name, cnt]) => (
+                                <span key={name} className="text-[11px] px-2 py-0.5 rounded-full bg-white border border-gray-200 text-gray-700">
+                                  {name} <span className="font-bold text-blue-600">{cnt}</span>
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                          {/* 팀원별 그룹 일정 목록 */}
+                          <div className="space-y-2">
+                            {grouped.map(([name, scheds]) => (
+                              <div key={name} className="bg-white rounded-lg border border-gray-100 overflow-hidden">
+                                <div className="px-2.5 py-1.5 bg-gray-50 border-b border-gray-100 flex items-center justify-between">
+                                  <span className="text-xs font-bold text-gray-800">{name}</span>
+                                  <span className="text-[10px] text-gray-500">{scheds.length}건</span>
+                                </div>
+                                <div className="divide-y divide-gray-50">
+                                  {scheds.map((s) => (
+                                    <div key={s.id} className="text-[11px] flex items-center gap-2 px-2.5 py-1">
+                                      <span className="text-gray-400 shrink-0 w-9 font-medium">{timeLabel(s.startTime)}</span>
+                                      <span className="text-gray-800 truncate flex-1">{s.title}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
                             ))}
                           </div>
-                        )}
-                        {/* 일정 목록 */}
-                        <div className="space-y-1">
-                          {d.schedules.map((s) => (
-                            <div key={s.id} className="text-[11px] flex items-center gap-2 py-0.5">
-                              <span className="text-gray-400 shrink-0 w-10">{s.startTime || "-"}</span>
-                              <span className="text-gray-800 truncate flex-1">{s.title}</span>
-                              <span className="text-gray-500 shrink-0">{s.memberName}</span>
-                            </div>
-                          ))}
                         </div>
-                      </div>
-                    )}
+                      );
+                    })()}
                   </div>
                 );
               })}
