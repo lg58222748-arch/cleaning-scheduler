@@ -447,6 +447,10 @@ function FieldStatsSection({ allUsers }: {
   const [monthSchedules, setMonthSchedules] = useState<Schedule[]>([]);
   // 정렬 모드: count(현재배정 많은 순) | branch(지역 가나다 순)
   const [sortMode, setSortMode] = useState<"count" | "branch">("count");
+  // 보기 모드: month(팀원별 합계) | day(일별)
+  const [viewMode, setViewMode] = useState<"month" | "day">("month");
+  // 일별 보기에서 펼친 날짜
+  const [expandedDate, setExpandedDate] = useState<string | null>(null);
 
   const monthLabel = `${selectedMonth.slice(0, 4)}년 ${Number(selectedMonth.slice(5))}월`;
 
@@ -504,6 +508,26 @@ function FieldStatsSection({ allUsers }: {
     return rows.sort((a, b) => b.count - a.count);
   }, [inCalendar, allUsers, sortMode]);
 
+  // 일별 집계 (날짜순) — 각 날짜의 일정 수 + 팀원별 분포
+  const dayRows = useMemo(() => {
+    const dayMap = new Map<string, { count: number; perMember: Record<string, number>; schedules: Schedule[] }>();
+    for (const s of inCalendar) {
+      if (!s.date) continue;
+      const entry = dayMap.get(s.date) || { count: 0, perMember: {}, schedules: [] };
+      entry.count++;
+      const names = normalizeMemberName(s.memberName || "");
+      for (const n of names) {
+        if (!n) continue;
+        entry.perMember[n] = (entry.perMember[n] || 0) + 1;
+      }
+      entry.schedules.push(s);
+      dayMap.set(s.date, entry);
+    }
+    return Array.from(dayMap.entries())
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([date, info]) => ({ date, ...info }));
+  }, [inCalendar]);
+
   const total = inCalendar.length;
 
   return (
@@ -534,47 +558,132 @@ function FieldStatsSection({ allUsers }: {
         <div className="text-[11px] text-gray-400 mt-0.5">달력에 등록된 일정 (휴무·마감 제외)</div>
       </div>
 
-      {/* 팀원별 건수 */}
-      <div className="rounded-xl border border-gray-200 bg-white overflow-hidden">
-        <div className="px-3 py-2 border-b border-gray-100 flex items-center justify-between gap-2">
-          <span className="text-xs font-bold text-gray-700 shrink-0">팀원별 건수</span>
-          <div className="flex items-center gap-2 shrink-0">
-            <button
-              onClick={() => setSortMode((m) => (m === "count" ? "branch" : "count"))}
-              className="text-[10px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 font-medium active:bg-blue-100"
-              aria-label="정렬 방식 변경"
-            >
-              {sortMode === "count" ? "건수순" : "지역순"}
-            </button>
-            <span className="text-[10px] text-gray-400">희망 / 현재배정</span>
-          </div>
-        </div>
-        {loading ? (
-          <div className="py-6 text-center text-gray-400 text-sm">불러오는 중...</div>
-        ) : memberRows.length === 0 ? (
-          <div className="py-6 text-center text-gray-400 text-sm">현장팀 회원이 없습니다</div>
-        ) : (
-          <div className="divide-y divide-gray-100">
-            {memberRows.map((m) => (
-              <div key={m.name} className="flex items-center justify-between px-3 py-2.5">
-                <div className="flex items-center gap-2 flex-1 min-w-0">
-                  <span className="text-sm font-medium text-gray-800 truncate">{m.name}</span>
-                  <span className="text-[10px] text-gray-400 shrink-0">{m.branch}</span>
-                </div>
-                <div className="flex items-baseline gap-2 shrink-0">
-                  <span className="text-xs text-gray-400 tabular-nums w-10 text-right">
-                    {m.desired > 0 ? m.desired : "-"}
-                  </span>
-                  <span className="text-gray-300 text-xs">/</span>
-                  <span className={`text-sm font-bold tabular-nums w-12 text-right ${m.count > 0 ? "text-blue-600" : "text-gray-300"}`}>
-                    {m.count}건
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
+      {/* 월/일 보기 토글 */}
+      <div className="flex rounded-lg overflow-hidden border border-gray-200 text-xs font-bold">
+        <button
+          onClick={() => setViewMode("month")}
+          className={`flex-1 py-2 ${viewMode === "month" ? "bg-blue-500 text-white" : "bg-white text-gray-500 active:bg-gray-50"}`}
+        >
+          팀원별 (월)
+        </button>
+        <button
+          onClick={() => { setViewMode("day"); setExpandedDate(null); }}
+          className={`flex-1 py-2 ${viewMode === "day" ? "bg-blue-500 text-white" : "bg-white text-gray-500 active:bg-gray-50"}`}
+        >
+          날짜별 (일)
+        </button>
       </div>
+
+      {/* 월 모드: 팀원별 건수 */}
+      {viewMode === "month" && (
+        <div className="rounded-xl border border-gray-200 bg-white overflow-hidden">
+          <div className="px-3 py-2 border-b border-gray-100 flex items-center justify-between gap-2">
+            <span className="text-xs font-bold text-gray-700 shrink-0">팀원별 건수</span>
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                onClick={() => setSortMode((m) => (m === "count" ? "branch" : "count"))}
+                className="text-[10px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 font-medium active:bg-blue-100"
+                aria-label="정렬 방식 변경"
+              >
+                {sortMode === "count" ? "건수순" : "지역순"}
+              </button>
+              <span className="text-[10px] text-gray-400">희망 / 현재배정</span>
+            </div>
+          </div>
+          {loading ? (
+            <div className="py-6 text-center text-gray-400 text-sm">불러오는 중...</div>
+          ) : memberRows.length === 0 ? (
+            <div className="py-6 text-center text-gray-400 text-sm">현장팀 회원이 없습니다</div>
+          ) : (
+            <div className="divide-y divide-gray-100">
+              {memberRows.map((m) => (
+                <div key={m.name} className="flex items-center justify-between px-3 py-2.5">
+                  <div className="flex items-center gap-2 flex-1 min-w-0">
+                    <span className="text-sm font-medium text-gray-800 truncate">{m.name}</span>
+                    <span className="text-[10px] text-gray-400 shrink-0">{m.branch}</span>
+                  </div>
+                  <div className="flex items-baseline gap-2 shrink-0">
+                    <span className="text-xs text-gray-400 tabular-nums w-10 text-right">
+                      {m.desired > 0 ? m.desired : "-"}
+                    </span>
+                    <span className="text-gray-300 text-xs">/</span>
+                    <span className={`text-sm font-bold tabular-nums w-12 text-right ${m.count > 0 ? "text-blue-600" : "text-gray-300"}`}>
+                      {m.count}건
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* 일 모드: 날짜별 건수 — 클릭 시 그날 팀원별 + 일정 목록 펼치기 */}
+      {viewMode === "day" && (
+        <div className="rounded-xl border border-gray-200 bg-white overflow-hidden">
+          <div className="px-3 py-2 border-b border-gray-100 flex items-center justify-between">
+            <span className="text-xs font-bold text-gray-700">날짜별 건수</span>
+            <span className="text-[10px] text-gray-400">날짜 / 건수 (탭하면 상세)</span>
+          </div>
+          {loading ? (
+            <div className="py-6 text-center text-gray-400 text-sm">불러오는 중...</div>
+          ) : dayRows.length === 0 ? (
+            <div className="py-6 text-center text-gray-400 text-sm">이 달에 등록된 일정이 없습니다</div>
+          ) : (
+            <div className="divide-y divide-gray-100">
+              {dayRows.map((d) => {
+                const isOpen = expandedDate === d.date;
+                const day = Number(d.date.slice(8));
+                const dow = ["일", "월", "화", "수", "목", "금", "토"][new Date(d.date + "T00:00:00").getDay()];
+                const memberList = Object.entries(d.perMember).sort((a, b) => b[1] - a[1]);
+                return (
+                  <div key={d.date}>
+                    <button
+                      onClick={() => setExpandedDate(isOpen ? null : d.date)}
+                      className="w-full flex items-center justify-between px-3 py-2.5 active:bg-gray-50"
+                    >
+                      <div className="flex items-baseline gap-2">
+                        <span className="text-sm font-bold text-gray-800 tabular-nums w-6 text-right">{day}</span>
+                        <span className={`text-[10px] font-medium ${dow === "일" ? "text-red-500" : dow === "토" ? "text-blue-500" : "text-gray-400"}`}>({dow})</span>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span className={`text-sm font-bold tabular-nums ${d.count > 0 ? "text-blue-600" : "text-gray-300"}`}>{d.count}건</span>
+                        <svg className={`w-3.5 h-3.5 text-gray-400 transition-transform ${isOpen ? "rotate-90" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                        </svg>
+                      </div>
+                    </button>
+                    {isOpen && (
+                      <div className="bg-blue-50/40 px-3 py-2 space-y-2">
+                        {/* 팀원별 분포 */}
+                        {memberList.length > 0 && (
+                          <div className="flex flex-wrap gap-1">
+                            {memberList.map(([name, cnt]) => (
+                              <span key={name} className="text-[11px] px-2 py-0.5 rounded-full bg-white border border-gray-200 text-gray-700">
+                                {name} <span className="font-bold text-blue-600">{cnt}</span>
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                        {/* 일정 목록 */}
+                        <div className="space-y-1">
+                          {d.schedules.map((s) => (
+                            <div key={s.id} className="text-[11px] flex items-center gap-2 py-0.5">
+                              <span className="text-gray-400 shrink-0 w-10">{s.startTime || "-"}</span>
+                              <span className="text-gray-800 truncate flex-1">{s.title}</span>
+                              <span className="text-gray-500 shrink-0">{s.memberName}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
