@@ -226,7 +226,7 @@ export default function Home() {
               if (uName && n.message.includes(uName)) return true;
               return false;
             }
-            if (n.type === "happy_call_reminder") return isAdminOrScheduler;
+            if (n.type === "happy_call_reminder") return isAdminOrScheduler || (!!uName && n.message.includes(uName));
             if (isAdminOrScheduler) return true;
             return uName && (n.message.includes(uName) || n.title.includes(uName));
           }).map(n => localRead.has(n.id) ? { ...n, read: true } : n);

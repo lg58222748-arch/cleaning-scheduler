@@ -452,12 +452,15 @@ export async function checkHappyCallReminders(): Promise<Notification[]> {
   for (const s of tomorrowSchedules || []) {
     const { data: existing } = await supabase.from("notifications").select("id").eq("type", "happy_call_reminder").eq("schedule_id", String(s.id));
     if (!existing || existing.length === 0) {
+      // 담당자(현장팀장)도 푸시 받게 — '미배정' 제외
+      const memberName = s.member_name ? String(s.member_name).trim() : "";
+      const targetNames = memberName && memberName !== "미배정" ? [memberName] : undefined;
       const n = await addNotification(
         "happy_call_reminder",
         "해피콜 요청",
         `내일 ${s.start_time} "${s.title}" 일정이 있습니다. ${s.member_name}님에게 해피콜을 진행해주세요.`,
         String(s.id),
-        undefined,
+        targetNames,
         ["ceo", "admin", "scheduler"]
       );
       newReminders.push(n);
