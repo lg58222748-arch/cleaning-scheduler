@@ -2004,13 +2004,37 @@ export default function Home() {
                 ["연락처", pu.phone],
                 ["관리점", pu.branch ? `${pu.branch}[관리점]` : ""],
                 ["주민등록번호", pu.residentNumber],
-                ["사업자등록증", pu.businessLicenseFile],
               ].filter(([, v]) => v).map(([label, value]) => (
                 <div key={label} className="flex items-start gap-2">
                   <span className="text-xs text-gray-500 w-20 shrink-0">{label}</span>
                   <span className="text-sm text-gray-800">{value}</span>
                 </div>
               ))}
+              {/* 사업자등록증 — Storage 경로면 다운로드 링크, 옛 파일명만이면 텍스트 */}
+              {pu.businessLicenseFile && (
+                <div className="flex items-start gap-2">
+                  <span className="text-xs text-gray-500 w-20 shrink-0">사업자등록증</span>
+                  {/\d+-[a-z0-9]+\.[a-z0-9]+$/i.test(pu.businessLicenseFile) ? (
+                    <button
+                      onClick={async () => {
+                        try {
+                          const res = await fetch(`/api/upload/business-license/sign?path=${encodeURIComponent(pu.businessLicenseFile)}`);
+                          const j = await res.json();
+                          if (j.url) window.open(j.url, "_blank");
+                          else showAlert("다운로드 링크 생성 실패: " + (j.message || j.error || ""));
+                        } catch (e) {
+                          showAlert("다운로드 실패: " + (e instanceof Error ? e.message : ""));
+                        }
+                      }}
+                      className="text-sm text-blue-600 active:text-blue-800 underline"
+                    >
+                      📎 보기 / 다운로드
+                    </button>
+                  ) : (
+                    <span className="text-sm text-gray-500">{pu.businessLicenseFile} <span className="text-[10px] text-gray-400">(파일명만, 실제 파일 없음)</span></span>
+                  )}
+                </div>
+              )}
               {/* 주소 — 대표만 수정 가능 */}
               <div className="flex items-start gap-2">
                 <span className="text-xs text-gray-500 w-20 shrink-0 pt-1.5">주소</span>

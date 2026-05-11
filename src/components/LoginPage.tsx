@@ -24,7 +24,9 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
   const [address, setAddress] = useState("");
   const [addressDetail, setAddressDetail] = useState("");
   const [residentNumber, setResidentNumber] = useState("");
+  // businessLicenseFile = DB에 저장될 경로(또는 비어있음). businessLicenseLocal = 실제 업로드용 File.
   const [businessLicenseFile, setBusinessLicenseFile] = useState("");
+  const [businessLicenseLocal, setBusinessLicenseLocal] = useState<File | null>(null);
   const [branchSelect, setBranchSelect] = useState("");
   const [branchCustom, setBranchCustom] = useState("");
   const [regUsername, setRegUsername] = useState("");
@@ -86,10 +88,34 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
     const fullAddress = addressDetail.trim()
       ? `${address.trim()} ${addressDetail.trim()}`
       : address.trim();
+
+    // 사업자등록증 업로드 — 첨부된 경우만 Storage 에 올리고 path 반환받기
+    let licensePath = businessLicenseFile; // 이미 업로드된 경로가 있으면 재사용
+    if (businessLicenseLocal && !licensePath) {
+      try {
+        const fd = new FormData();
+        fd.append("file", businessLicenseLocal);
+        const res = await fetch("/api/upload/business-license", { method: "POST", body: fd });
+        const j = await res.json();
+        if (!res.ok || !j.path) {
+          setError(j.message || "사업자등록증 업로드 실패");
+          setLoading(false);
+          return;
+        }
+        licensePath = j.path;
+        setBusinessLicenseFile(j.path); // 재시도 시 중복 업로드 방지
+      } catch (e) {
+        console.error("[license upload]", e);
+        setError("사업자등록증 업로드 실패. 다시 시도해주세요.");
+        setLoading(false);
+        return;
+      }
+    }
+
     const result = await registerApi({
       username: regUsername.trim(), password: regPassword,
       name: name.trim(), phone: phone.trim(), address: fullAddress,
-      residentNumber: residentNumber.trim(), businessLicenseFile, branch: branchValue,
+      residentNumber: residentNumber.trim(), businessLicenseFile: licensePath, branch: branchValue,
     });
     if (result.error) {
       setError(result.error);
@@ -273,15 +299,24 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
                   />
                 )}
               </div>
-              {/* 6) 사업자등록증 */}
+              {/* 6) 사업자등록증 — 가입 신청 시 Supabase Storage 에 업로드 */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">사업자등록증</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">사업자등록증 (선택)</label>
                 <input
                   type="file" accept="image/*,.pdf"
-                  onChange={(e) => setBusinessLicenseFile(e.target.files?.[0]?.name || "")}
+                  onChange={(e) => {
+                    const f = e.target.files?.[0] || null;
+                    setBusinessLicenseLocal(f);
+                    setBusinessLicenseFile(""); // 새 파일 → 이전 업로드 경로 무효화
+                  }}
                   className="w-full text-sm text-gray-500 file:mr-2 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-medium file:bg-blue-50 file:text-blue-600"
                 />
-                {businessLicenseFile && <p className="text-xs text-green-600 mt-1">{businessLicenseFile}</p>}
+                {businessLicenseLocal && (
+                  <p className="text-xs text-green-600 mt-1">
+                    {businessLicenseLocal.name} ({(businessLicenseLocal.size / 1024).toFixed(0)} KB)
+                  </p>
+                )}
+                <p className="text-[10px] text-gray-400 mt-1">5MB 이하 · 이미지 또는 PDF</p>
               </div>
               <button
                 onClick={handleRegister} disabled={loading}
