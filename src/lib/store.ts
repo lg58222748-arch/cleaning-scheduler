@@ -441,6 +441,34 @@ export async function prefillHappyCallMarkers(): Promise<number> {
   return created;
 }
 
+// 일정 제목에서 고객 이름 추출 — 해피콜 메시지용
+// 예: 'U지혜/김성훈/경기의정부시/신대원 [1/1]/입주청소' → '김성훈'
+//     'U오전/성원/박정원/인천/윤정(민서)' → '박정원' (영업사원이 시간 키워드면 한 칸 더 skip)
+//     'U거주/지혜/이현주/광주/거주/대원' → '이현주'
+function extractCustomerFromTitle(title: string): string {
+  if (!title) return "";
+  const cleaned = title.replace(/^\[.+?\]\s*/, "").trim();
+  const parts = cleaned.split("/").map((p) => p.trim()).filter(Boolean);
+  if (parts.length < 2) return "";
+  // 첫 토큰: 'U지혜', 'A기수', 'U오전' 등 (영업사원 식별자) — 보통 skip
+  // 단, prefix 떼고 시간/서비스 키워드면 두 번째도 skip
+  const first = parts[0];
+  const stripped = first.replace(/^[AUTZ]/, "").trim();
+  const timeOrSvcKeywords = ["오전", "오후", "시무", "사이", "거주", "입주", "인테리어", "새집"];
+  const customerIdx = timeOrSvcKeywords.includes(stripped) ? 2 : 1;
+  // 이후 토큰 중 한글 2~4글자 이름 후보 찾기
+  const skipWords = new Set([...timeOrSvcKeywords, "미입금", "휴무", "마감", "보류", "예완", "관리자"]);
+  for (let i = customerIdx; i < parts.length; i++) {
+    let p = parts[i];
+    p = p.replace(/\s*\[\d+\/\d+\]\s*/g, "").trim(); // [1/1] 같은 인덱스 제거
+    if (!p) continue;
+    if (skipWords.has(p)) continue;
+    const noParen = p.replace(/\([^)]*\)/g, "").trim(); // 괄호 안 보조 표기 제거
+    if (/^[가-힣]{2,4}$/.test(noParen)) return noParen;
+  }
+  return "";
+}
+
 export async function checkHappyCallReminders(): Promise<Notification[]> {
   const tomorrow = new Date();
   tomorrow.setDate(tomorrow.getDate() + 1);
@@ -455,10 +483,18 @@ export async function checkHappyCallReminders(): Promise<Notification[]> {
       // 담당자(현장팀장)도 푸시 받게 — '미배정' 제외
       const memberName = s.member_name ? String(s.member_name).trim() : "";
       const targetNames = memberName && memberName !== "미배정" ? [memberName] : undefined;
+      // 고객 이름 추출 (제목 기반). 추출 실패 시 fallback 으로 settlement 의 customer_name 조회.
+      let customer = extractCustomerFromTitle(String(s.title || ""));
+      if (!customer) {
+        const { data: stl } = await supabase.from("settlements").select("customer_name").eq("schedule_id", String(s.id)).maybeSingle();
+        if (stl?.customer_name) customer = String(stl.customer_name).trim();
+      }
+      const customerPart = customer ? `고객 ${customer}님` : "고객님";
+      const memberPart = memberName && memberName !== "미배정" ? ` (담당: ${memberName})` : "";
       const n = await addNotification(
         "happy_call_reminder",
         "해피콜 요청",
-        `내일 ${s.start_time} "${s.title}" 일정이 있습니다. ${s.member_name}님에게 해피콜을 진행해주세요.`,
+        `내일 ${s.start_time} "${s.title}" 일정 — ${customerPart}에게 해피콜을 진행해주세요.${memberPart}`,
         String(s.id),
         targetNames,
         ["ceo", "admin", "scheduler"]
