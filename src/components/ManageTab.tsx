@@ -643,6 +643,10 @@ function FieldStatsSection({ allUsers }: {
   const [viewMode, setViewMode] = useState<"month" | "day">("month");
   // 일별 보기에서 펼친 날짜
   const [expandedDate, setExpandedDate] = useState<string | null>(null);
+  // 일별 펼침 안 팀장 그룹 정렬: count | branch
+  const [dayGroupSort, setDayGroupSort] = useState<"count" | "branch">("count");
+  // 일별 펼침 안 지역 필터 (빈 문자열 = 전체)
+  const [dayRegionFilter, setDayRegionFilter] = useState<string>("");
 
   const monthLabel = `${selectedMonth.slice(0, 4)}년 ${Number(selectedMonth.slice(5))}월`;
 
@@ -671,6 +675,28 @@ function FieldStatsSection({ allUsers }: {
     () => monthSchedules.filter((s) => s.status !== "unassigned" && !isOffDay(s.title)),
     [monthSchedules]
   );
+
+  // 팀원 이름 → 지역 매핑 (field role 사용자 기준, 정규화된 이름 → branch)
+  const memberBranchMap = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const u of allUsers) {
+      if (u.role !== "field" && u.role !== "ceo") continue;
+      const branch = (u.branch || "").replace(/\[관리점\]/, "").trim() || "미지정";
+      map.set(u.name, branch);
+    }
+    return map;
+  }, [allUsers]);
+
+  // 사용 가능한 모든 지역 목록 (필터 드롭다운용)
+  const allRegions = useMemo(() => {
+    const set = new Set<string>();
+    for (const u of allUsers) {
+      if (u.role !== "field" && u.role !== "ceo") continue;
+      const branch = (u.branch || "").replace(/\[관리점\]/, "").trim();
+      if (branch) set.add(branch);
+    }
+    return Array.from(set).sort((a, b) => a.localeCompare(b, "ko"));
+  }, [allUsers]);
 
   // 현장팀 팀원별 달력 건수 (이름 표기 정규화 — "A서승우(화성)" 등 변형도 같은 사람으로 카운트)
   const memberRows = useMemo(() => {
@@ -868,11 +894,48 @@ function FieldStatsSection({ allUsers }: {
                           byMember.set(name, arr);
                         }
                       }
-                      const grouped = Array.from(byMember.entries()).sort((a, b) => b[1].length - a[1].length);
+                      // 1) 지역 필터 적용 (dayRegionFilter 빈 문자열이면 전체)
+                      // 2) 정렬 (count 또는 branch 순)
+                      let grouped = Array.from(byMember.entries()).map(([name, scheds]) => ({
+                        name,
+                        scheds,
+                        branch: memberBranchMap.get(name) || "미지정",
+                      }));
+                      if (dayRegionFilter) {
+                        grouped = grouped.filter((g) => g.branch === dayRegionFilter);
+                      }
+                      if (dayGroupSort === "branch") {
+                        grouped.sort((a, b) => {
+                          const c = a.branch.localeCompare(b.branch, "ko");
+                          return c !== 0 ? c : b.scheds.length - a.scheds.length;
+                        });
+                      } else {
+                        grouped.sort((a, b) => b.scheds.length - a.scheds.length);
+                      }
                       return (
                         <div className="bg-blue-50/40 px-3 py-2 space-y-3">
+                          {/* 컨트롤 — 지역 필터 드롭다운 + 정렬 토글 */}
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <select
+                              value={dayRegionFilter}
+                              onChange={(e) => setDayRegionFilter(e.target.value)}
+                              className="text-[10px] px-2 py-1 rounded border border-gray-200 bg-white text-gray-700 outline-none"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <option value="">전체 지역</option>
+                              {allRegions.map((r) => (
+                                <option key={r} value={r}>{r}</option>
+                              ))}
+                            </select>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); setDayGroupSort((m) => (m === "count" ? "branch" : "count")); }}
+                              className="text-[10px] px-2 py-1 rounded-full bg-white border border-gray-200 text-gray-700 font-medium active:bg-blue-100"
+                            >
+                              {dayGroupSort === "count" ? "건수순" : "지역순"}
+                            </button>
+                          </div>
                           {/* 팀원별 분포 칩 */}
-                          {memberList.length > 0 && (
+                          {memberList.length > 0 && !dayRegionFilter && (
                             <div className="flex flex-wrap gap-1">
                               {memberList.map(([name, cnt]) => (
                                 <span key={name} className="text-[11px] px-2 py-0.5 rounded-full bg-white border border-gray-200 text-gray-700">
@@ -883,10 +946,15 @@ function FieldStatsSection({ allUsers }: {
                           )}
                           {/* 팀원별 그룹 일정 목록 */}
                           <div className="space-y-2">
-                            {grouped.map(([name, scheds]) => (
+                            {grouped.length === 0 ? (
+                              <div className="text-[11px] text-gray-400 text-center py-3">선택한 지역에 해당하는 팀장이 없습니다</div>
+                            ) : grouped.map(({ name, scheds, branch }) => (
                               <div key={name} className="bg-white rounded-lg border border-gray-100 overflow-hidden">
                                 <div className="px-2.5 py-1.5 bg-gray-50 border-b border-gray-100 flex items-center justify-between">
-                                  <span className="text-xs font-bold text-gray-800">{name}</span>
+                                  <span className="flex items-center gap-1.5">
+                                    <span className="text-xs font-bold text-gray-800">{name}</span>
+                                    <span className="text-[10px] text-gray-400">{branch}</span>
+                                  </span>
                                   <span className="text-[10px] text-gray-500">{scheds.length}건</span>
                                 </div>
                                 <div className="divide-y divide-gray-50">
