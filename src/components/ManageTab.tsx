@@ -596,6 +596,23 @@ function FieldTeamGuide() {
 }
 
 /* ════════════ 현장팀 통계 섹션 ════════════ */
+// 지역 정렬 우선순위 — 수도권 → 충청 → 영남 순. 미지정은 항상 맨 마지막.
+const REGION_PRIORITY = [
+  "서울", "경기", "인천",
+  "수원", "화성", "동탄", "오산", "안산", "평택",
+  "천안", "아산",
+  "대전", "청주",
+  "부산", "대구", "울산",
+];
+function regionRank(branch: string): number {
+  const b = (branch || "").trim();
+  if (!b || b === "미지정") return 9999; // 맨 마지막
+  for (let i = 0; i < REGION_PRIORITY.length; i++) {
+    if (b.includes(REGION_PRIORITY[i])) return i;
+  }
+  return 9998; // 기타 지역 — 미지정 바로 위
+}
+
 // 팀장별 월간 희망 배정 갯수 (이름 끝부분으로 매칭 — 예: "이동환" → "동환" → 250)
 const DESIRED_COUNTS: Record<string, number> = {
   "동환": 250, "기열": 50, "지혜": 50, "성원": 50, "승우": 50,
@@ -687,7 +704,7 @@ function FieldStatsSection({ allUsers }: {
     return map;
   }, [allUsers]);
 
-  // 사용 가능한 모든 지역 목록 (필터 드롭다운용)
+  // 사용 가능한 모든 지역 목록 (필터 드롭다운용) — 우선순위 정렬
   const allRegions = useMemo(() => {
     const set = new Set<string>();
     for (const u of allUsers) {
@@ -695,7 +712,12 @@ function FieldStatsSection({ allUsers }: {
       const branch = (u.branch || "").replace(/\[관리점\]/, "").trim();
       if (branch) set.add(branch);
     }
-    return Array.from(set).sort((a, b) => a.localeCompare(b, "ko"));
+    return Array.from(set).sort((a, b) => {
+      const ra = regionRank(a);
+      const rb = regionRank(b);
+      if (ra !== rb) return ra - rb;
+      return a.localeCompare(b, "ko");
+    });
   }, [allUsers]);
 
   // 현장팀 팀원별 달력 건수 (이름 표기 정규화 — "A서승우(화성)" 등 변형도 같은 사람으로 카운트)
@@ -716,10 +738,12 @@ function FieldStatsSection({ allUsers }: {
       desired: getDesiredCount(u.name),
     }));
     if (sortMode === "branch") {
-      // 지역(가나다) 순 → 같은 지역은 건수 많은 순
+      // 지역 우선순위(서울→경기→천안...→미지정 마지막) → 같은 지역은 건수 많은 순
       return rows.sort((a, b) => {
-        const c = a.branch.localeCompare(b.branch, "ko");
-        return c !== 0 ? c : b.count - a.count;
+        const ra = regionRank(a.branch);
+        const rb = regionRank(b.branch);
+        if (ra !== rb) return ra - rb;
+        return b.count - a.count;
       });
     }
     // 기본: 건수 많은 순
@@ -905,9 +929,12 @@ function FieldStatsSection({ allUsers }: {
                         grouped = grouped.filter((g) => g.branch === dayRegionFilter);
                       }
                       if (dayGroupSort === "branch") {
+                        // 우선순위 정렬 (서울→경기→천안...→미지정 마지막) + 같은 지역 안은 건수 많은 순
                         grouped.sort((a, b) => {
-                          const c = a.branch.localeCompare(b.branch, "ko");
-                          return c !== 0 ? c : b.scheds.length - a.scheds.length;
+                          const ra = regionRank(a.branch);
+                          const rb = regionRank(b.branch);
+                          if (ra !== rb) return ra - rb;
+                          return b.scheds.length - a.scheds.length;
                         });
                       } else {
                         grouped.sort((a, b) => b.scheds.length - a.scheds.length);
