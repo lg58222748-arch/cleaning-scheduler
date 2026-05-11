@@ -147,6 +147,8 @@ export default function Home() {
   const notifReloadSuppressRef = useRef(0);
   // 일정 액션(생성/수정/반환/삭제) 중엔 schedule reload 억제 (낙관적 업데이트 보호)
   const scheduleReloadSuppressRef = useRef(0);
+  // 사용자 액션(승인/거절/역할변경/삭제) 중엔 user reload 억제 (승인 시 깜빡임 방지)
+  const userReloadSuppressRef = useRef(0);
   // 현재 달력에서 보고 있는 월 (selectedDate 와 별개, 스크롤 시 변경)
   // Realtime reload 가 이 달 기준으로 ±1 달 범위 fetch → 먼 달로 스크롤해도 안 깜빡임
   const viewingMonthRef = useRef<Date>(new Date());
@@ -488,7 +490,13 @@ export default function Home() {
       }).catch(() => {});
     }
     function reloadUsers() {
-      fetchUsers().then(d => { setAllUsers(d.users); setPendingUsers(d.pendingUsers); }).catch(() => {});
+      if (Date.now() < userReloadSuppressRef.current) return;
+      fetchUsers().then(d => {
+        // 응답 도착 시점에도 재확인 (in-flight 중 액션 발생 케이스 방어)
+        if (Date.now() < userReloadSuppressRef.current) return;
+        setAllUsers(d.users);
+        setPendingUsers(d.pendingUsers);
+      }).catch(() => {});
     }
     function reloadMembers() {
       fetchMembers().then(m => setMembers(m)).catch(() => {});
@@ -1615,6 +1623,7 @@ export default function Home() {
                           value={u.role}
                           onChange={async (e) => {
                             const newRole = e.target.value as UserRole;
+                            userReloadSuppressRef.current = Date.now() + 4000;
                             setAllUsers(prev => prev.map(x => x.id === u.id ? { ...x, role: newRole } : x));
                             await changeUserRoleApi(u.id, newRole);
                           }}
@@ -1631,6 +1640,7 @@ export default function Home() {
                         </button>
                         <button onClick={async () => {
                           if (!(await showConfirm(u.name + "님을 탈퇴시키겠습니까?"))) return;
+                          userReloadSuppressRef.current = Date.now() + 4000;
                           setAllUsers(prev => prev.filter(x => x.id !== u.id));
                           deleteUserApi(u.id).then(() => loadData(undefined, true));
                         }} className="p-1.5 active:bg-red-50 rounded-lg border border-gray-200">
@@ -1641,6 +1651,8 @@ export default function Home() {
                     {u.status === "pending" && canApprovePending && (
                       <div className="flex gap-2 mt-2 pt-2 border-t border-gray-100">
                         <button onClick={() => {
+                          // realtime/polling 으로 인한 깜빡임 방지 — 4초간 user reload 차단
+                          userReloadSuppressRef.current = Date.now() + 4000;
                           setPendingUsers(prev => prev.filter(x => x.id !== u.id));
                           setAllUsers(prev => [...prev, { ...u, status: "approved" as const, role: "field" as const }]);
                           approveUserApi(u.id).catch((err) => {
@@ -1651,6 +1663,7 @@ export default function Home() {
                           });
                         }} className="flex-1 py-2 bg-green-500 text-white rounded-lg text-xs font-bold active:bg-green-600">승인</button>
                         <button onClick={() => {
+                          userReloadSuppressRef.current = Date.now() + 4000;
                           setPendingUsers(prev => prev.filter(x => x.id !== u.id));
                           deleteUserApi(u.id).catch((err) => {
                             console.error("[rejectUser] 실패, 복구:", err);
@@ -2045,6 +2058,7 @@ export default function Home() {
                       onBlur={async (e) => {
                         const newAddr = e.target.value.trim();
                         if (newAddr === pu.address) return;
+                        userReloadSuppressRef.current = Date.now() + 4000;
                         setAllUsers(prev => prev.map(u => u.id === pu.id ? { ...u, address: newAddr } : u));
                         setProfileUser({ ...pu, address: newAddr });
                         await updateUserInfoApi(pu.id, { address: newAddr });
