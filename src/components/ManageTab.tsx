@@ -85,11 +85,7 @@ export default function ManageTab({ isAdmin, userRole, userName = "", allUsers =
       )}
 
       {/* 현장팀 탭 — 통계는 일정관리 탭으로 이동 */}
-      {activeSubTab === "field" && (
-        <div className="px-4 py-12 text-center text-xs text-gray-400">
-          현장팀 통계는 <span className="font-medium text-gray-500">일정관리</span> 탭으로 이동했습니다.
-        </div>
-      )}
+      {activeSubTab === "field" && <FieldTeamGuide />}
 
       {/* 일정관리 탭 — 일정관리자/대표/관리자 전용 */}
       {activeSubTab === "scheduler" && (
@@ -402,6 +398,202 @@ function CeoSection({ onRefresh, allUsers, members, schedules }: {
   );
 }
 
+
+/* ════════════ 현장팀 사용 가이드 섹션 ════════════ */
+function FieldTeamGuide() {
+  const [openId, setOpenId] = useState<string | null>("calendar");
+
+  const Section = ({ id, icon, title, children }: { id: string; icon: string; title: string; children: React.ReactNode }) => {
+    const isOpen = openId === id;
+    return (
+      <div className="rounded-xl border border-gray-200 bg-white overflow-hidden">
+        <button
+          onClick={() => setOpenId(isOpen ? null : id)}
+          className="w-full px-4 py-3 flex items-center justify-between active:bg-gray-50"
+        >
+          <span className="flex items-center gap-2">
+            <span className="text-xl">{icon}</span>
+            <span className="text-sm font-bold text-gray-800">{title}</span>
+          </span>
+          <svg
+            className={`w-4 h-4 text-gray-400 transition-transform ${isOpen ? "rotate-90" : ""}`}
+            fill="none" stroke="currentColor" viewBox="0 0 24 24"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
+        </button>
+        {isOpen && (
+          <div className="px-4 py-3 bg-gray-50 border-t border-gray-100 text-sm text-gray-700 leading-relaxed space-y-3">
+            {children}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const Step = ({ n, title, children }: { n: number; title: string; children?: React.ReactNode }) => (
+    <div className="flex gap-3">
+      <span className="shrink-0 w-6 h-6 rounded-full bg-blue-500 text-white text-xs font-bold flex items-center justify-center">{n}</span>
+      <div className="flex-1">
+        <div className="text-sm font-bold text-gray-800">{title}</div>
+        {children && <div className="text-xs text-gray-600 mt-1 leading-relaxed">{children}</div>}
+      </div>
+    </div>
+  );
+
+  const Tip = ({ children }: { children: React.ReactNode }) => (
+    <div className="bg-blue-50 border-l-4 border-blue-400 px-3 py-2 rounded-r-lg text-xs text-blue-900">
+      💡 {children}
+    </div>
+  );
+
+  const Warn = ({ children }: { children: React.ReactNode }) => (
+    <div className="bg-amber-50 border-l-4 border-amber-400 px-3 py-2 rounded-r-lg text-xs text-amber-900">
+      ⚠️ {children}
+    </div>
+  );
+
+  return (
+    <div className="px-4 py-4 space-y-3">
+      <div className="text-center pb-2">
+        <h2 className="text-base font-bold text-gray-800">현장팀 사용 가이드</h2>
+        <p className="text-xs text-gray-500 mt-1">달력 / 검수 / 정산 / 고객 안내까지 단계별로</p>
+      </div>
+
+      {/* 1. 달력 사용법 */}
+      <Section id="calendar" icon="📅" title="1. 달력 사용법">
+        <Step n={1} title="달력 탭 → 본인 일정 확인">
+          하단 메뉴 <b>달력</b> 탭에서 이번 달 본인 일정만 보입니다.<br/>
+          (현장팀은 다른 팀원 일정 못 봄 — 본인 일정만)
+        </Step>
+        <Step n={2} title="일정 칩 색상 의미">
+          • <span className="px-1 rounded" style={{ background: "#FDDCCC" }}>살몬</span> 일반 일정<br/>
+          • <span className="px-1 rounded" style={{ background: "#D1FAE5" }}>연두</span> 완료된 일정<br/>
+          • <span className="px-1 rounded" style={{ background: "#E9D5FF" }}>보라</span> 미입금 (제목에 /미입금 포함)
+        </Step>
+        <Step n={3} title="일정 클릭 → 상세 화면">
+          일정 칩 탭하면 상세 화면 열림. 제목·메모·시간 등 확인.<br/>
+          본인 일정이면 제목·메모 직접 수정 가능.
+        </Step>
+        <Step n={4} title="날짜 추가 (← 달력 아래 + 버튼)">
+          날짜 칸 누르고 우측 상단 <b>+</b> → 새 일정 등록.<br/>
+          시간대(오전/오후/시무) 선택 → 저장.
+        </Step>
+        <Tip>
+          가까운 미래 한 달은 항상 빠르게 표시됩니다. 먼 미래(예: 3개월 후) 보려면 달력 위/아래 스와이프 하시면 됩니다.
+        </Tip>
+      </Section>
+
+      {/* 2. 검수 (체크리스트) */}
+      <Section id="checklist" icon="✅" title="2. 검수 (체크리스트)">
+        <Step n={1} title="일정 상세 → '체크리스트' 탭">
+          작업 끝나면 본인 일정 열고 <b>체크리스트</b> 탭으로 이동.
+        </Step>
+        <Step n={2} title="항목별 체크 + 사진 첨부">
+          현관·거실·주방·욕실 등 항목별로 깨끗하게 했는지 체크.<br/>
+          필요하면 사진도 첨부 (스마트폰 카메라 바로 호출).
+        </Step>
+        <Step n={3} title="특이사항 메모">
+          현장에서 추가 작업 / 손상 발견 / 부재 시 안내 등 메모.<br/>
+          (정산할 때 그대로 활용됨)
+        </Step>
+        <Step n={4} title="작업 완료 처리">
+          모든 항목 체크 + 저장 → 일정 상태가 <b>완료(연두색)</b> 로 바뀜.
+        </Step>
+        <Warn>
+          체크리스트 미완료 = 정산 못 함. 작업 끝나면 <b>꼭 그 자리에서</b> 체크 마무리하세요.
+        </Warn>
+      </Section>
+
+      {/* 3. 정산서 발행 */}
+      <Section id="settlement" icon="💰" title="3. 정산서 발행">
+        <Step n={1} title="일정 상세 → '정산' 탭">
+          체크리스트 끝낸 후 같은 화면에서 <b>정산</b> 탭으로 이동.
+        </Step>
+        <Step n={2} title="금액 확인 / 수정">
+          영업팀이 미리 입력한 견적·예약금이 자동으로 들어와있음.<br/>
+          현장 특이사항 비용 있으면 그 자리에서 추가 입력.
+        </Step>
+        <Step n={3} title="결제 방식 / 현금영수증">
+          고객이 어떻게 결제할지 선택: 계좌이체 / 현금 / 카드.<br/>
+          현금영수증 신청 여부도 체크 (부가세 자동 계산됨).
+        </Step>
+        <Step n={4} title="계좌 정보 입력 (한 번만)">
+          본인 계좌 정보(은행/계좌번호/입금주)를 한 번 저장해두면 다음부터 자동으로 들어감.
+        </Step>
+        <Step n={5} title="<b>정산서 발행</b> 버튼 클릭">
+          최종 금액 확인 후 <b>정산서 발행</b> 누르면 DB에 정산 데이터 저장 + 공유 모달 자동으로 열림.
+        </Step>
+        <Tip>
+          정산서 발행을 누르지 않으면 DB에 정산 기록이 안 남아요. <b>꼭 발행 누르고 마무리</b>하세요.
+        </Tip>
+      </Section>
+
+      {/* 4. 고객에게 정산서 전송 */}
+      <Section id="send-customer" icon="📤" title="4. 고객에게 정산서 전송">
+        <Step n={1} title="공유 모달 확인">
+          정산서 발행 누르면 자동으로 모달 뜨고 미리보기 텍스트가 보임.<br/>
+          금액·계좌·고객명 다 확인 후 다음 단계로.
+        </Step>
+        <Step n={2} title="문자 전송 OR 카카오톡 전송 선택">
+          <div className="mt-1 space-y-1">
+            <div>📩 <b>문자 전송</b>: 고객 연락처가 자동으로 들어간 문자 앱이 열림 → 보내기</div>
+            <div>💛 <b>카카오톡 전송</b>: 카톡 공유 시트 열림 → 고객 채팅방 선택 → 전송</div>
+          </div>
+        </Step>
+        <Step n={3} title="복사가 안 될 때">
+          공유 안 되면 미리보기 텍스트가 자동으로 복사돼있음. 카톡 들어가서 <b>붙여넣기</b> 만 하면 됨.
+        </Step>
+        <Step n={4} title="잔금 받기">
+          고객이 입금하면 정산서에서 <b>입금확인</b> 버튼 누름 → 제목에서 "/미입금" 빠지고 색상도 일반으로 돌아옴.
+        </Step>
+        <Warn>
+          고객 연락처가 비어있으면 문자/카톡 보내는 사람 정보가 없어 직접 입력해야 합니다. 영업팀이 미리 입력하도록 부탁하세요.
+        </Warn>
+      </Section>
+
+      {/* 5. 자주 묻는 질문 */}
+      <Section id="faq" icon="❓" title="5. 자주 묻는 질문">
+        <div className="space-y-3">
+          <div>
+            <div className="font-bold text-gray-800 text-sm">Q. 일정이 갑자기 안 보여요</div>
+            <div className="text-xs text-gray-600 mt-1">
+              앱 강제 종료 → 재실행 한 번 해보세요. 데이터는 서버에 있으니 절대 사라지지 않아요. 그래도 안 보이면 인터넷 연결 확인.
+            </div>
+          </div>
+          <div>
+            <div className="font-bold text-gray-800 text-sm">Q. 다른 팀장 일정도 보고 싶어요</div>
+            <div className="text-xs text-gray-600 mt-1">
+              현장팀끼리는 서로 일정 못 보게 설계됨. 본인 일정 + 본인이 배정된 일정만 보입니다.
+            </div>
+          </div>
+          <div>
+            <div className="font-bold text-gray-800 text-sm">Q. 일정 시간을 잘못 등록했어요</div>
+            <div className="text-xs text-gray-600 mt-1">
+              일정 클릭 → 상세에서 제목·시간·날짜 직접 수정 가능. 저장 누르면 다른 사람한테도 자동 반영.
+            </div>
+          </div>
+          <div>
+            <div className="font-bold text-gray-800 text-sm">Q. 카톡으로 정산서를 받았는데 못 봤다고 해요</div>
+            <div className="text-xs text-gray-600 mt-1">
+              스팸 처리됐을 수 있어요. 문자로 다시 보내거나, 직접 전화해서 카톡 확인 요청.
+            </div>
+          </div>
+          <div>
+            <div className="font-bold text-gray-800 text-sm">Q. 알림이 안 와요</div>
+            <div className="text-xs text-gray-600 mt-1">
+              핸드폰 설정 → 새집느낌 파트너 앱 → 알림 권한 ON 확인. 잠금화면·진동 권한도 같이 켜주세요.
+            </div>
+          </div>
+        </div>
+      </Section>
+
+      <div className="text-center text-[10px] text-gray-400 pt-2">
+        문제 있으면 관리자(대표)에게 카톡으로 문의해주세요 🙏
+      </div>
+    </div>
+  );
+}
 
 /* ════════════ 현장팀 통계 섹션 ════════════ */
 // 팀장별 월간 희망 배정 갯수 (이름 끝부분으로 매칭 — 예: "이동환" → "동환" → 250)
