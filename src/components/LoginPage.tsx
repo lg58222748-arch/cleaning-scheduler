@@ -8,6 +8,13 @@ interface LoginPageProps {
   onLogin: (user: User) => void;
 }
 
+// 관리점 선택지 — '기타' 선택 시 직접 입력 input 노출
+const BRANCH_OPTIONS = [
+  "서울", "인천", "수원", "화성", "동탄", "오산", "안산",
+  "천안", "아산", "평택", "대전", "청주",
+  "부산", "대구", "울산",
+];
+
 export default function LoginPage({ onLogin }: LoginPageProps) {
   const [mode, setMode] = useState<"login" | "register">("login");
   const [username, setUsername] = useState("");
@@ -15,15 +22,39 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [address, setAddress] = useState("");
+  const [addressDetail, setAddressDetail] = useState("");
   const [residentNumber, setResidentNumber] = useState("");
   const [businessLicenseFile, setBusinessLicenseFile] = useState("");
-  const [branch, setBranch] = useState("");
+  const [branchSelect, setBranchSelect] = useState("");
+  const [branchCustom, setBranchCustom] = useState("");
   const [regUsername, setRegUsername] = useState("");
   const [regPassword, setRegPassword] = useState("");
   const [regPasswordConfirm, setRegPasswordConfirm] = useState("");
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState(false);
+
+  // Daum 우편번호 팝업 — 한국 주소 표준 (도로명/지번 자동 채움)
+  function openAddressSearch() {
+    const run = () => {
+      const W = window as unknown as { daum?: { Postcode: new (opts: { oncomplete: (data: { roadAddress?: string; jibunAddress?: string; zonecode?: string }) => void }) => { open: () => void } } };
+      if (!W.daum?.Postcode) return;
+      new W.daum.Postcode({
+        oncomplete: (data) => {
+          const addr = data.roadAddress || data.jibunAddress || "";
+          setAddress(addr);
+        },
+      }).open();
+    };
+    const W = window as unknown as { daum?: unknown };
+    if (W.daum) { run(); return; }
+    // 동적 로드 — 회원가입 안 들어가는 사람은 다운로드 안 함
+    const script = document.createElement("script");
+    script.src = "//t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js";
+    script.async = true;
+    script.onload = run;
+    document.body.appendChild(script);
+  }
 
   async function handleLogin() {
     if (!username.trim()) { setError("아이디를 입력하세요"); return; }
@@ -43,14 +74,22 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
     if (!regPassword) { setError("비밀번호를 입력하세요"); return; }
     if (regPassword !== regPasswordConfirm) { setError("비밀번호가 일치하지 않습니다"); return; }
     if (regPassword.length < 4) { setError("비밀번호는 4자 이상이어야 합니다"); return; }
+    const branchValue = branchSelect === "기타" ? branchCustom.trim() : branchSelect;
     if (!name.trim() || !phone.trim() || !address.trim()) {
       setError("이름, 연락처, 주소는 필수입니다"); return;
     }
+    if (!branchValue) {
+      setError("관리점을 선택해주세요"); return;
+    }
     setLoading(true); setError("");
+    // 상세주소 합치기 — DB 에는 한 줄로 저장
+    const fullAddress = addressDetail.trim()
+      ? `${address.trim()} ${addressDetail.trim()}`
+      : address.trim();
     const result = await registerApi({
       username: regUsername.trim(), password: regPassword,
-      name: name.trim(), phone: phone.trim(), address: address.trim(),
-      residentNumber: residentNumber.trim(), businessLicenseFile, branch: branch.trim(),
+      name: name.trim(), phone: phone.trim(), address: fullAddress,
+      residentNumber: residentNumber.trim(), businessLicenseFile, branch: branchValue,
     });
     if (result.error) {
       setError(result.error);
@@ -166,29 +205,12 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
                   />
                 </div>
               </div>
+              {/* 1) 이름 */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">이름 *</label>
                 <input value={name} onChange={(e) => setName(e.target.value)} placeholder="실명" className={inputClass} />
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">연락처 *</label>
-                <input value={phone} onChange={(e) => {
-                  const v = e.target.value.replace(/[^0-9]/g, "").slice(0, 11);
-                  const formatted = v.length <= 3 ? v : v.length <= 7 ? v.slice(0,3) + "-" + v.slice(3) : v.slice(0,3) + "-" + v.slice(3,7) + "-" + v.slice(7);
-                  setPhone(formatted);
-                }} placeholder="010-0000-0000" inputMode="tel" className={inputClass} />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">주소 *</label>
-                <input value={address} onChange={(e) => setAddress(e.target.value)} placeholder="활동 지역/주소" className={inputClass} />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">관리점 *</label>
-                <div className="flex items-center gap-1">
-                  <input value={branch} onChange={(e) => setBranch(e.target.value)} placeholder="지역명 (예: 서울, 인천)" className={`${inputClass} flex-1`} />
-                  <span className="text-sm text-gray-500 font-medium shrink-0">[관리점]</span>
-                </div>
-              </div>
+              {/* 2) 생년월일 */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">생년월일 (뒤 1자리)</label>
                 <input value={residentNumber} onChange={(e) => {
@@ -198,6 +220,60 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
                   setResidentNumber(v);
                 }} placeholder="990101-1" maxLength={8} className={inputClass} />
               </div>
+              {/* 3) 연락처 */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">연락처 *</label>
+                <input value={phone} onChange={(e) => {
+                  const v = e.target.value.replace(/[^0-9]/g, "").slice(0, 11);
+                  const formatted = v.length <= 3 ? v : v.length <= 7 ? v.slice(0,3) + "-" + v.slice(3) : v.slice(0,3) + "-" + v.slice(3,7) + "-" + v.slice(7);
+                  setPhone(formatted);
+                }} placeholder="010-0000-0000" inputMode="tel" className={inputClass} />
+              </div>
+              {/* 4) 주소 — Daum 우편번호 검색 + 상세 주소 */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">주소 *</label>
+                <button
+                  type="button"
+                  onClick={openAddressSearch}
+                  className={`${inputClass} text-left ${address ? "text-gray-800" : "text-gray-400"} active:bg-gray-50`}
+                >
+                  {address || "🔍 주소 검색 (탭하세요)"}
+                </button>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">상세 주소</label>
+                <input
+                  value={addressDetail}
+                  onChange={(e) => setAddressDetail(e.target.value)}
+                  placeholder="동/호수 등 상세 입력"
+                  className={inputClass}
+                  disabled={!address}
+                />
+              </div>
+              {/* 5) 관리점 — 드롭다운 + 기타 직접 입력 */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">관리점 *</label>
+                <select
+                  value={branchSelect}
+                  onChange={(e) => setBranchSelect(e.target.value)}
+                  className={inputClass}
+                >
+                  <option value="">관리점 선택</option>
+                  {BRANCH_OPTIONS.map((b) => (
+                    <option key={b} value={b}>{b}</option>
+                  ))}
+                  <option value="기타">기타 (직접 입력)</option>
+                </select>
+                {branchSelect === "기타" && (
+                  <input
+                    value={branchCustom}
+                    onChange={(e) => setBranchCustom(e.target.value)}
+                    placeholder="관리점 지역명을 직접 입력"
+                    className={`${inputClass} mt-2`}
+                  />
+                )}
+              </div>
+              {/* 6) 사업자등록증 */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">사업자등록증</label>
                 <input
