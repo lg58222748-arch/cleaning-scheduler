@@ -855,13 +855,18 @@ function FieldStatsSection({ allUsers }: {
                         if (h >= 13 && h <= 15) return "오후";
                         return t;
                       };
-                      // 팀원별 그룹 (건수 많은 순)
+                      // 팀원별 그룹 — 이름 정규화 (T/A 등 prefix 제거 + (부산) 등 지역 표기 제거)
+                      // → 'T김기열(부산)' 과 '김기열' 이 같은 사람으로 묶임
                       const byMember = new Map<string, typeof d.schedules>();
                       for (const s of d.schedules) {
-                        const name = s.memberName || "미배정";
-                        const arr = byMember.get(name) || [];
-                        arr.push(s);
-                        byMember.set(name, arr);
+                        const names = normalizeMemberName(s.memberName || "");
+                        const keys = names.length > 0 ? names : ["미배정"];
+                        for (const name of keys) {
+                          if (!name) continue;
+                          const arr = byMember.get(name) || [];
+                          arr.push(s);
+                          byMember.set(name, arr);
+                        }
                       }
                       const grouped = Array.from(byMember.entries()).sort((a, b) => b[1].length - a[1].length);
                       return (
