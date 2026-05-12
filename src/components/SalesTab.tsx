@@ -11,7 +11,7 @@ interface SalesTabProps {
   canEditTemplates?: boolean; // 영업팀 이상 (add/delete)
 }
 
-const ALL_SERVICES = ["입주청소", "거주청소", "인테리어청소", "사이청소", "새집증후군", "줄눈시공", "탄성코트", "나노코팅", "에어컨청소(완전분해)"];
+const ALL_SERVICES = ["입주청소", "거주청소", "인테리어청소", "사이청소", "외부유리창", "새집증후군", "줄눈시공", "탄성코트", "나노코팅", "에어컨청소(완전분해)"];
 const TIME_SLOTS = ["오전", "오후", "시무", "사이"];
 const TYPES = ["확장형", "비확장형", "부분비확장형"];
 
@@ -423,7 +423,7 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
 
   function calcAutoDeposit(svcName: string, quote: number): number | null {
     // ALL_SERVICES 의 '에어컨청소(완전분해)' 같은 변형 이름도 매칭되도록 includes 사용
-    const highGroup = ["입주청소", "거주청소", "인테리어청소", "사이청소"];
+    const highGroup = ["입주청소", "거주청소", "인테리어청소", "사이청소", "외부유리창"];
     const lowGroup = ["줄눈시공", "탄성코트", "에어컨청소", "나노코팅"];
     if (highGroup.some((h) => svcName.includes(h)) && quote > 0) return Math.ceil(((quote - 10000) * 0.24 + 10000) / 10000) * 10000;
     if (svcName.includes("새집증후군") && quote > 0) return Math.ceil((quote * 0.2) / 10000) * 10000;
@@ -455,6 +455,7 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
       ["나노코팅", "나노코팅 희망날짜"],
       ["에어컨청소", "에어컨청소 희망날짜"],
       ["새집증후군", "새집증후군 희망날짜"],
+      ["외부유리창", "외부유리창 희망날짜"],
     ];
     for (const [key, label] of specials) {
       if (svcNames.some(n => n && n.includes(key))) return label;
