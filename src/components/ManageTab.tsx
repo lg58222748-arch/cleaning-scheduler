@@ -908,6 +908,12 @@ function FieldStatsSection({ allUsers }: {
                       // 팀원별 그룹 — 이름 정규화 (T/A 등 prefix 제거 + (부산) 등 지역 표기 제거)
                       // → 'T김기열(부산)' 과 '김기열' 이 같은 사람으로 묶임
                       const byMember = new Map<string, typeof d.schedules>();
+                      // 1) 모든 현장팀 사용자 먼저 빈 배열로 등록 — 일정 0건인 팀장도 이름이 뜨도록
+                      for (const u of allUsers) {
+                        if (u.role !== "field" && u.role !== "ceo") continue;
+                        if (!byMember.has(u.name)) byMember.set(u.name, []);
+                      }
+                      // 2) 그날 일정을 해당 팀장에게 누적
                       for (const s of d.schedules) {
                         const names = normalizeMemberName(s.memberName || "");
                         const keys = names.length > 0 ? names : ["미배정"];
@@ -971,29 +977,34 @@ function FieldStatsSection({ allUsers }: {
                               ))}
                             </div>
                           )}
-                          {/* 팀원별 그룹 일정 목록 */}
+                          {/* 팀원별 그룹 일정 목록 — 0건 팀장도 헤더만 표시 */}
                           <div className="space-y-2">
                             {grouped.length === 0 ? (
                               <div className="text-[11px] text-gray-400 text-center py-3">선택한 지역에 해당하는 팀장이 없습니다</div>
-                            ) : grouped.map(({ name, scheds, branch }) => (
-                              <div key={name} className="bg-white rounded-lg border border-gray-100 overflow-hidden">
-                                <div className="px-2.5 py-1.5 bg-gray-50 border-b border-gray-100 flex items-center justify-between">
-                                  <span className="flex items-center gap-1.5">
-                                    <span className="text-xs font-bold text-gray-800">{name}</span>
-                                    <span className="text-[10px] text-gray-400">{branch}</span>
-                                  </span>
-                                  <span className="text-[10px] text-gray-500">{scheds.length}건</span>
-                                </div>
-                                <div className="divide-y divide-gray-50">
-                                  {scheds.map((s) => (
-                                    <div key={s.id} className="text-[11px] flex items-center gap-2 px-2.5 py-1">
-                                      <span className="text-gray-400 shrink-0 w-9 font-medium">{timeLabel(s.startTime)}</span>
-                                      <span className="text-gray-800 truncate flex-1">{s.title}</span>
+                            ) : grouped.map(({ name, scheds, branch }) => {
+                              const isEmpty = scheds.length === 0;
+                              return (
+                                <div key={name} className={`bg-white rounded-lg border ${isEmpty ? "border-gray-100" : "border-gray-100"} overflow-hidden`}>
+                                  <div className={`px-2.5 py-1.5 ${isEmpty ? "bg-gray-50/50" : "bg-gray-50"} ${!isEmpty ? "border-b border-gray-100" : ""} flex items-center justify-between`}>
+                                    <span className="flex items-center gap-1.5">
+                                      <span className={`text-xs font-bold ${isEmpty ? "text-gray-400" : "text-gray-800"}`}>{name}</span>
+                                      <span className="text-[10px] text-gray-400">{branch}</span>
+                                    </span>
+                                    <span className={`text-[10px] ${isEmpty ? "text-gray-300" : "text-gray-500"}`}>{scheds.length}건</span>
+                                  </div>
+                                  {!isEmpty && (
+                                    <div className="divide-y divide-gray-50">
+                                      {scheds.map((s) => (
+                                        <div key={s.id} className="text-[11px] flex items-center gap-2 px-2.5 py-1">
+                                          <span className="text-gray-400 shrink-0 w-9 font-medium">{timeLabel(s.startTime)}</span>
+                                          <span className="text-gray-800 truncate flex-1">{s.title}</span>
+                                        </div>
+                                      ))}
                                     </div>
-                                  ))}
+                                  )}
                                 </div>
-                              </div>
-                            ))}
+                              );
+                            })}
                           </div>
                         </div>
                       );
