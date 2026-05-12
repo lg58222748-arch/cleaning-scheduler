@@ -1564,34 +1564,60 @@ function MapToggle({ allUsers }: { allUsers: { id?: string; name: string; role?:
   );
 }
 
-export function BranchMap({ allUsers, isAdmin = false }: { allUsers: { id?: string; name: string; role?: string; address?: string; branch?: string }[]; isAdmin?: boolean }) {
+export function BranchMap({ allUsers, isAdmin = false, currentUserId = "" }: { allUsers: { id?: string; name: string; role?: string; address?: string; branch?: string }[]; isAdmin?: boolean; currentUserId?: string }) {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInitialized = useRef(false);
   const [ready, setReady] = useState(false);
   const [selectedUser, setSelectedUser] = useState<string | null>(null);
   const [showCircles, setShowCircles] = useState(true);
-  const [userRadii, setUserRadii] = useState<Record<string, number>>(() => {
-    if (typeof window === "undefined") return {};
-    try { return JSON.parse(localStorage.getItem("map_user_radii") || "{}"); } catch { return {}; }
-  });
-  const [customPositions, setCustomPositions] = useState<Record<string, { lat: number; lng: number }>>(() => {
-    if (typeof window === "undefined") return {};
-    try { return JSON.parse(localStorage.getItem("map_custom_positions") || "{}"); } catch { return {}; }
-  });
-  const [hiddenPins, setHiddenPins] = useState<Set<string>>(() => {
-    if (typeof window === "undefined") return new Set();
-    try { return new Set<string>(JSON.parse(localStorage.getItem("map_hidden_pins") || "[]")); } catch { return new Set(); }
-  });
+  // 서버 동기화 — 모든 사용자가 같은 지도 설정을 봄. 관리자만 수정 가능.
+  const [userRadii, setUserRadii] = useState<Record<string, number>>({});
+  const [customPositions, setCustomPositions] = useState<Record<string, { lat: number; lng: number }>>({});
+  const [hiddenPins, setHiddenPins] = useState<Set<string>>(new Set());
+  const settingsLoadedRef = useRef(false);
   const circlesRef = useRef<Record<string, unknown>>({});
   const markersRef = useRef<Record<string, unknown>>({});
   // 마커/원 전체 추적 - 동명이인이나 렌더 누적으로 인한 잔존 마커 방지
   const allMarkersRef = useRef<unknown[]>([]);
   const allCirclesRef = useRef<unknown[]>([]);
 
+  // 서버에서 초기 로드 — 모든 사용자 공통
+  useEffect(() => {
+    let alive = true;
+    fetch("/api/settings/map").then(r => r.json()).then(d => {
+      if (!alive) return;
+      if (d.radii && typeof d.radii === "object") setUserRadii(d.radii);
+      if (d.positions && typeof d.positions === "object") setCustomPositions(d.positions);
+      if (Array.isArray(d.hiddenPins)) setHiddenPins(new Set(d.hiddenPins));
+      settingsLoadedRef.current = true;
+    }).catch(() => { settingsLoadedRef.current = true; });
+    return () => { alive = false; };
+  }, []);
+
+  // 서버에 저장 (대표/admin 만 — 권한 체크는 서버에서도 한 번 더)
+  async function persistSettings(patch: { radii?: Record<string, number>; positions?: Record<string, { lat: number; lng: number }>; hiddenPins?: string[] }) {
+    if (!isAdmin || !currentUserId) return;
+    if (!settingsLoadedRef.current) return; // 초기 로드 끝나기 전 저장 시도 방지 (덮어쓰기 위험)
+    const value = {
+      radii: patch.radii !== undefined ? patch.radii : userRadii,
+      positions: patch.positions !== undefined ? patch.positions : customPositions,
+      hiddenPins: patch.hiddenPins !== undefined ? patch.hiddenPins : Array.from(hiddenPins),
+    };
+    try {
+      await fetch("/api/settings/map", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: currentUserId, value }),
+      });
+    } catch (e) {
+      console.error("[map settings] 저장 실패:", e);
+    }
+  }
+
   function saveCustomPosition(name: string, lat: number, lng: number) {
     setCustomPositions(prev => {
       const next = { ...prev, [name]: { lat, lng } };
-      localStorage.setItem("map_custom_positions", JSON.stringify(next));
+      persistSettings({ positions: next });
       return next;
     });
   }
@@ -1599,7 +1625,7 @@ export function BranchMap({ allUsers, isAdmin = false }: { allUsers: { id?: stri
   function hidePin(name: string) {
     setHiddenPins(prev => {
       const next = new Set(prev); next.add(name);
-      localStorage.setItem("map_hidden_pins", JSON.stringify(Array.from(next)));
+      persistSettings({ hiddenPins: Array.from(next) });
       return next;
     });
     setSelectedUser(null);
@@ -1607,7 +1633,7 @@ export function BranchMap({ allUsers, isAdmin = false }: { allUsers: { id?: stri
 
   function showAllPins() {
     setHiddenPins(new Set());
-    localStorage.setItem("map_hidden_pins", "[]");
+    persistSettings({ hiddenPins: [] });
     mapInitialized.current = false;
     setReady(false);
     setTimeout(() => setReady(true), 50);
@@ -1810,7 +1836,7 @@ export function BranchMap({ allUsers, isAdmin = false }: { allUsers: { id?: stri
               <input type="range" min={5} max={50} step={5} value={selRadius} onChange={(e) => {
                 const next = { ...userRadii, [selectedUser]: Number(e.target.value) };
                 setUserRadii(next);
-                localStorage.setItem("map_user_radii", JSON.stringify(next));
+                persistSettings({ radii: next });
               }} className="flex-1 accent-blue-500" />
               <span className="text-xs font-bold text-blue-600 w-12 text-right">{selRadius}km</span>
             </div>
