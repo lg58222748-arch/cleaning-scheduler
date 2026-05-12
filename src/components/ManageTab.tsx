@@ -750,25 +750,34 @@ function FieldStatsSection({ allUsers }: {
     return rows.sort((a, b) => b.count - a.count);
   }, [inCalendar, allUsers, sortMode]);
 
-  // 일별 집계 (날짜순) — 각 날짜의 일정 수 + 팀원별 분포
+  // 일별 집계 (날짜순) — 각 날짜의 일정 수 + 팀원별 분포 + 휴가 멤버
   const dayRows = useMemo(() => {
-    const dayMap = new Map<string, { count: number; perMember: Record<string, number>; schedules: Schedule[] }>();
-    for (const s of inCalendar) {
+    const dayMap = new Map<string, { count: number; perMember: Record<string, number>; schedules: Schedule[]; offMembers: Set<string> }>();
+    // monthSchedules 직접 사용 — inCalendar 는 휴무/마감 필터링됨 (휴가 추적용으로 원본 필요)
+    for (const s of monthSchedules) {
       if (!s.date) continue;
-      const entry = dayMap.get(s.date) || { count: 0, perMember: {}, schedules: [] };
-      entry.count++;
+      if (s.status === "unassigned") continue; // 미배정만 제외
+      const entry = dayMap.get(s.date) || { count: 0, perMember: {}, schedules: [], offMembers: new Set<string>() };
       const names = normalizeMemberName(s.memberName || "");
-      for (const n of names) {
-        if (!n) continue;
-        entry.perMember[n] = (entry.perMember[n] || 0) + 1;
+      if (isOffDay(s.title)) {
+        // 휴무/마감 — offMembers 에만 추가, 일정 카운트엔 미포함
+        for (const n of names) {
+          if (n) entry.offMembers.add(n);
+        }
+      } else {
+        entry.count++;
+        for (const n of names) {
+          if (!n) continue;
+          entry.perMember[n] = (entry.perMember[n] || 0) + 1;
+        }
+        entry.schedules.push(s);
       }
-      entry.schedules.push(s);
       dayMap.set(s.date, entry);
     }
     return Array.from(dayMap.entries())
       .sort((a, b) => a[0].localeCompare(b[0]))
       .map(([date, info]) => ({ date, ...info }));
-  }, [inCalendar]);
+  }, [monthSchedules]);
 
   const total = inCalendar.length;
 
@@ -877,7 +886,21 @@ function FieldStatsSection({ allUsers }: {
                 const isOpen = expandedDate === d.date;
                 const day = Number(d.date.slice(8));
                 const dow = ["일", "월", "화", "수", "목", "금", "토"][new Date(d.date + "T00:00:00").getDay()];
-                const memberList = Object.entries(d.perMember).sort((a, b) => b[1] - a[1]);
+                // 모든 현장팀 + 휴가 표시 — 일정 0건도 칩으로 표시
+                const fieldUserNames = allUsers.filter((u) => u.role === "field" || u.role === "ceo").map((u) => u.name);
+                const allChipNames = new Set<string>([...fieldUserNames, ...Object.keys(d.perMember), ...d.offMembers]);
+                const memberList = Array.from(allChipNames).map((name) => ({
+                  name,
+                  count: d.perMember[name] || 0,
+                  isOff: d.offMembers.has(name),
+                })).sort((a, b) => {
+                  // 1) 일정 많은 사람 위로 (휴가 무관)
+                  if (a.count !== b.count) return b.count - a.count;
+                  // 2) 일정 같으면 휴가 없는 사람 위로 (휴가는 뒤)
+                  if (a.isOff !== b.isOff) return a.isOff ? 1 : -1;
+                  // 3) 이름 가나다
+                  return a.name.localeCompare(b.name, "ko");
+                });
                 return (
                   <div key={d.date}>
                     <button
@@ -967,12 +990,33 @@ function FieldStatsSection({ allUsers }: {
                               {dayGroupSort === "count" ? "건수순" : "지역순"}
                             </button>
                           </div>
-                          {/* 팀원별 분포 칩 */}
+                          {/* 팀원별 분포 칩 — 모든 현장팀 표시 (0건/휴가 포함) */}
                           {memberList.length > 0 && !dayRegionFilter && (
                             <div className="flex flex-wrap gap-1">
-                              {memberList.map(([name, cnt]) => (
-                                <span key={name} className="text-[11px] px-2 py-0.5 rounded-full bg-white border border-gray-200 text-gray-700">
-                                  {name} <span className="font-bold text-blue-600">{cnt}</span>
+                              {memberList.map(({ name, count, isOff }) => (
+                                <span
+                                  key={name}
+                                  className={`text-[11px] px-2 py-0.5 rounded-full border ${
+                                    count > 0
+                                      ? "bg-white border-gray-200 text-gray-700"
+                                      : isOff
+                                        ? "bg-orange-50 border-orange-200 text-orange-700"
+                                        : "bg-gray-50 border-gray-100 text-gray-400"
+                                  }`}
+                                  title={isOff ? `${name} (휴가)` : undefined}
+                                >
+                                  {name}{" "}
+                                  <span
+                                    className={`font-bold ${
+                                      count > 0
+                                        ? "text-blue-600"
+                                        : isOff
+                                          ? "text-orange-600"
+                                          : "text-gray-400"
+                                    }`}
+                                  >
+                                    {count}
+                                  </span>
                                 </span>
                               ))}
                             </div>
