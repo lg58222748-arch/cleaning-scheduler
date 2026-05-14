@@ -54,6 +54,11 @@ export async function POST(req: NextRequest) {
   }
 
   if (body.action === "assign" && body.scheduleId && body.memberId) {
+    // 미입금 일정 배정 차단 — 제목에 /미입금 포함되어 있으면 거부
+    const { data: before } = await supabase.from("schedules").select("title").eq("id", body.scheduleId).maybeSingle();
+    if (before?.title && String(before.title).includes("/미입금")) {
+      return Response.json({ error: "unpaid_block", message: "미입금 일정은 배정할 수 없습니다. 먼저 입금확인 후 배정해주세요." }, { status: 400 });
+    }
     const schedule = await assignSchedule(body.scheduleId, body.memberId, body.memberName);
     if (!schedule) return Response.json({ error: "Not found" }, { status: 404 });
     const msg = `"${schedule.title}" 일정이 ${schedule.memberName}님에게 배정되었습니다.`;

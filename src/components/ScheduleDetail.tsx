@@ -3,7 +3,7 @@
 import { useState, useEffect, useLayoutEffect, useRef, useCallback } from "react";
 import { Schedule, Member, Comment } from "@/types";
 import { fetchComments, createComment, deleteCommentApi, updateSchedule as apiUpdateSchedule } from "@/lib/api";
-import { showConfirm } from "@/lib/dialog";
+import { showConfirm, showAlert } from "@/lib/dialog";
 import { POST_PAYMENT_MESSAGES } from "@/lib/customerMessages";
 import ScheduleChecklist from "./ScheduleChecklist";
 import ScheduleSettlement from "./ScheduleSettlement";
@@ -609,18 +609,29 @@ export default function ScheduleDetail({
           <button onClick={handleAddComment} disabled={loading || !newComment.trim()} className="px-3 py-1.5 bg-blue-500 text-white rounded-lg text-xs font-medium active:bg-blue-600 disabled:opacity-50 shrink-0">등록</button>
         </div>
         {mode === "assign" && canAssignMember && (
-          <div className="flex items-center gap-2 px-4 pb-1">
-            <select
-              value={assignMemberId}
-              onChange={(e) => setAssignMemberId(e.target.value)}
-              className="flex-1 px-2 py-1.5 border border-gray-300 rounded-lg text-xs outline-none bg-white focus:ring-2 focus:ring-orange-400"
-            >
-              <option value="">배정 팀장 선택</option>
-              {(allUsers || []).filter(u => u.role === "field").map((u) => (
-                <option key={u.id || u.name} value={`user:${u.id || ""}:${u.name}`}>{u.name}</option>
-              ))}
-            </select>
-          </div>
+          <>
+            {/* 미입금 일정 경고 — 배정 차단 */}
+            {titleText.includes("/미입금") && (
+              <div className="px-4 pb-1">
+                <div className="bg-red-50 border border-red-200 text-red-700 text-xs px-3 py-2 rounded-lg">
+                  ⚠️ 미입금 일정은 배정할 수 없습니다. 먼저 <b>입금확인</b> 후 배정해주세요.
+                </div>
+              </div>
+            )}
+            <div className="flex items-center gap-2 px-4 pb-1">
+              <select
+                value={assignMemberId}
+                onChange={(e) => setAssignMemberId(e.target.value)}
+                disabled={titleText.includes("/미입금")}
+                className="flex-1 px-2 py-1.5 border border-gray-300 rounded-lg text-xs outline-none bg-white focus:ring-2 focus:ring-orange-400 disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed"
+              >
+                <option value="">배정 팀장 선택</option>
+                {(allUsers || []).filter(u => u.role === "field").map((u) => (
+                  <option key={u.id || u.name} value={`user:${u.id || ""}:${u.name}`}>{u.name}</option>
+                ))}
+              </select>
+            </div>
+          </>
         )}
         <div className="flex gap-2 px-4 py-2">
           {mode === "calendar" && schedule.status !== "unassigned" && onUnassign && (
@@ -635,6 +646,11 @@ export default function ScheduleDetail({
             <button
               onClick={() => {
                 if (!assignMemberId || !onAssign) return;
+                // 미입금 일정은 배정 차단 (이중 방어 — 위 UI 도 disabled 상태)
+                if (titleText.includes("/미입금")) {
+                  showAlert("미입금 일정은 배정할 수 없습니다.\n먼저 입금확인 후 배정해주세요.");
+                  return;
+                }
 
                 // 1) 펜딩 편집(제목/본문) 먼저 로컬 반영 — 부모가 새 제목으로 리스트 렌더하도록
                 const updates: Partial<Schedule> = {};
@@ -667,10 +683,10 @@ export default function ScheduleDetail({
                   }, 0);
                 }
               }}
-              disabled={!assignMemberId}
-              className="flex-1 py-3 bg-orange-500 text-white rounded-xl text-sm font-bold active:bg-orange-600 disabled:opacity-40"
+              disabled={!assignMemberId || titleText.includes("/미입금")}
+              className="flex-1 py-3 bg-orange-500 text-white rounded-xl text-sm font-bold active:bg-orange-600 disabled:opacity-40 disabled:cursor-not-allowed"
             >
-              배정
+              {titleText.includes("/미입금") ? "미입금 — 배정 불가" : "배정"}
             </button>
           )}
           {/* 입금확인/미입금 버튼 - 배정 모드에서만 */}
@@ -678,23 +694,9 @@ export default function ScheduleDetail({
             <>
               <button
                 onClick={() => {
-                  // 1) /미입금 제거 (이미 입금완료 상태면 스킵)
-                  if (titleText.includes("/미입금")) {
-                    const originalMatch = schedule.note?.match(/원래제목:\s*(.+)/);
-                    const newTitle = originalMatch ? originalMatch[1].trim() : titleText.replace(/\/미입금/g, "");
-                    // 로컬 UI 즉시 반응 — 이 render 에서는 버튼/제목만 바뀜
-                    schedule.title = newTitle;
-                    setTitleText(newTitle);
-                    // 부모 상태 + 서버 동기화는 다음 tick 으로 분리
-                    //   (리스트 수백 개 재렌더가 버튼 반응을 블로킹하지 않게)
-                    setTimeout(() => {
-                      onUpdated?.({ id: schedule.id, title: newTitle });
-                      apiUpdateSchedule(schedule.id, { title: newTitle })
-                        .catch((err) => { console.error("[입금확인] 저장 실패:", err); });
-                    }, 0);
-                  }
-                  // 2) 입금 후 고객에게 보낼 안내 메시지 4종 복사 팝업 열기
-                  //    (입금완료 상태에서도 재오픈 가능 — 메시지 재전송 필요시 사용)
+                  // 미입금 제거 + 입금완료 처리는 모달 안의 "입금완료 처리" 버튼에서.
+                  //   (안내 메시지 5종을 모두 복사한 후에만 처리 가능 — 강제 가이드)
+                  // 입금완료 상태에서도 재오픈 가능 — 메시지 재전송 용도일 뿐 상태 변경 X.
                   setCopiedPostMsgs(new Set());
                   setShowPostPaymentModal(true);
                 }}
@@ -808,13 +810,57 @@ export default function ScheduleDetail({
                 </div>
               ))}
             </div>
-            <div className="border-t border-gray-100 px-5 py-3">
-              <button
-                onClick={() => setShowPostPaymentModal(false)}
-                className="w-full py-2.5 bg-gray-100 text-gray-700 rounded-xl text-sm font-bold active:bg-gray-200"
-              >
-                닫기
-              </button>
+            <div className="border-t border-gray-100 px-5 py-3 space-y-2">
+              {titleText.includes("/미입금") ? (
+                // 미입금 상태: 5종 메시지 모두 복사해야 입금완료 처리 가능
+                <>
+                  <button
+                    onClick={() => {
+                      if (copiedPostMsgs.size < POST_PAYMENT_MESSAGES.length) return;
+                      // 1) 미입금 제거 + 제목 복원
+                      const originalMatch = schedule.note?.match(/원래제목:\s*(.+)/);
+                      const newTitle = originalMatch
+                        ? originalMatch[1].trim()
+                        : titleText.replace(/\/미입금/g, "");
+                      schedule.title = newTitle;
+                      setTitleText(newTitle);
+                      // 2) 부모 + 서버 동기화 (다음 tick)
+                      setTimeout(() => {
+                        onUpdated?.({ id: schedule.id, title: newTitle });
+                        apiUpdateSchedule(schedule.id, { title: newTitle }).catch((err) => {
+                          console.error("[입금완료] 저장 실패:", err);
+                        });
+                      }, 0);
+                      // 3) 모달 닫기
+                      setShowPostPaymentModal(false);
+                    }}
+                    disabled={copiedPostMsgs.size < POST_PAYMENT_MESSAGES.length}
+                    className={`w-full py-2.5 rounded-xl text-sm font-bold ${
+                      copiedPostMsgs.size >= POST_PAYMENT_MESSAGES.length
+                        ? "bg-green-600 text-white active:bg-green-700"
+                        : "bg-gray-200 text-gray-400 cursor-not-allowed"
+                    }`}
+                  >
+                    {copiedPostMsgs.size >= POST_PAYMENT_MESSAGES.length
+                      ? "✅ 입금완료 처리"
+                      : `📋 메시지 복사 후 입금완료 (${copiedPostMsgs.size}/${POST_PAYMENT_MESSAGES.length})`}
+                  </button>
+                  <button
+                    onClick={() => setShowPostPaymentModal(false)}
+                    className="w-full py-2 bg-gray-100 text-gray-600 rounded-xl text-xs font-bold active:bg-gray-200"
+                  >
+                    취소
+                  </button>
+                </>
+              ) : (
+                // 이미 입금완료 상태: 단순 메시지 재전송 용도이므로 그냥 닫기만
+                <button
+                  onClick={() => setShowPostPaymentModal(false)}
+                  className="w-full py-2.5 bg-gray-100 text-gray-700 rounded-xl text-sm font-bold active:bg-gray-200"
+                >
+                  닫기
+                </button>
+              )}
             </div>
           </div>
         </div>
