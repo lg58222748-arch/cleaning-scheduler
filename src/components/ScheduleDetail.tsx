@@ -686,7 +686,7 @@ export default function ScheduleDetail({
               disabled={!assignMemberId || titleText.includes("/미입금")}
               className="flex-1 py-3 bg-orange-500 text-white rounded-xl text-sm font-bold active:bg-orange-600 disabled:opacity-40 disabled:cursor-not-allowed"
             >
-              {titleText.includes("/미입금") ? "미입금 — 배정 불가" : "배정"}
+              {titleText.includes("/미입금") ? "미입금(배정불가)" : "배정"}
             </button>
           )}
           {/* 입금확인 버튼 - 배정 모드에서만. 미입금/입금완료 선택은 5종 메시지 복사 후 모달 안에서 */}
