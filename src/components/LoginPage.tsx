@@ -19,7 +19,7 @@ type RegistrationType = "office" | "partner";
 
 export default function LoginPage({ onLogin }: LoginPageProps) {
   const [mode, setMode] = useState<"login" | "register">("login");
-  const [registrationType, setRegistrationType] = useState<RegistrationType>("office");
+  const [registrationType, setRegistrationType] = useState<RegistrationType>("partner");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
@@ -211,17 +211,6 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
                 <div className="flex rounded-xl overflow-hidden border border-gray-300">
                   <button
                     type="button"
-                    onClick={() => setRegistrationType("office")}
-                    className={`flex-1 py-2.5 text-sm font-bold transition-colors ${
-                      registrationType === "office"
-                        ? "bg-blue-500 text-white"
-                        : "bg-white text-gray-500 active:bg-gray-50"
-                    }`}
-                  >
-                    🏢 사무실
-                  </button>
-                  <button
-                    type="button"
                     onClick={() => setRegistrationType("partner")}
                     className={`flex-1 py-2.5 text-sm font-bold transition-colors ${
                       registrationType === "partner"
@@ -231,11 +220,22 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
                   >
                     🤝 파트너
                   </button>
+                  <button
+                    type="button"
+                    onClick={() => setRegistrationType("office")}
+                    className={`flex-1 py-2.5 text-sm font-bold transition-colors ${
+                      registrationType === "office"
+                        ? "bg-blue-500 text-white"
+                        : "bg-white text-gray-500 active:bg-gray-50"
+                    }`}
+                  >
+                    🏢 사무실
+                  </button>
                 </div>
                 <p className="text-[10px] text-gray-400 mt-1">
-                  {registrationType === "office"
-                    ? "사무실 직원 · 사업자등록증 선택"
-                    : "파트너 청소업체 · 사업자등록증 필수"}
+                  {registrationType === "partner"
+                    ? "파트너 청소업체 · 사업자등록증 필수"
+                    : "사무실 직원 · 사업자등록증 선택"}
                 </p>
               </div>
               <div>
