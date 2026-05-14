@@ -555,19 +555,21 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
     // Top-level 견적/예약금/잔금 — ► 서비스 블록 없이 번호만 있는 경우 지원 (박금진 케이스)
     // "31만원", "82000원", "228,000원" 모두 처리
     // "총 견적금액/예약금/잔금" 라인은 합계라서 top-level 값으로 쓰면 안 됨 (건너뜀)
+    // [중요] 콜론(:) 필수 — 고객 특이사항에 '잔금시 010 ...' 같은 텍스트가 있어도
+    // '10)잔 금 : 218,000원' 만 매칭되게. 콜론 없는 '잔금시' 는 매칭 안 됨.
     let topQuote = "", topDeposit = "", topBalance = "";
     for (const line of lines) {
       if (line.startsWith("총")) continue;
       if (!topQuote) {
-        const m = line.match(/(?:^\d+[.)]\s*)?견적금액[^\d]*([\d,]+)\s*(만원|원)?/);
+        const m = line.match(/(?:^\d+[.)]\s*)?견적금액[^\d:：]*[:：][^\d]*([\d,]+)\s*(만원|원)?/);
         if (m) topQuote = parsePriceString(m[1], m[2]);
       }
       if (!topDeposit) {
-        const m = line.match(/(?:^\d+[.)]\s*)?예\s*약\s*금[^\d]*([\d,]+)\s*(만원|원)?/);
+        const m = line.match(/(?:^\d+[.)]\s*)?예\s*약\s*금[^\d:：]*[:：][^\d]*([\d,]+)\s*(만원|원)?/);
         if (m) topDeposit = parsePriceString(m[1], m[2]);
       }
       if (!topBalance) {
-        const m = line.match(/(?:^\d+[.)]\s*)?잔\s*금[^\d]*([\d,]+)\s*(만원|원)?/);
+        const m = line.match(/(?:^\d+[.)]\s*)?잔\s*금[^\d:：]*[:：][^\d]*([\d,]+)\s*(만원|원)?/);
         if (m) topBalance = parsePriceString(m[1], m[2]);
       }
     }
