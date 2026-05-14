@@ -689,41 +689,21 @@ export default function ScheduleDetail({
               {titleText.includes("/미입금") ? "미입금 — 배정 불가" : "배정"}
             </button>
           )}
-          {/* 입금확인/미입금 버튼 - 배정 모드에서만 */}
+          {/* 입금확인 버튼 - 배정 모드에서만. 미입금/입금완료 선택은 5종 메시지 복사 후 모달 안에서 */}
           {mode === "assign" && (
             <>
               <button
                 onClick={() => {
-                  // 미입금 제거 + 입금완료 처리는 모달 안의 "입금완료 처리" 버튼에서.
-                  //   (안내 메시지 5종을 모두 복사한 후에만 처리 가능 — 강제 가이드)
-                  // 입금완료 상태에서도 재오픈 가능 — 메시지 재전송 용도일 뿐 상태 변경 X.
+                  // 5종 메시지 모두 복사해야 미입금/입금완료 선택지 노출 (강제 가이드)
                   setCopiedPostMsgs(new Set());
                   setShowPostPaymentModal(true);
                 }}
-                className={`flex-1 py-3 rounded-xl text-sm font-bold active:opacity-90 ${titleText.includes("/미입금") ? "text-white" : "text-green-600 bg-green-50 border border-green-200"}`}
-                style={titleText.includes("/미입금") ? { background: "linear-gradient(135deg, #00c473, #00a35e)" } : {}}
+                className="flex-1 py-3 rounded-xl text-sm font-bold text-white active:opacity-90"
+                style={{ background: "linear-gradient(135deg, #00c473, #00a35e)" }}
               >
-                {titleText.includes("/미입금") ? "입금확인" : "입금완료"}
+                입금확인
               </button>
-              {!titleText.includes("/미입금") && (
-                <button
-                  onClick={() => {
-                    const newTitle = `${titleText}/미입금`;
-                    // 1) 로컬 UI 즉시 반응
-                    schedule.title = newTitle;
-                    setTitleText(newTitle);
-                    // 2) 부모 상태 + 서버 동기화는 다음 tick
-                    setTimeout(() => {
-                      onUpdated?.({ id: schedule.id, title: newTitle });
-                      apiUpdateSchedule(schedule.id, { title: newTitle })
-                        .catch((err) => { console.error("[미입금] 저장 실패:", err); });
-                    }, 0);
-                  }}
-                  className="flex-1 py-3 rounded-xl text-sm font-bold text-red-500 bg-red-50 border border-red-200 active:opacity-90"
-                >
-                  미입금
-                </button>
-              )}
+              {/* 미입금 즉시 토글 버튼 제거 — 모든 상태 변경은 입금확인 모달에서 5종 메시지 복사 후 진행 */}
             </>
           )}
           <button
@@ -811,40 +791,12 @@ export default function ScheduleDetail({
               ))}
             </div>
             <div className="border-t border-gray-100 px-5 py-3 space-y-2">
-              {titleText.includes("/미입금") ? (
-                // 미입금 상태: 5종 메시지 모두 복사해야 입금완료 처리 가능
+              {/* 5종 메시지 모두 복사해야 입금완료/미입금 처리 가능 */}
+              {copiedPostMsgs.size < POST_PAYMENT_MESSAGES.length ? (
                 <>
-                  <button
-                    onClick={() => {
-                      if (copiedPostMsgs.size < POST_PAYMENT_MESSAGES.length) return;
-                      // 1) 미입금 제거 + 제목 복원
-                      const originalMatch = schedule.note?.match(/원래제목:\s*(.+)/);
-                      const newTitle = originalMatch
-                        ? originalMatch[1].trim()
-                        : titleText.replace(/\/미입금/g, "");
-                      schedule.title = newTitle;
-                      setTitleText(newTitle);
-                      // 2) 부모 + 서버 동기화 (다음 tick)
-                      setTimeout(() => {
-                        onUpdated?.({ id: schedule.id, title: newTitle });
-                        apiUpdateSchedule(schedule.id, { title: newTitle }).catch((err) => {
-                          console.error("[입금완료] 저장 실패:", err);
-                        });
-                      }, 0);
-                      // 3) 모달 닫기
-                      setShowPostPaymentModal(false);
-                    }}
-                    disabled={copiedPostMsgs.size < POST_PAYMENT_MESSAGES.length}
-                    className={`w-full py-2.5 rounded-xl text-sm font-bold ${
-                      copiedPostMsgs.size >= POST_PAYMENT_MESSAGES.length
-                        ? "bg-green-600 text-white active:bg-green-700"
-                        : "bg-gray-200 text-gray-400 cursor-not-allowed"
-                    }`}
-                  >
-                    {copiedPostMsgs.size >= POST_PAYMENT_MESSAGES.length
-                      ? "✅ 입금완료 처리"
-                      : `📋 메시지 복사 후 입금완료 (${copiedPostMsgs.size}/${POST_PAYMENT_MESSAGES.length})`}
-                  </button>
+                  <div className="w-full py-2.5 rounded-xl text-sm font-bold bg-gray-200 text-gray-500 text-center">
+                    📋 5종 메시지 복사 후 선택지 표시 ({copiedPostMsgs.size}/{POST_PAYMENT_MESSAGES.length})
+                  </div>
                   <button
                     onClick={() => setShowPostPaymentModal(false)}
                     className="w-full py-2 bg-gray-100 text-gray-600 rounded-xl text-xs font-bold active:bg-gray-200"
@@ -853,13 +805,63 @@ export default function ScheduleDetail({
                   </button>
                 </>
               ) : (
-                // 이미 입금완료 상태: 단순 메시지 재전송 용도이므로 그냥 닫기만
-                <button
-                  onClick={() => setShowPostPaymentModal(false)}
-                  className="w-full py-2.5 bg-gray-100 text-gray-700 rounded-xl text-sm font-bold active:bg-gray-200"
-                >
-                  닫기
-                </button>
+                // 5종 다 복사함 → 입금완료 / 미입금 두 선택지 노출
+                <>
+                  <div className="text-[11px] text-gray-500 text-center pb-1">
+                    고객 결제 상태에 맞춰 선택해주세요
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => {
+                        // 입금완료 처리 — title 에서 /미입금 제거 (없으면 변화 X)
+                        const originalMatch = schedule.note?.match(/원래제목:\s*(.+)/);
+                        const newTitle = originalMatch
+                          ? originalMatch[1].trim()
+                          : titleText.replace(/\/미입금/g, "");
+                        if (newTitle !== titleText) {
+                          schedule.title = newTitle;
+                          setTitleText(newTitle);
+                          setTimeout(() => {
+                            onUpdated?.({ id: schedule.id, title: newTitle });
+                            apiUpdateSchedule(schedule.id, { title: newTitle }).catch((err) => {
+                              console.error("[입금완료] 저장 실패:", err);
+                            });
+                          }, 0);
+                        }
+                        setShowPostPaymentModal(false);
+                      }}
+                      className="flex-1 py-2.5 rounded-xl text-sm font-bold bg-green-600 text-white active:bg-green-700"
+                    >
+                      ✅ 입금완료
+                    </button>
+                    <button
+                      onClick={() => {
+                        // 미입금 처리 — title 끝에 /미입금 추가 (이미 있으면 변화 X)
+                        if (!titleText.includes("/미입금")) {
+                          const newTitle = `${titleText}/미입금`;
+                          schedule.title = newTitle;
+                          setTitleText(newTitle);
+                          setTimeout(() => {
+                            onUpdated?.({ id: schedule.id, title: newTitle });
+                            apiUpdateSchedule(schedule.id, { title: newTitle }).catch((err) => {
+                              console.error("[미입금] 저장 실패:", err);
+                            });
+                          }, 0);
+                        }
+                        setShowPostPaymentModal(false);
+                      }}
+                      className="flex-1 py-2.5 rounded-xl text-sm font-bold text-red-600 bg-red-50 border border-red-300 active:bg-red-100"
+                    >
+                      ⚠️ 미입금
+                    </button>
+                  </div>
+                  <button
+                    onClick={() => setShowPostPaymentModal(false)}
+                    className="w-full py-1.5 text-xs text-gray-400 active:text-gray-600"
+                  >
+                    나중에 결정
+                  </button>
+                </>
               )}
             </div>
           </div>
