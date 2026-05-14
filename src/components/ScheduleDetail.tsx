@@ -4,6 +4,7 @@ import { useState, useEffect, useLayoutEffect, useRef, useCallback } from "react
 import { Schedule, Member, Comment } from "@/types";
 import { fetchComments, createComment, deleteCommentApi, updateSchedule as apiUpdateSchedule } from "@/lib/api";
 import { showConfirm } from "@/lib/dialog";
+import { POST_PAYMENT_MESSAGES } from "@/lib/customerMessages";
 import ScheduleChecklist from "./ScheduleChecklist";
 import ScheduleSettlement from "./ScheduleSettlement";
 
@@ -65,6 +66,9 @@ export default function ScheduleDetail({
   const [showReturnModal, setShowReturnModal] = useState(false);
   const [returnReason, setReturnReason] = useState("");
   const [assignMemberId, setAssignMemberId] = useState("");
+  // 입금확인 버튼 누르면 뜨는 안내 메시지 복사 팝업
+  const [showPostPaymentModal, setShowPostPaymentModal] = useState(false);
+  const [copiedPostMsgs, setCopiedPostMsgs] = useState<Set<number>>(new Set());
 
   // 탭 히스토리 (뒤로가기 지원)
   const tabHistoryRef = useRef<DetailTab[]>([]);
@@ -674,20 +678,25 @@ export default function ScheduleDetail({
             <>
               <button
                 onClick={() => {
+                  // 1) /미입금 제거 (이미 입금완료 상태면 스킵)
                   if (titleText.includes("/미입금")) {
                     const originalMatch = schedule.note?.match(/원래제목:\s*(.+)/);
                     const newTitle = originalMatch ? originalMatch[1].trim() : titleText.replace(/\/미입금/g, "");
-                    // 1) 로컬 UI 즉시 반응 — 이 render 에서는 버튼/제목만 바뀜
+                    // 로컬 UI 즉시 반응 — 이 render 에서는 버튼/제목만 바뀜
                     schedule.title = newTitle;
                     setTitleText(newTitle);
-                    // 2) 부모 상태 + 서버 동기화는 다음 tick 으로 분리
-                    //    (리스트 수백 개 재렌더가 버튼 반응을 블로킹하지 않게)
+                    // 부모 상태 + 서버 동기화는 다음 tick 으로 분리
+                    //   (리스트 수백 개 재렌더가 버튼 반응을 블로킹하지 않게)
                     setTimeout(() => {
                       onUpdated?.({ id: schedule.id, title: newTitle });
                       apiUpdateSchedule(schedule.id, { title: newTitle })
                         .catch((err) => { console.error("[입금확인] 저장 실패:", err); });
                     }, 0);
                   }
+                  // 2) 입금 후 고객에게 보낼 안내 메시지 4종 복사 팝업 열기
+                  //    (입금완료 상태에서도 재오픈 가능 — 메시지 재전송 필요시 사용)
+                  setCopiedPostMsgs(new Set());
+                  setShowPostPaymentModal(true);
                 }}
                 className={`flex-1 py-3 rounded-xl text-sm font-bold active:opacity-90 ${titleText.includes("/미입금") ? "text-white" : "text-green-600 bg-green-50 border border-green-200"}`}
                 style={titleText.includes("/미입금") ? { background: "linear-gradient(135deg, #00c473, #00a35e)" } : {}}
@@ -747,6 +756,69 @@ export default function ScheduleDetail({
       </div>
       )}
       </div>
+      {/* 입금확인 후 안내 메시지 복사 팝업 - 4종 메시지를 순서대로 복사해서 고객에게 전송 */}
+      {showPostPaymentModal && (
+        <div
+          className="fixed inset-0 bg-black/40 z-[60] flex items-center justify-center px-4"
+          onClick={(e) => { if (e.target === e.currentTarget) setShowPostPaymentModal(false); }}
+        >
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md max-h-[85vh] flex flex-col animate-[modalIn_0.15s_ease-out]">
+            <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+              <h3 className="text-sm font-bold text-gray-800">입금 확인 - 고객 안내 메시지 복사</h3>
+              <button
+                onClick={() => setShowPostPaymentModal(false)}
+                className="p-1 -mr-1 active:bg-gray-100 rounded-lg"
+                aria-label="닫기"
+              >
+                <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <div className="overflow-y-auto px-5 py-4 space-y-3">
+              <p className="text-xs text-gray-500 leading-relaxed">
+                고객에게 순서대로 복사 → 붙여넣어 전송해주세요.
+              </p>
+              {POST_PAYMENT_MESSAGES.map((msg, i) => (
+                <div
+                  key={i}
+                  className={`border rounded-xl p-3 ${copiedPostMsgs.has(i) ? "border-green-300 bg-green-50" : "border-gray-200"}`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className={`text-xs font-bold ${copiedPostMsgs.has(i) ? "text-green-600" : "text-green-800"}`}>
+                      {copiedPostMsgs.has(i) ? "✅ " : ""}{msg.label}
+                    </span>
+                    <button
+                      onClick={async () => {
+                        try { await navigator.clipboard.writeText(msg.text); } catch {
+                          const ta = document.createElement("textarea");
+                          ta.value = msg.text;
+                          document.body.appendChild(ta);
+                          ta.select();
+                          document.execCommand("copy");
+                          document.body.removeChild(ta);
+                        }
+                        setCopiedPostMsgs((prev) => new Set(prev).add(i));
+                      }}
+                      className="px-3 py-1 bg-green-700 text-white rounded-lg text-xs font-bold active:bg-green-800"
+                    >
+                      {copiedPostMsgs.has(i) ? "✅" : "📋 복사"}
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="border-t border-gray-100 px-5 py-3">
+              <button
+                onClick={() => setShowPostPaymentModal(false)}
+                className="w-full py-2.5 bg-gray-100 text-gray-700 rounded-xl text-sm font-bold active:bg-gray-200"
+              >
+                닫기
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       {/* 반환 사유 모달 */}
       {showReturnModal && (
         <div className="fixed inset-0 bg-black/40 z-[60] flex items-center justify-center px-6" onClick={(e) => { if (e.target === e.currentTarget) setShowReturnModal(false); }}>
