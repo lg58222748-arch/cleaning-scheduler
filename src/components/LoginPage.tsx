@@ -15,8 +15,11 @@ const BRANCH_OPTIONS = [
   "부산", "대구", "울산",
 ];
 
+type RegistrationType = "office" | "partner";
+
 export default function LoginPage({ onLogin }: LoginPageProps) {
   const [mode, setMode] = useState<"login" | "register">("login");
+  const [registrationType, setRegistrationType] = useState<RegistrationType>("office");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
@@ -82,6 +85,11 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
     }
     if (!branchValue) {
       setError("관리점을 선택해주세요"); return;
+    }
+    // 파트너 가입은 사업자등록증 필수
+    if (registrationType === "partner" && !businessLicenseLocal && !businessLicenseFile) {
+      setError("파트너 가입은 사업자등록증 첨부가 필수입니다");
+      return;
     }
     setLoading(true); setError("");
     // 상세주소 합치기 — DB 에는 한 줄로 저장
@@ -197,6 +205,39 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
             </>
           ) : (
             <>
+              {/* 가입 유형 — 사무실 / 파트너 */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">가입 유형 *</label>
+                <div className="flex rounded-xl overflow-hidden border border-gray-300">
+                  <button
+                    type="button"
+                    onClick={() => setRegistrationType("office")}
+                    className={`flex-1 py-2.5 text-sm font-bold transition-colors ${
+                      registrationType === "office"
+                        ? "bg-blue-500 text-white"
+                        : "bg-white text-gray-500 active:bg-gray-50"
+                    }`}
+                  >
+                    🏢 사무실
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setRegistrationType("partner")}
+                    className={`flex-1 py-2.5 text-sm font-bold transition-colors ${
+                      registrationType === "partner"
+                        ? "bg-blue-500 text-white"
+                        : "bg-white text-gray-500 active:bg-gray-50"
+                    }`}
+                  >
+                    🤝 파트너
+                  </button>
+                </div>
+                <p className="text-[10px] text-gray-400 mt-1">
+                  {registrationType === "office"
+                    ? "사무실 직원 · 사업자등록증 선택"
+                    : "파트너 청소업체 · 사업자등록증 필수"}
+                </p>
+              </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">아이디 *</label>
                 <input
@@ -299,9 +340,11 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
                   />
                 )}
               </div>
-              {/* 6) 사업자등록증 — 가입 신청 시 Supabase Storage 에 업로드 */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">사업자등록증 (선택)</label>
+              {/* 6) 사업자등록증 — 파트너는 필수, 사무실은 선택 */}
+              <div className={registrationType === "partner" && !businessLicenseLocal ? "p-3 -mx-3 rounded-xl bg-red-50/40 border border-red-100" : ""}>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  사업자등록증 {registrationType === "partner" ? <span className="text-red-500">*</span> : "(선택)"}
+                </label>
                 <input
                   type="file" accept="image/*,.pdf"
                   onChange={(e) => {
@@ -316,7 +359,12 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
                     {businessLicenseLocal.name} ({(businessLicenseLocal.size / 1024).toFixed(0)} KB)
                   </p>
                 )}
-                <p className="text-[10px] text-gray-400 mt-1">5MB 이하 · 이미지 또는 PDF</p>
+                <p className="text-[10px] text-gray-400 mt-1">
+                  5MB 이하 · 이미지 또는 PDF
+                  {registrationType === "partner" && (
+                    <span className="text-red-500 ml-1">· 파트너 가입은 필수입니다</span>
+                  )}
+                </p>
               </div>
               <button
                 onClick={handleRegister} disabled={loading}
