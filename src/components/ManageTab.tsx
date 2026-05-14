@@ -81,7 +81,10 @@ export default function ManageTab({ isAdmin, userRole, userName = "", allUsers =
 
       {/* 영업팀 탭 */}
       {activeSubTab === "sales-stats" && (
-        <SalesStatsSection userName={userName} userRole={userRole} allUsers={allUsers} schedules={schedules} unassignedSchedules={unassignedSchedules} />
+        <>
+          <SalesStatsSection userName={userName} userRole={userRole} allUsers={allUsers} schedules={schedules} unassignedSchedules={unassignedSchedules} />
+          <SalesTeamGuide />
+        </>
       )}
 
       {/* 현장팀 탭 — 통계는 일정관리 탭으로 이동 */}
@@ -400,6 +403,162 @@ function CeoSection({ onRefresh, allUsers, members, schedules }: {
 
 
 /* ════════════ 현장팀 사용 가이드 섹션 ════════════ */
+function SalesTeamGuide() {
+  const [openId, setOpenId] = useState<string | null>(null);
+
+  const Section = ({ id, icon, title, children }: { id: string; icon: string; title: string; children: React.ReactNode }) => {
+    const isOpen = openId === id;
+    return (
+      <div className="rounded-xl border border-gray-200 bg-white overflow-hidden">
+        <button
+          onClick={() => setOpenId(isOpen ? null : id)}
+          className="w-full px-4 py-3 flex items-center justify-between active:bg-gray-50"
+        >
+          <span className="flex items-center gap-2">
+            <span className="text-xl">{icon}</span>
+            <span className="text-sm font-bold text-gray-800">{title}</span>
+          </span>
+          <svg className={`w-4 h-4 text-gray-400 transition-transform ${isOpen ? "rotate-90" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
+        </button>
+        {isOpen && (
+          <div className="px-4 py-3 bg-gray-50 border-t border-gray-100 text-sm text-gray-700 leading-relaxed space-y-3">
+            {children}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const Step = ({ n, title, children }: { n: number; title: string; children?: React.ReactNode }) => (
+    <div className="flex gap-3">
+      <span className="shrink-0 w-6 h-6 rounded-full bg-blue-500 text-white text-xs font-bold flex items-center justify-center">{n}</span>
+      <div className="flex-1">
+        <div className="text-sm font-bold text-gray-800">{title}</div>
+        {children && <div className="text-xs text-gray-600 mt-1 leading-relaxed">{children}</div>}
+      </div>
+    </div>
+  );
+
+  const Tip = ({ children }: { children: React.ReactNode }) => (
+    <div className="bg-blue-50 border-l-4 border-blue-400 px-3 py-2 rounded-r-lg text-xs text-blue-900">💡 {children}</div>
+  );
+  const Warn = ({ children }: { children: React.ReactNode }) => (
+    <div className="bg-amber-50 border-l-4 border-amber-400 px-3 py-2 rounded-r-lg text-xs text-amber-900">⚠️ {children}</div>
+  );
+
+  return (
+    <div className="px-4 pb-6 space-y-3">
+      <div className="text-center pt-2 pb-1">
+        <h2 className="text-base font-bold text-gray-800">영업팀 업무 가이드</h2>
+        <p className="text-xs text-gray-500 mt-1">상담부터 정산까지 단계별 안내</p>
+      </div>
+
+      {/* 1. 양식 발송 */}
+      <Section id="sales-form" icon="📝" title="1. 양식 발송 (상담 1차)">
+        <Step n={1} title="영업탭 → 양식 발송">
+          하단 메뉴 <b>영업</b> 탭 진입 → 첫 번째 <b>양식 발송</b> 화면 열림.
+        </Step>
+        <Step n={2} title="서비스 종류 선택 (복수 가능)">
+          입주청소 / 거주청소 / 인테리어청소 / 사이청소 / 외부유리창 / 새집증후군 / 줄눈시공 / 탄성코트 / 나노코팅 / 에어컨청소 등.<br/>
+          여러 개 동시 선택 가능 (예: 입주청소 + 에어컨청소).
+        </Step>
+        <Step n={3} title="견적 정보 입력">
+          평수, 타입 (기본/확장형/복층 등), 추가 구조, 상담사 특이사항 입력.
+        </Step>
+        <Step n={4} title="양식 복사 or 예약금 안내">
+          우측 미리보기 확인 후 <b>1. 양식 복사</b> 누르면 클립보드에 복사 → 고객 카톡에 붙여넣기.<br/>
+          예약금 안내가 필요하면 <b>2. 예약금 안내</b> 사용.
+        </Step>
+        <Tip>
+          예약금은 입력한 견적의 24% (입주청소·거주청소 등) 또는 10% (줄눈/탄성/에어컨/나노코팅) 로 자동 계산됩니다.
+        </Tip>
+      </Section>
+
+      {/* 2. 예약 확정 */}
+      <Section id="sales-confirm" icon="📋" title="2. 예약 확정 (고객 답장 받은 뒤)">
+        <Step n={1} title="영업탭 → 예약 확정">
+          고객이 카톡으로 답장 보내면 영업탭 → <b>예약 확정</b> 탭 진입.
+        </Step>
+        <Step n={2} title="고객 답장 텍스트 붙여넣기">
+          고객 카톡 메시지 전체 복사 → 입력란에 붙여넣고 <b>파싱</b> 버튼 클릭.
+        </Step>
+        <Step n={3} title="AI 자동 추출 결과 확인">
+          이름·연락처·주소·희망날짜·특이사항·상담사 특이사항·평수·견적/예약금 모두 자동 채워짐.<br/>
+          빠지거나 잘못된 항목 있으면 직접 수정.
+        </Step>
+        <Step n={4} title="예약 확정 메시지 복사 / 전송">
+          파싱된 정보로 예약 확정 메시지가 자동 생성됨.<br/>
+          <b>최종 확정 예약 양식</b> 복사 → 고객 카톡에 전송. 일정은 자동으로 배정탭에 미배정 상태로 생성됨.
+        </Step>
+        <Warn>
+          파싱이 잘 안 되면 고객 답장 텍스트 포맷이 표준과 다를 수 있어요. 누락 항목은 직접 입력하면 됩니다.
+        </Warn>
+      </Section>
+
+      {/* 3. 배정탭 — 미배정/미입금 관리 */}
+      <Section id="sales-assign" icon="📥" title="3. 배정탭 — 미배정 / 미입금 관리">
+        <Step n={1} title="배정탭 → 미배정 일정 확인">
+          예약 확정 끝나면 일정이 <b>배정탭</b> 에 미배정 상태로 들어옴 (주황 배경).<br/>
+          제목에 <b>"/미입금"</b> 포함 시 보라색으로 자동 표시.
+        </Step>
+        <Step n={2} title="현장팀장 배정">
+          일정 클릭 → 상세화면 → <b>배정</b> 영역에서 담당 팀장 선택 → <b>배정</b> 버튼.<br/>
+          관리자/대표/일정관리자 가 배정 권한 있음.
+        </Step>
+        <Step n={3} title="고객 입금 확인되면 입금확인 진행 (4단계 참고)">
+          미입금 → 입금완료 처리는 아래 4번 참고.
+        </Step>
+      </Section>
+
+      {/* 4. 입금확인 → 입금완료 전환 */}
+      <Section id="sales-payment" icon="💰" title="4. 입금확인 → 입금완료 전환">
+        <Step n={1} title="고객 입금 확인 후 일정 상세 열기">
+          미입금 일정 (보라색) 클릭 → 상세화면.
+        </Step>
+        <Step n={2} title="입금확인 버튼 클릭">
+          하단 <b>입금확인</b> 초록 버튼 누르면 안내 메시지 모달이 열림.
+        </Step>
+        <Step n={3} title="5개 메시지 모두 복사 → 고객 전송">
+          <div className="mt-1 space-y-1 text-xs">
+            <div>1-1. 사전 고지사항 (앞부분)</div>
+            <div>1-2. 사전 고지사항 (뒷부분)</div>
+            <div>2. 예약/변경/취소 안내</div>
+            <div>3. 확인 안내</div>
+            <div>4. 인터넷 할인 안내</div>
+          </div>
+          <div className="mt-2">각 카드 <b>📋 복사</b> 버튼 누르고 카톡에 붙여넣기. 5개 모두 복사해야 다음 단계 진행 가능.</div>
+        </Step>
+        <Step n={4} title="입금완료 처리 버튼 클릭">
+          5개 메시지 다 복사하면 하단 버튼이 <b>✅ 입금완료 처리</b> 로 활성화.<br/>
+          누르면 제목에서 <b>"/미입금"</b> 자동 제거 + 색상 일반으로 돌아옴.
+        </Step>
+        <Warn>
+          5개 메시지를 모두 고객에게 보내지 않으면 입금완료 처리 버튼이 회색 비활성 상태입니다. <b>고객이 사전 고지사항을 받고 동의했음을 확실히 하기 위함</b> 입니다.
+        </Warn>
+      </Section>
+
+      {/* 5. 미입금 추적 (위 미입금 리스트 활용) */}
+      <Section id="sales-unpaid-track" icon="🔍" title="5. 미입금 추적">
+        <Step n={1} title="위쪽 미입금 리스트 확인">
+          이 화면 상단의 <b>미입금 N건</b> 리스트가 본인 명의 미입금 일정 (영업팀은 본인 거만, 대표/관리자는 전체).
+        </Step>
+        <Step n={2} title="일정 클릭 → 입금확인 진행">
+          미입금 일정 클릭하면 상세화면 열림 → 위 4번 절차로 입금확인.
+        </Step>
+        <Tip>
+          미입금 상태는 제목에 "/미입금" 글자가 들어가 있는지로 판정합니다. 영업탭에서 예약 확정할 때 "예약금 아직 안 받음" 으로 마크되면 자동으로 붙고, 입금완료 처리하면 자동으로 빠집니다.
+        </Tip>
+      </Section>
+
+      <div className="text-center text-[10px] text-gray-400 pt-2">
+        문제 있으면 관리자(대표)에게 카톡으로 문의해주세요 🙏
+      </div>
+    </div>
+  );
+}
+
 function FieldTeamGuide() {
   const [openId, setOpenId] = useState<string | null>("calendar");
 
@@ -505,55 +664,21 @@ function FieldTeamGuide() {
         </Warn>
       </Section>
 
-      {/* 3. 정산서 발행 */}
-      <Section id="settlement" icon="💰" title="3. 정산서 발행">
-        <Step n={1} title="일정 상세 → '정산' 탭">
-          체크리스트 끝낸 후 같은 화면에서 <b>정산</b> 탭으로 이동.
-        </Step>
-        <Step n={2} title="금액 확인 / 수정">
-          영업팀이 미리 입력한 견적·예약금이 자동으로 들어와있음.<br/>
-          현장 특이사항 비용 있으면 그 자리에서 추가 입력.
-        </Step>
-        <Step n={3} title="결제 방식 / 현금영수증">
-          고객이 어떻게 결제할지 선택: 계좌이체 / 현금 / 카드.<br/>
-          현금영수증 신청 여부도 체크 (부가세 자동 계산됨).
-        </Step>
-        <Step n={4} title="계좌 정보 입력 (한 번만)">
-          본인 계좌 정보(은행/계좌번호/입금주)를 한 번 저장해두면 다음부터 자동으로 들어감.
-        </Step>
-        <Step n={5} title="정산서 발행 버튼 클릭">
-          최종 금액 확인 후 <b>정산서 발행</b> 누르면 DB에 정산 데이터 저장 + 공유 모달 자동으로 열림.
-        </Step>
+      {/* 정산 / 입금확인 안내 */}
+      <Section id="settlement-note" icon="ℹ️" title="3. 정산 / 입금확인 (영업팀 담당)">
         <Tip>
-          정산서 발행을 누르지 않으면 DB에 정산 기록이 안 남아요. <b>꼭 발행 누르고 마무리</b>하세요.
+          정산서 발행 / 고객에게 정산서 전송 / 미입금 → 입금완료 처리는 <b>영업팀이 배정탭에서</b> 진행합니다.
         </Tip>
+        <div className="text-xs text-gray-600 leading-relaxed">
+          현장팀장은 작업이 끝나면 <b>체크리스트만</b> 마무리해주시면 됩니다.<br/>
+          정산서 발행·고객 안내·입금 확인은 영업팀이 별도로 처리하니 따로 신경 안 쓰셔도 됩니다.<br/>
+          만약 현장에서 추가 비용이 발생했다면 일정 상세의 <b>메모</b> 또는 체크리스트 <b>특이사항</b> 에 적어두시면
+          영업팀이 정산할 때 반영합니다.
+        </div>
       </Section>
 
-      {/* 4. 고객에게 정산서 전송 */}
-      <Section id="send-customer" icon="📤" title="4. 고객에게 정산서 전송">
-        <Step n={1} title="공유 모달 확인">
-          정산서 발행 누르면 자동으로 모달 뜨고 미리보기 텍스트가 보임.<br/>
-          금액·계좌·고객명 다 확인 후 다음 단계로.
-        </Step>
-        <Step n={2} title="문자 전송 OR 카카오톡 전송 선택">
-          <div className="mt-1 space-y-1">
-            <div>📩 <b>문자 전송</b>: 고객 연락처가 자동으로 들어간 문자 앱이 열림 → 보내기</div>
-            <div>💛 <b>카카오톡 전송</b>: 카톡 공유 시트 열림 → 고객 채팅방 선택 → 전송</div>
-          </div>
-        </Step>
-        <Step n={3} title="복사가 안 될 때">
-          공유 안 되면 미리보기 텍스트가 자동으로 복사돼있음. 카톡 들어가서 <b>붙여넣기</b> 만 하면 됨.
-        </Step>
-        <Step n={4} title="잔금 받기">
-          고객이 입금하면 정산서에서 <b>입금확인</b> 버튼 누름 → 제목에서 "/미입금" 빠지고 색상도 일반으로 돌아옴.
-        </Step>
-        <Warn>
-          고객 연락처가 비어있으면 문자/카톡 보내는 사람 정보가 없어 직접 입력해야 합니다. 영업팀이 미리 입력하도록 부탁하세요.
-        </Warn>
-      </Section>
-
-      {/* 5. 자주 묻는 질문 */}
-      <Section id="faq" icon="❓" title="5. 자주 묻는 질문">
+      {/* 4. 자주 묻는 질문 */}
+      <Section id="faq" icon="❓" title="4. 자주 묻는 질문">
         <div className="space-y-3">
           <div>
             <div className="font-bold text-gray-800 text-sm">Q. 일정이 갑자기 안 보여요</div>
