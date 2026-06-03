@@ -248,6 +248,8 @@ export default function ScheduleDetail({
 
   // 스와이프 뒤로가기 (오른쪽 스와이프 → 닫기)
   const detailRef = useRef<HTMLDivElement>(null);
+  // backdrop 닫기: 드래그(텍스트 선택)와 진짜 클릭 구분용 — mousedown 이 backdrop 에서 시작했는지 기록
+  const backdropMouseDownRef = useRef(false);
   useEffect(() => {
     if (!detailRef.current) return;
     let mc: InstanceType<typeof import("hammerjs")> | null = null;
@@ -271,7 +273,19 @@ export default function ScheduleDetail({
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
-    <div ref={detailRef} className="fixed inset-0 z-50 md:flex md:items-center md:justify-center md:bg-black/30 animate-[modalIn_0.15s_ease-out]" style={{ paddingTop: "env(safe-area-inset-top, 0px)", paddingBottom: "env(safe-area-inset-bottom, 0px)" }}>
+    <div
+      ref={detailRef}
+      className="fixed inset-0 z-50 md:flex md:items-center md:justify-center md:bg-black/30 animate-[modalIn_0.15s_ease-out]"
+      style={{ paddingTop: "env(safe-area-inset-top, 0px)", paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
+      // 빈 backdrop 영역을 '진짜로 클릭'했을 때만 닫기.
+      // mousedown 과 mouseup(=click) 둘 다 backdrop(currentTarget) 에서 일어나야 함.
+      // → 본문에서 드래그 시작해 backdrop 에서 뗀 경우(텍스트 선택) 는 닫지 않음.
+      onMouseDown={(e) => { backdropMouseDownRef.current = e.target === e.currentTarget; }}
+      onClick={(e) => {
+        if (e.target === e.currentTarget && backdropMouseDownRef.current) onClose();
+        backdropMouseDownRef.current = false;
+      }}
+    >
       <div className="h-full w-full md:h-[85vh] md:w-[480px] md:rounded-2xl md:shadow-2xl bg-white flex flex-col overflow-hidden">
         {/* Header */}
         <div className="px-4 py-1.5 border-b border-gray-100 flex items-center justify-between">
