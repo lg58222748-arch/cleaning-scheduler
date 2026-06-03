@@ -253,7 +253,10 @@ export default function ScheduleDetail({
     let mc: InstanceType<typeof import("hammerjs")> | null = null;
     import("hammerjs").then((Hammer) => {
       if (!detailRef.current) return;
-      mc = new Hammer.default(detailRef.current);
+      // [중요] TouchInput 강제 — 기본값은 마우스 드래그도 swipe 로 인식해서
+      // PC 에서 본문 텍스트 드래그 선택 시 'swiperight = 닫기' 로 오인되어 창이 꺼지던 버그.
+      // 터치 제스처만 닫기 트리거가 되도록 제한.
+      mc = new Hammer.default(detailRef.current, { inputClass: Hammer.default.TouchInput });
       mc.get("swipe").set({ direction: Hammer.default.DIRECTION_RIGHT });
       mc.on("swiperight", () => {
         if (tabHistoryRef.current.length > 0) {
