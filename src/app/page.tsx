@@ -516,7 +516,10 @@ export default function Home() {
       if (pollInterval) return;
       if (realtimeConnected) return; // 리얼타임 멀쩡한데 폴링 돌리지 말기 (중복 갱신 방지)
       console.log("[RT] 폴링 시작 (Realtime 실패)");
-      pollInterval = setInterval(reloadAll, 8000);
+      // 30초 간격 — 기존 8초는 egress 폭증 주범이었음 (WebView 에서 realtime 자주 끊겨
+      // 8초마다 일정 전체 재조회 → 직원 몇 명만 폴링돼도 월 수백 GB).
+      // realtime 정상이면 즉시 반영이라 체감 거의 없음. 끊긴 상태에서만 최대 30초 지연.
+      pollInterval = setInterval(reloadAll, 30000);
     }
     function stopPolling() {
       if (pollInterval) { console.log("[RT] 폴링 중지 (Realtime 복구)"); clearInterval(pollInterval); pollInterval = null; }
