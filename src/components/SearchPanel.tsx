@@ -14,6 +14,7 @@ export default function SearchPanel({ onSelectSchedule, onClose }: SearchPanelPr
   const [results, setResults] = useState<Schedule[]>([]);
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
+  const [includeDeleted, setIncludeDeleted] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -22,8 +23,7 @@ export default function SearchPanel({ onSelectSchedule, onClose }: SearchPanelPr
     return () => { if (timerRef.current) clearTimeout(timerRef.current); };
   }, []);
 
-  function handleSearch(q: string) {
-    setQuery(q);
+  function runSearch(q: string, withDeleted: boolean) {
     if (timerRef.current) clearTimeout(timerRef.current);
     if (!q.trim()) {
       setResults([]);
@@ -32,11 +32,30 @@ export default function SearchPanel({ onSelectSchedule, onClose }: SearchPanelPr
     }
     timerRef.current = setTimeout(async () => {
       setLoading(true);
-      const data = await searchSchedules(q.trim());
+      const data = await searchSchedules(q.trim(), withDeleted);
       setResults(data);
       setSearched(true);
       setLoading(false);
     }, 300);
+  }
+
+  function handleSearch(q: string) {
+    setQuery(q);
+    runSearch(q, includeDeleted);
+  }
+
+  function toggleDeleted() {
+    const next = !includeDeleted;
+    setIncludeDeleted(next);
+    // 현재 검색어 즉시 재검색 (debounce 없이 바로)
+    if (query.trim()) {
+      setLoading(true);
+      searchSchedules(query.trim(), next).then((data) => {
+        setResults(data);
+        setSearched(true);
+        setLoading(false);
+      });
+    }
   }
 
   // 날짜별 그룹핑
@@ -87,6 +106,21 @@ export default function SearchPanel({ onSelectSchedule, onClose }: SearchPanelPr
         </div>
       </div>
 
+      {/* 휴지통 포함 토글 */}
+      <div className="px-4 py-2 border-b border-gray-50 flex items-center justify-between">
+        <span className="text-xs text-gray-400">검색 범위</span>
+        <button
+          onClick={toggleDeleted}
+          className={`text-xs px-2.5 py-1 rounded-full font-medium border ${
+            includeDeleted
+              ? "bg-red-50 text-red-600 border-red-200"
+              : "bg-gray-100 text-gray-500 border-transparent active:bg-gray-200"
+          }`}
+        >
+          🗑️ 휴지통 포함 {includeDeleted ? "ON" : "OFF"}
+        </button>
+      </div>
+
       {/* 검색 결과 */}
       <div className="flex-1 overflow-y-auto">
         {loading && (
@@ -114,17 +148,21 @@ export default function SearchPanel({ onSelectSchedule, onClose }: SearchPanelPr
                 </div>
                 {schedules.map((s) => {
                   const titleDisplay = s.title.replace(/^\[.+?\]\s*/, "");
-                  // 미입금 일정은 보라 #E9D5FF (4번째) 으로 자동 표시
-                  const schedColor = s.title.includes("/미입금") ? "#E9D5FF" : (s.color || "#FDDCCC");
+                  const isDeleted = s.status === "deleted";
+                  // 미입금 일정은 보라 #E9D5FF (4번째) 으로 자동 표시. 삭제된 건 회색.
+                  const schedColor = isDeleted ? "#D1D5DB" : (s.title.includes("/미입금") ? "#E9D5FF" : (s.color || "#FDDCCC"));
                   return (
                     <div
                       key={s.id}
-                      className="px-4 py-3 border-b border-gray-50 active:bg-gray-50 cursor-pointer flex items-center gap-3"
+                      className={`px-4 py-3 border-b border-gray-50 active:bg-gray-50 cursor-pointer flex items-center gap-3 ${isDeleted ? "bg-gray-50/60" : ""}`}
                       onClick={() => onSelectSchedule(s)}
                     >
                       <div className="w-1 h-10 rounded-full shrink-0" style={{ backgroundColor: schedColor }} />
                       <div className="flex-1 min-w-0">
-                        <div className="text-sm font-medium text-gray-800">{titleDisplay}</div>
+                        <div className={`text-sm font-medium flex items-center gap-1.5 ${isDeleted ? "text-gray-400 line-through" : "text-gray-800"}`}>
+                          <span className="truncate">{titleDisplay}</span>
+                          {isDeleted && <span className="shrink-0 text-[10px] px-1.5 py-0.5 rounded-full bg-red-100 text-red-500 no-underline font-bold">🗑️ 휴지통</span>}
+                        </div>
                         <div className="text-xs text-gray-500 mt-0.5">
                           {s.memberName} · 하루 종일
                         </div>

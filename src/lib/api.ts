@@ -60,8 +60,9 @@ export async function fetchSchedules(start?: string, end?: string): Promise<Sche
   return safeJson(`${BASE}/api/schedules${params}`, []);
 }
 
-export async function searchSchedules(query: string): Promise<Schedule[]> {
-  return safeJson(`${BASE}/api/schedules?q=${encodeURIComponent(query)}`, []);
+export async function searchSchedules(query: string, includeDeleted = false): Promise<Schedule[]> {
+  const delParam = includeDeleted ? "&includeDeleted=true" : "";
+  return safeJson(`${BASE}/api/schedules?q=${encodeURIComponent(query)}${delParam}`, []);
 }
 
 export async function softDeleteSchedule(id: string): Promise<void> {

@@ -148,12 +148,14 @@ export async function getUnassignedSchedules(): Promise<Schedule[]> {
   return all;
 }
 
-export async function searchSchedules(query: string): Promise<Schedule[]> {
-  const { data } = await supabase.from("schedules").select("*")
-    .neq("status", "deleted")
+export async function searchSchedules(query: string, includeDeleted = false): Promise<Schedule[]> {
+  let q = supabase.from("schedules").select("*")
     .or(`title.ilike.%${query}%,note.ilike.%${query}%,member_name.ilike.%${query}%`)
     .order("date", { ascending: false })
     .limit(50);
+  // includeDeleted=false 면 휴지통(deleted) 제외 — 기본 동작
+  if (!includeDeleted) q = q.neq("status", "deleted");
+  const { data } = await q;
   return (data || []).map(rowToSchedule);
 }
 

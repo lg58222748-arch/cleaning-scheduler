@@ -12,7 +12,8 @@ export async function GET(req: NextRequest) {
   const deleted = searchParams.get("deleted");
 
   if (query) {
-    return Response.json(await searchSchedules(query));
+    const includeDeleted = searchParams.get("includeDeleted") === "true";
+    return Response.json(await searchSchedules(query, includeDeleted));
   }
   if (deleted === "true") {
     return Response.json(await getDeletedSchedules());
