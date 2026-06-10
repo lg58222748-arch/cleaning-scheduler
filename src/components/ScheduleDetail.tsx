@@ -75,14 +75,22 @@ export default function ScheduleDetail({
   const dateInputRef = useRef<HTMLInputElement>(null);
   const noteTextareaRef = useRef<HTMLTextAreaElement>(null);
 
-  // 본문 textarea 높이 조정 - noteText 실제로 바뀔 때만 실행
-  // (이전엔 ref callback 이 매 렌더마다 실행돼서 스크롤이 위로 튕기는 버그 있었음)
+  // 본문 textarea 높이 조정 - noteText 바뀌거나 '정보' 탭으로 돌아올 때 재계산.
+  // (검수/정산 탭 갔다 오면 정보 탭이 remount 되는데, remount 직후 scrollHeight 가
+  //  레이아웃 전이라 짤려 보이던 버그 → activeTab 의존 + 다음 프레임에 재측정으로 해결)
   useEffect(() => {
-    const el = noteTextareaRef.current;
-    if (!el) return;
-    el.style.height = "auto";
-    el.style.height = el.scrollHeight + "px";
-  }, [noteText]);
+    if (activeTab !== "info") return;
+    const adjust = () => {
+      const el = noteTextareaRef.current;
+      if (!el) return;
+      el.style.height = "auto";
+      el.style.height = el.scrollHeight + "px";
+    };
+    adjust();
+    // remount 직후엔 레이아웃이 덜 잡혀 scrollHeight 가 작게 나옴 → 다음 프레임에 한 번 더
+    const raf = requestAnimationFrame(adjust);
+    return () => cancelAnimationFrame(raf);
+  }, [noteText, activeTab]);
 
   // 날짜 input native touch 이벤트 stopPropagation.
   // Hammer.js(모달 root native 리스너)가 swipe 감지에 touch 이벤트를 씀.
