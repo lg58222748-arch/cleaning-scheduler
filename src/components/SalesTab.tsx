@@ -351,20 +351,31 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
   const [saving, setSaving] = useState(false);
   const [globalCopied, setGlobalCopied] = useState<Set<string>>(new Set()); // Step 3 템플릿 복사 상태
 
-  // 안내 양식 (제목/내용 수정 + 순서 저장) — 전체 객체 저장
-  const [templates, setTemplates] = useState<{ id: string; title: string; content: string }[]>(() => {
-    const defaults = DEFAULT_TEMPLATES.map((t, i) => ({ id: `tpl-${i}`, ...t }));
+  // 안내 양식 카테고리 — 제목 기반 자동 분류 (저장된 category 없을 때 마이그레이션용)
+  const inferCategory = (title: string): TemplateCategory => {
+    if (title.includes("입주청소")) return "입주청소";
+    if (title.includes("거주청소")) return "거주청소";
+    return "기타";
+  };
+  // 안내 양식 (제목/내용/카테고리 수정 + 순서 저장) — 전체 객체 저장
+  const [templates, setTemplates] = useState<Template[]>(() => {
+    const defaults: Template[] = DEFAULT_TEMPLATES.map((t, i) => ({ id: `tpl-${i}`, ...t, category: inferCategory(t.title) }));
     if (typeof window === "undefined") return defaults;
     try {
       const saved = localStorage.getItem("salesTemplates");
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          // 옛 데이터(category 없음) → 제목 기반 추론으로 보강
+          return parsed.map((t: Template) => ({ ...t, category: t.category || inferCategory(t.title || "") }));
+        }
       }
     } catch {}
     return defaults;
   });
-  function saveTemplates(next: { id: string; title: string; content: string }[]) {
+  // 현재 보고 있는 카테고리 탭
+  const [tplCategory, setTplCategory] = useState<TemplateCategory>("입주청소");
+  function saveTemplates(next: Template[]) {
     setTemplates(next);
     localStorage.setItem("salesTemplates", JSON.stringify(next));
   }
@@ -382,7 +393,7 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
     next.splice(toIdx, 0, item);
     saveTemplates(next);
   }
-  function updateTemplateField(id: string, field: "title" | "content", value: string) {
+  function updateTemplateField(id: string, field: "title" | "content" | "category", value: string) {
     setTemplates(prev => {
       const next = prev.map(t => t.id === id ? { ...t, [field]: value } : t);
       localStorage.setItem("salesTemplates", JSON.stringify(next));
@@ -390,7 +401,8 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
     });
   }
   function addTemplate() {
-    const newTpl = { id: "tpl-" + Date.now(), title: "새 양식", content: "" };
+    // 새 양식은 현재 보고 있는 카테고리로 추가
+    const newTpl: Template = { id: "tpl-" + Date.now(), title: "새 양식", content: "", category: tplCategory };
     saveTemplates([...templates, newTpl]);
   }
   async function deleteTemplate(id: string) {
@@ -1465,24 +1477,45 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
                 <button onClick={addTemplate} className="text-[11px] font-bold px-2 py-1 bg-green-700 text-white rounded-lg active:bg-green-800">+ 양식 추가</button>
               )}
             </div>
-            {templates.map((tpl, i) => (
+            {/* 카테고리 탭 */}
+            <div className="flex rounded-lg overflow-hidden border border-gray-200 mb-1.5">
+              {TEMPLATE_CATEGORIES.map((cat) => {
+                const count = templates.filter(t => (t.category || inferCategory(t.title)) === cat).length;
+                const active = tplCategory === cat;
+                return (
+                  <button
+                    key={cat}
+                    onClick={() => setTplCategory(cat)}
+                    className={`flex-1 py-1.5 text-[11px] font-bold transition-colors ${active ? "bg-green-700 text-white" : "bg-white text-gray-500 active:bg-gray-50"}`}
+                  >
+                    {cat} <span className={active ? "text-green-200" : "text-gray-400"}>{count}</span>
+                  </button>
+                );
+              })}
+            </div>
+            {templates
+              .map((tpl, gi) => ({ tpl, gi }))
+              .filter(({ tpl }) => (tpl.category || inferCategory(tpl.title)) === tplCategory)
+              .map(({ tpl, gi }) => (
               <TemplateCard
                 key={tpl.id}
                 id={tpl.id}
                 title={tpl.title}
                 content={tpl.content}
-                onCopy={(text) => handleCopy(text, `tpl${i}`)}
-                copied={copied.has(`tpl${i}`)}
+                category={tpl.category || inferCategory(tpl.title)}
+                onCopy={(text) => handleCopy(text, `tpl${gi}`)}
+                copied={copied.has(`tpl${gi}`)}
                 isAdmin={isAdmin}
                 canEdit={canEditTemplates}
                 isSelected={selectedTplId === tpl.id}
                 onSelect={() => setSelectedTplId(tpl.id)}
-                canMoveUp={i > 0}
-                canMoveDown={i < templates.length - 1}
-                onMoveUp={() => moveTemplate(i, -1)}
-                onMoveDown={() => moveTemplate(i, 1)}
+                canMoveUp={false}
+                canMoveDown={false}
+                onMoveUp={() => {}}
+                onMoveDown={() => {}}
                 onChangeTitle={(v) => updateTemplateField(tpl.id, "title", v)}
                 onChangeContent={(v) => updateTemplateField(tpl.id, "content", v)}
+                onChangeCategory={(v) => updateTemplateField(tpl.id, "category", v)}
                 onDelete={() => deleteTemplate(tpl.id)}
                 isDragging={dragTplId === tpl.id}
                 isDragOver={dragOverTplId === tpl.id && dragTplId !== tpl.id}
@@ -1499,6 +1532,9 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
                 }}
               />
             ))}
+            {templates.filter(t => (t.category || inferCategory(t.title)) === tplCategory).length === 0 && (
+              <div className="py-8 text-center text-xs text-gray-400">이 카테고리에 양식이 없습니다</div>
+            )}
           </div>
 
           {/* PC 전용 오른쪽 미리보기 패널 */}
@@ -1543,6 +1579,10 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
 }
 
 // ===== 안내 양식 데이터 =====
+type TemplateCategory = "입주청소" | "거주청소" | "기타";
+const TEMPLATE_CATEGORIES: TemplateCategory[] = ["입주청소", "거주청소", "기타"];
+type Template = { id: string; title: string; content: string; category?: TemplateCategory };
+
 const DEFAULT_TEMPLATES = [
   { title: "견적질문 - 입주청소", content: `문의주셔서 감사합니다.\n\n이사가시는 곳 지역 :\n\n이사 날짜:\n\n청소 원하시는 날짜 :\n\n이사가시는 곳 구조( 예 : 아파트,빌라,오피스텔,단독주택 ) :\n\n이사가시는 곳 평수 (공급면적):\n\n인테리어 여부 :\n(새로 인테리어 하고 들어가는 부분이 있다면 기재부탁드립니다)\n\n곰팡이 니코틴 스티커 여부 : \n\n거실에 베란다 있는지 여부 :\n\n말씀해주시면 견적안내드리겠습니다^^` },
   { title: "견적질문 - 거주청소", content: `문의주셔서 감사합니다.\n\n지역 :\n\n청소 원하시는 날짜 :\n\n구조( 예 : 아파트,빌라,오피스텔,단독주택 ) :\n\n평수 (공급면적):\n\n인테리어 여부 :\n(새로 인테리어 하고 들어가는 부분이 있다면 기재부탁드립니다)\n\n집 내부 곰팡이 니코틴 스티커 여부 :\n\n거실에 베란다 있는지 여부 :\n\n반려동물 키우는지 여부 :\n\n거주청소를 원하는 이유 (예 하자보수로 인한 청소, 대청소, 출산맞이 청소 등 ) :\n\n짐을빼는 전체 탈거 거주청소 or 짐을안빼는 일반 거주청소 유형 선택 : \n\n말씀해주시면 견적안내드리겠습니다^^` },
@@ -1561,17 +1601,17 @@ const DEFAULT_TEMPLATES = [
 
 // ===== 안내 양식 카드 =====
 function TemplateCard({
-  id, title, content, onCopy, copied, isAdmin, canEdit,
+  id, title, content, category, onCopy, copied, isAdmin, canEdit,
   isSelected, onSelect,
   canMoveUp, canMoveDown, onMoveUp, onMoveDown,
-  onChangeTitle, onChangeContent, onDelete,
+  onChangeTitle, onChangeContent, onChangeCategory, onDelete,
   isDragging, isDragOver, onDragStart, onDragEnd, onDragOver, onDrop,
 }: {
-  id: string; title: string; content: string; onCopy: (text: string) => void; copied: boolean;
+  id: string; title: string; content: string; category?: TemplateCategory; onCopy: (text: string) => void; copied: boolean;
   isAdmin: boolean; canEdit?: boolean;
   isSelected?: boolean; onSelect?: () => void;
   canMoveUp?: boolean; canMoveDown?: boolean; onMoveUp?: () => void; onMoveDown?: () => void;
-  onChangeTitle?: (v: string) => void; onChangeContent?: (v: string) => void; onDelete?: () => void;
+  onChangeTitle?: (v: string) => void; onChangeContent?: (v: string) => void; onChangeCategory?: (v: string) => void; onDelete?: () => void;
   isDragging?: boolean; isDragOver?: boolean;
   onDragStart?: () => void; onDragEnd?: () => void; onDragOver?: () => void; onDrop?: () => void;
 }) {
@@ -1661,6 +1701,19 @@ function TemplateCard({
       </div>
       {open && (
         <div className="px-3 pb-2.5 border-t border-gray-100 md:hidden">
+          {/* 카테고리 변경 (편집 권한자만) */}
+          {(isAdmin || canEdit) && (
+            <div className="flex items-center gap-2 mt-2">
+              <span className="text-[11px] text-gray-400 shrink-0">카테고리</span>
+              <select
+                value={category || "기타"}
+                onChange={(e) => onChangeCategory?.(e.target.value)}
+                className="flex-1 text-[12px] border border-gray-200 rounded-lg px-2 py-1 outline-none bg-white"
+              >
+                {TEMPLATE_CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
+          )}
           <textarea
             value={content}
             readOnly={!(isAdmin || canEdit)}
