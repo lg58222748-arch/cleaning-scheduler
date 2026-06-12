@@ -75,27 +75,38 @@ export default function ScheduleDetail({
   const dateInputRef = useRef<HTMLInputElement>(null);
   const noteTextareaRef = useRef<HTMLTextAreaElement>(null);
 
-  // [1] 타이핑 시 높이 조정 — 동기 1회만. (RAF 등 다음 프레임 재측정을 넣으면
-  //     키 입력마다 스크롤이 맨 위로 튕기는 버그 발생. 반드시 동기 1회로 유지.)
-  useEffect(() => {
+  // textarea 자동 높이 조정 — 스크롤 컨테이너 위치 보존.
+  // height='auto' 로 잠깐 줄이면 부모 overflow 컨테이너의 max scrollTop 이 작아져
+  // scrollTop 이 0(맨 위)으로 클램프됨 → 다시 늘려도 0 그대로라 '맨 위로 튕김'.
+  // 조정 전 scrollTop 기억 → 조정 후 복원해서 그 자리 유지.
+  const adjustNoteHeight = useCallback(() => {
     const el = noteTextareaRef.current;
     if (!el) return;
+    // 스크롤 부모 찾기 (overflow auto/scroll 이고 실제 스크롤 있는 첫 조상)
+    let sp: HTMLElement | null = el.parentElement;
+    while (sp) {
+      const oy = getComputedStyle(sp).overflowY;
+      if ((oy === "auto" || oy === "scroll") && sp.scrollHeight > sp.clientHeight) break;
+      sp = sp.parentElement;
+    }
+    const prev = sp ? sp.scrollTop : 0;
     el.style.height = "auto";
     el.style.height = el.scrollHeight + "px";
-  }, [noteText]);
+    if (sp) sp.scrollTop = prev; // 위치 복원 → 튕김 방지
+  }, []);
 
-  // [2] 정보 탭으로 복귀(remount) 시에만 RAF 로 한 번 재측정 — 검수/정산 갔다 오면
-  //     레이아웃 전이라 scrollHeight 가 작게 나와 짤리던 것 보정. 타이핑 경로와 분리.
+  // [1] 타이핑 시 높이 조정 (동기 1회 + 스크롤 보존)
+  useEffect(() => {
+    adjustNoteHeight();
+  }, [noteText, adjustNoteHeight]);
+
+  // [2] 정보 탭 복귀(remount) 시 RAF 로 1회 재측정 — 검수/정산 갔다 오면 레이아웃 전이라
+  //     scrollHeight 작게 나와 짤리던 것 보정.
   useEffect(() => {
     if (activeTab !== "info") return;
-    const raf = requestAnimationFrame(() => {
-      const el = noteTextareaRef.current;
-      if (!el) return;
-      el.style.height = "auto";
-      el.style.height = el.scrollHeight + "px";
-    });
+    const raf = requestAnimationFrame(() => adjustNoteHeight());
     return () => cancelAnimationFrame(raf);
-  }, [activeTab]);
+  }, [activeTab, adjustNoteHeight]);
 
   // 날짜 input native touch 이벤트 stopPropagation.
   // Hammer.js(모달 root native 리스너)가 swipe 감지에 touch 이벤트를 씀.
