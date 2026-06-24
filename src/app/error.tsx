@@ -13,6 +13,23 @@ export default function Error({
   useEffect(() => {
     // 에러 콘솔 출력 (Sentry 도입 시 여기서 자동 전송)
     console.error("[ErrorBoundary]", error);
+
+    // stale chunk 자동 복구 — 새 배포로 옛 chunk 가 사라져 dynamic import 가 실패한 경우.
+    // 새 HTML 을 강제로 다시 받으면 새 chunk 로 정상화됨. 무한루프 방지 위해 1회만.
+    const msg = `${error?.message || ""} ${error?.name || ""}`;
+    const isChunkError =
+      /ChunkLoadError|Loading chunk|Loading CSS chunk|dynamically imported module|Importing a module script failed|Failed to fetch dynamically/i.test(msg);
+    if (isChunkError && typeof window !== "undefined") {
+      try {
+        const KEY = "chunk-reload-at";
+        const last = Number(sessionStorage.getItem(KEY) || 0);
+        // 최근 10초 내에 이미 리로드 했으면 또 안 함 (루프 방지)
+        if (Date.now() - last > 10000) {
+          sessionStorage.setItem(KEY, String(Date.now()));
+          window.location.reload();
+        }
+      } catch { /* sessionStorage 막힌 환경 무시 */ }
+    }
   }, [error]);
 
   return (
