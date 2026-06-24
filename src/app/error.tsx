@@ -15,18 +15,35 @@ export default function Error({
     console.error("[ErrorBoundary]", error);
 
     // stale chunk 자동 복구 — 새 배포로 옛 chunk 가 사라져 dynamic import 가 실패한 경우.
-    // 새 HTML 을 강제로 다시 받으면 새 chunk 로 정상화됨. 무한루프 방지 위해 1회만.
-    const msg = `${error?.message || ""} ${error?.name || ""}`;
+    // 옛 Service Worker 가 죽은 HTML/chunk 를 계속 물고 있으면 단순 reload 로는 안 풀리므로
+    // SW unregister + 캐시 전체 삭제 후 reload 한다. 무한루프 방지 위해 세션당 1회만.
+    const msg = `${error?.message || ""} ${error?.name || ""} ${error?.stack || ""}`;
     const isChunkError =
-      /ChunkLoadError|Loading chunk|Loading CSS chunk|dynamically imported module|Importing a module script failed|Failed to fetch dynamically/i.test(msg);
+      /ChunkLoadError|Loading chunk|Loading CSS chunk|dynamically imported module|Importing a module script failed|Failed to fetch dynamically|error loading dynamically imported/i.test(msg);
     if (isChunkError && typeof window !== "undefined") {
       try {
-        const KEY = "chunk-reload-at";
+        const KEY = "chunk-recover-at";
         const last = Number(sessionStorage.getItem(KEY) || 0);
-        // 최근 10초 내에 이미 리로드 했으면 또 안 함 (루프 방지)
-        if (Date.now() - last > 10000) {
+        if (Date.now() - last > 15000) {
           sessionStorage.setItem(KEY, String(Date.now()));
-          window.location.reload();
+          // SW 해제 + 캐시 전체 삭제 후 강제 새로고침 (옛 chunk 캐시 완전 제거)
+          const hardReload = () => window.location.reload();
+          const clean = async () => {
+            try {
+              if ("serviceWorker" in navigator) {
+                const regs = await navigator.serviceWorker.getRegistrations();
+                await Promise.all(regs.map((r) => r.unregister()));
+              }
+              if ("caches" in window) {
+                const keys = await caches.keys();
+                await Promise.all(keys.map((k) => caches.delete(k)));
+              }
+            } catch { /* 무시 */ }
+            hardReload();
+          };
+          // 1.5초 안에 정리 안 끝나면 그냥 리로드 (블로킹 방지)
+          const t = setTimeout(hardReload, 1500);
+          clean().finally(() => clearTimeout(t));
         }
       } catch { /* sessionStorage 막힌 환경 무시 */ }
     }
