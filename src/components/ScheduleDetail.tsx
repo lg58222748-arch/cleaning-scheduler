@@ -836,7 +836,7 @@ export default function ScheduleDetail({
               {copiedPostMsgs.size < POST_PAYMENT_MESSAGES.length ? (
                 <>
                   <div className="w-full py-2.5 rounded-xl text-sm font-bold bg-gray-200 text-gray-500 text-center">
-                    📋 5종 메시지 복사 후 선택지 표시 ({copiedPostMsgs.size}/{POST_PAYMENT_MESSAGES.length})
+                    📋 메시지 모두 복사 후 선택지 표시 ({copiedPostMsgs.size}/{POST_PAYMENT_MESSAGES.length})
                   </div>
                   <button
                     onClick={() => setShowPostPaymentModal(false)}
