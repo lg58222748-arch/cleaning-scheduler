@@ -1982,6 +1982,16 @@ export default function Home() {
       )}
       {showSearch && (
         <SearchPanel
+          filterResults={(list) => {
+            // 현장팀만 본인 일정만 검색되게 (달력과 동일 규칙). 관리자/영업팀은 전체.
+            if (role !== "field") return list;
+            return list.filter((s) =>
+              s.memberName === currentUser.name ||
+              s.assignedToName === currentUser.name ||
+              s.assignedTo === currentUser.id ||
+              (myLinkedMember && s.memberId === myLinkedMember.id)
+            );
+          }}
           onSelectSchedule={(s) => {
             setShowSearch(false);
             consumeHash();

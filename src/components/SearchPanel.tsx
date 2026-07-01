@@ -7,9 +7,11 @@ import { searchSchedules } from "@/lib/api";
 interface SearchPanelProps {
   onSelectSchedule: (schedule: Schedule) => void;
   onClose: () => void;
+  // 역할별 필터 — 현장팀은 본인 일정만 검색되게. 없으면 전체 노출.
+  filterResults?: (list: Schedule[]) => Schedule[];
 }
 
-export default function SearchPanel({ onSelectSchedule, onClose }: SearchPanelProps) {
+export default function SearchPanel({ onSelectSchedule, onClose, filterResults }: SearchPanelProps) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<Schedule[]>([]);
   const [loading, setLoading] = useState(false);
@@ -33,7 +35,7 @@ export default function SearchPanel({ onSelectSchedule, onClose }: SearchPanelPr
     timerRef.current = setTimeout(async () => {
       setLoading(true);
       const data = await searchSchedules(q.trim(), withDeleted);
-      setResults(data);
+      setResults(filterResults ? filterResults(data) : data);
       setSearched(true);
       setLoading(false);
     }, 300);
@@ -51,7 +53,7 @@ export default function SearchPanel({ onSelectSchedule, onClose }: SearchPanelPr
     if (query.trim()) {
       setLoading(true);
       searchSchedules(query.trim(), next).then((data) => {
-        setResults(data);
+        setResults(filterResults ? filterResults(data) : data);
         setSearched(true);
         setLoading(false);
       });
