@@ -137,10 +137,15 @@ export async function getSchedulesByRange(start: string, end: string): Promise<S
 
 export async function getUnassignedSchedules(): Promise<Schedule[]> {
   // 자동 페이지네이션
+  // status='unassigned' 뿐 아니라 member_name='미배정' 도 포함한다.
+  // (담당=미배정 인데 status 가 confirmed 로 남은 "고아" 일정이 배정탭에서 누락되던 버그 방지)
   const all: Schedule[] = [];
   const pageSize = 1000;
   for (let offset = 0; offset < 50000; offset += pageSize) {
-    const { data, error } = await supabase.from("schedules").select("*").eq("status", "unassigned").order("date").range(offset, offset + pageSize - 1);
+    const { data, error } = await supabase.from("schedules").select("*")
+      .or("status.eq.unassigned,member_name.eq.미배정")
+      .neq("status", "deleted")
+      .order("date").range(offset, offset + pageSize - 1);
     if (error || !data) break;
     all.push(...data.map(rowToSchedule));
     if (data.length < pageSize) break;
@@ -160,8 +165,12 @@ export async function searchSchedules(query: string, includeDeleted = false): Pr
 }
 
 export async function addSchedule(input: Omit<Schedule, "id" | "status">): Promise<{ schedule?: Schedule; error?: string }> {
+  // 담당자 없이 등록되면(=미배정) status 를 'unassigned' 로 저장해야 배정탭에 뜬다.
+  // 담당자가 있으면 'confirmed'. (confirmed + 미배정 "고아" 일정 생성 방지)
+  const memberName = input.memberName || "미배정";
+  const status = memberName === "미배정" && !input.assignedTo ? "unassigned" : "confirmed";
   const row: Record<string, unknown> = {
-    member_id: input.memberId || "", member_name: input.memberName || "미배정", title: input.title, location: input.location || "", date: input.date, start_time: input.startTime, end_time: input.endTime, status: "confirmed", google_event_id: input.googleEventId || null, note: sanitizeNote(input.note),
+    member_id: input.memberId || "", member_name: memberName, title: input.title, location: input.location || "", date: input.date, start_time: input.startTime, end_time: input.endTime, status, google_event_id: input.googleEventId || null, note: sanitizeNote(input.note),
   };
   if (input.assignedTo) row.assigned_to = input.assignedTo;
   if (input.assignedToName) row.assigned_to_name = input.assignedToName;
