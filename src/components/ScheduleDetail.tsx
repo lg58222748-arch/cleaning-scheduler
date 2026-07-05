@@ -159,6 +159,18 @@ export default function ScheduleDetail({
   };
   const [timeSlot, setTimeSlot] = useState(extractTimeSlot());
 
+  // 배정된 시각(배정탭 → 달력으로 옮겨진 시각) 라벨. 미배정/기록없음이면 빈 문자열.
+  const assignedAtLabel = (() => {
+    if (!schedule.assignedAt || schedule.memberName === "미배정") return "";
+    const d = new Date(schedule.assignedAt);
+    if (isNaN(d.getTime())) return "";
+    return d.toLocaleString("ko-KR", {
+      timeZone: "Asia/Seoul",
+      month: "long", day: "numeric",
+      hour: "numeric", minute: "2-digit",
+    });
+  })();
+
   const SCHEDULE_COLORS = [
     { name: "살몬", value: "#FDDCCC" },
     { name: "하늘", value: "#DBEAFE" },
@@ -538,9 +550,9 @@ export default function ScheduleDetail({
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                   </svg>
                   <span>담당: <span className="font-medium">{schedule.memberName}</span></span>
-                  {timeSlot && (
-                    <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">
-                      {timeSlot}
+                  {assignedAtLabel && (
+                    <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-blue-50 text-blue-600 whitespace-nowrap">
+                      🕐 {assignedAtLabel} 배정
                     </span>
                   )}
                 </div>
@@ -573,17 +585,6 @@ export default function ScheduleDetail({
                     ))}
                   </div>
                 </div>
-
-                {/* 배정 시간 - 오더지(본문)에 명확히 표시 */}
-                {timeSlot && (
-                  <div className="flex items-center gap-3">
-                    <svg className="w-5 h-5 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    <span className="text-xs text-gray-500">배정 시간</span>
-                    <span className="text-sm font-bold px-2.5 py-1 rounded-lg bg-blue-500 text-white">{timeSlot}</span>
-                  </div>
-                )}
 
                 {/* 본문 - 메모장처럼 항상 편집 가능, 화면 꽉 채움 */}
                 <div className="flex items-start gap-3 flex-1">

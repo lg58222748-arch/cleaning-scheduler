@@ -40,7 +40,7 @@ function rowToMember(r: Record<string, unknown>): Member {
   return { id: String(r.id), name: String(r.name), color: String(r.color), phone: String(r.phone || ""), availableDays: (r.available_days as number[]) || [1,2,3,4,5], active: Boolean(r.active), linkedUsername: r.linked_username ? String(r.linked_username) : undefined };
 }
 function rowToSchedule(r: Record<string, unknown>): Schedule {
-  return { id: String(r.id), memberId: String(r.member_id || ""), memberName: String(r.member_name || "미배정"), title: String(r.title), location: String(r.location || ""), date: String(r.date), startTime: String(r.start_time), endTime: String(r.end_time), status: String(r.status) as Schedule["status"], assignedTo: r.assigned_to ? String(r.assigned_to) : undefined, assignedToName: r.assigned_to_name ? String(r.assigned_to_name) : undefined, googleEventId: r.google_event_id ? String(r.google_event_id) : undefined, note: sanitizeNote(r.note as string | null | undefined), color: r.color ? String(r.color) : undefined };
+  return { id: String(r.id), memberId: String(r.member_id || ""), memberName: String(r.member_name || "미배정"), title: String(r.title), location: String(r.location || ""), date: String(r.date), startTime: String(r.start_time), endTime: String(r.end_time), status: String(r.status) as Schedule["status"], assignedTo: r.assigned_to ? String(r.assigned_to) : undefined, assignedToName: r.assigned_to_name ? String(r.assigned_to_name) : undefined, googleEventId: r.google_event_id ? String(r.google_event_id) : undefined, note: sanitizeNote(r.note as string | null | undefined), color: r.color ? String(r.color) : undefined, assignedAt: r.assigned_at ? String(r.assigned_at) : undefined };
 }
 function rowToSwapRequest(r: Record<string, unknown>): SwapRequest {
   return { id: String(r.id), fromScheduleId: String(r.from_schedule_id), toScheduleId: String(r.to_schedule_id), fromMemberId: String(r.from_member_id), toMemberId: String(r.to_member_id), status: String(r.status) as SwapRequest["status"], createdAt: String(r.created_at) };
@@ -255,14 +255,22 @@ export async function assignSchedule(scheduleId: string, memberId: string, membe
   const { data } = await supabase.from("schedules").update({
     assigned_to: memberId, assigned_to_name: memberName, member_id: memberId, member_name: memberName, status: "confirmed",
   }).eq("id", scheduleId).select().single();
-  return data ? rowToSchedule(data) : null;
+  if (!data) return null;
+  // 배정 시각 기록 — 별도 best-effort 업데이트. assigned_at 컬럼이 아직 없어도
+  // 배정 자체는 위에서 이미 성공했으므로 여기 실패는 조용히 무시 (배정은 절대 안 깨지게).
+  const nowIso = new Date().toISOString();
+  const { error: tsErr } = await supabase.from("schedules").update({ assigned_at: nowIso }).eq("id", scheduleId);
+  return rowToSchedule(tsErr ? data : { ...data, assigned_at: nowIso });
 }
 
 export async function unassignSchedule(scheduleId: string): Promise<Schedule | null> {
   const { data } = await supabase.from("schedules").update({
     assigned_to: null, assigned_to_name: null, member_id: "", member_name: "미배정", status: "unassigned",
   }).eq("id", scheduleId).select().single();
-  return data ? rowToSchedule(data) : null;
+  if (!data) return null;
+  // 미배정으로 되돌리면 배정 시각도 초기화 (best-effort, 컬럼 없으면 무시)
+  await supabase.from("schedules").update({ assigned_at: null }).eq("id", scheduleId);
+  return rowToSchedule({ ...data, assigned_at: null });
 }
 
 export async function updateSchedule(id: string, input: Partial<Schedule>): Promise<Schedule | null> {

@@ -871,7 +871,7 @@ export default function Home() {
     setUnassignedSchedules((prev) => prev.filter((s) => s.id !== scheduleId));
     setSchedules((prev) => {
       const idx = prev.findIndex((s) => s.id === scheduleId);
-      const assigned = { ...target, memberId, memberName, status: "confirmed" as const };
+      const assigned = { ...target, memberId, memberName, status: "confirmed" as const, assignedAt: new Date().toISOString() };
       if (idx >= 0) {
         const next = [...prev];
         next[idx] = assigned;
@@ -1932,7 +1932,7 @@ export default function Home() {
               // 중복 방지: 같은 scheduleId 가 이미 있으면 덮어쓰고, 없을 때만 추가
               setSchedules((prev) => {
                 const idx = prev.findIndex((s) => s.id === scheduleId);
-                const assigned = { ...target, memberId, memberName, status: "confirmed" as const };
+                const assigned = { ...target, memberId, memberName, status: "confirmed" as const, assignedAt: new Date().toISOString() };
                 if (idx >= 0) {
                   const next = [...prev];
                   next[idx] = assigned;
