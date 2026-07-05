@@ -538,6 +538,11 @@ export default function ScheduleDetail({
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                   </svg>
                   <span>담당: <span className="font-medium">{schedule.memberName}</span></span>
+                  {timeSlot && (
+                    <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">
+                      {timeSlot}
+                    </span>
+                  )}
                 </div>
 
                 {/* 위치 */}
