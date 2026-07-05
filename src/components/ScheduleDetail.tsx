@@ -574,6 +574,17 @@ export default function ScheduleDetail({
                   </div>
                 </div>
 
+                {/* 배정 시간 - 오더지(본문)에 명확히 표시 */}
+                {timeSlot && (
+                  <div className="flex items-center gap-3">
+                    <svg className="w-5 h-5 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span className="text-xs text-gray-500">배정 시간</span>
+                    <span className="text-sm font-bold px-2.5 py-1 rounded-lg bg-blue-500 text-white">{timeSlot}</span>
+                  </div>
+                )}
+
                 {/* 본문 - 메모장처럼 항상 편집 가능, 화면 꽉 채움 */}
                 <div className="flex items-start gap-3 flex-1">
                   <svg className="w-5 h-5 text-gray-400 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
