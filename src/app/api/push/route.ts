@@ -173,5 +173,25 @@ export async function POST(req: NextRequest) {
     });
   }
 
+  // 진단용: 프로덕션 푸시 설정(FCM/VAPID) 존재 여부만 확인 (값/비밀 노출 없음, 읽기 전용)
+  if (body.action === "config-check") {
+    const raw = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
+    let fcmConfigured = false;
+    let fcmReason = "env 없음";
+    if (raw) {
+      try {
+        const p = JSON.parse(raw);
+        fcmConfigured = !!(p.client_email && p.private_key && p.project_id);
+        fcmReason = fcmConfigured ? "정상" : "필수 필드 누락";
+      } catch {
+        fcmReason = "JSON 파싱 실패";
+      }
+    }
+    return Response.json({
+      fcm_apk: { configured: fcmConfigured, reason: fcmReason },
+      webpush_browser: { configured: !!(process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) },
+    });
+  }
+
   return Response.json({ error: "Invalid action" }, { status: 400 });
 }
