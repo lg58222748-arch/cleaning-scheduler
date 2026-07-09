@@ -60,6 +60,19 @@ export async function fetchSchedules(start?: string, end?: string): Promise<Sche
   return safeJson(`${BASE}/api/schedules${params}`, []);
 }
 
+// 배경 리로드 전용: 네트워크/HTTP 실패 시 null 반환 → 호출부가 기존 일정을 빈배열로
+// 덮어쓰지 않게 함. 정상 응답이면 [] 도 그대로(진짜 빈 결과). 폰에서 신호 끊길 때
+// 일정이 통째로 사라졌다 돌아오던 버그의 근본 방지.
+export async function fetchSchedulesOrNull(start?: string, end?: string): Promise<Schedule[] | null> {
+  const params = start && end ? `?start=${start}&end=${end}` : "";
+  try {
+    const res = await safeFetch(`${BASE}/api/schedules${params}`);
+    return await res.json();
+  } catch {
+    return null;
+  }
+}
+
 export async function searchSchedules(query: string, includeDeleted = false): Promise<Schedule[]> {
   const delParam = includeDeleted ? "&includeDeleted=true" : "";
   return safeJson(`${BASE}/api/schedules?q=${encodeURIComponent(query)}${delParam}`, []);
@@ -114,6 +127,16 @@ export async function createSchedule(data: Omit<Schedule, "id" | "status">): Pro
 
 export async function fetchUnassignedSchedules(): Promise<Schedule[]> {
   return safeJson(`${BASE}/api/schedules?unassigned=true`, []);
+}
+
+// 배경 리로드 전용: 실패 시 null (기존 미배정 목록 유지). fetchSchedulesOrNull 과 동일 취지.
+export async function fetchUnassignedSchedulesOrNull(): Promise<Schedule[] | null> {
+  try {
+    const res = await safeFetch(`${BASE}/api/schedules?unassigned=true`);
+    return await res.json();
+  } catch {
+    return null;
+  }
 }
 
 export async function assignScheduleApi(scheduleId: string, memberId: string, memberName: string): Promise<Schedule> {

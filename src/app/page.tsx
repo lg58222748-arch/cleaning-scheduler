@@ -25,8 +25,8 @@ import {
   createMember,
   updateMember as apiUpdateMember,
   deleteMember as apiDeleteMember,
-  fetchSchedules,
-  fetchUnassignedSchedules,
+  fetchSchedulesOrNull,
+  fetchUnassignedSchedulesOrNull,
   createSchedule,
   updateSchedule as apiUpdateSchedule,
   softDeleteSchedule,
@@ -185,8 +185,8 @@ export default function Home() {
       if (fullRefresh) {
         const [m, rangeScheds, unassignedScheds, sw, notif, usersData] = await Promise.all([
           fetchMembers(),
-          fetchSchedules(start, end),
-          fetchUnassignedSchedules(),
+          fetchSchedulesOrNull(start, end),
+          fetchUnassignedSchedulesOrNull(),
           fetchSwapRequests(),
           fetchNotifications(),
           fetchUsers(),
@@ -194,10 +194,11 @@ export default function Home() {
         // stale 응답이면 schedule 관련은 덮어쓰지 않음 (월 이동 race)
         const isStale = seq !== loadSeqRef.current;
         setMembers(m);
-        // 일정 액션 중이거나 stale 이면 schedule 덮어쓰지 않음
+        // 일정 액션 중이거나 stale 이면 schedule 덮어쓰지 않음.
+        // rangeScheds/unassignedScheds 가 null 이면 fetch 실패 → 기존 데이터 유지(빈배열로 덮어쓰지 않음)
         if (!isStale && Date.now() >= scheduleReloadSuppressRef.current) {
-          setSchedules(rangeScheds);
-          setUnassignedSchedules(unassignedScheds);
+          if (rangeScheds) setSchedules(rangeScheds);
+          if (unassignedScheds) setUnassignedSchedules(unassignedScheds);
         }
         setSwapRequests(sw);
         // 알림 액션(모두읽음/지우기) 직후엔 loadData 결과로 덮어쓰지 않음 (깜빡임 방지)
@@ -245,19 +246,23 @@ export default function Home() {
             const todayMs = Date.now();
             const minMs = todayMs - 31 * 24 * 60 * 60 * 1000;
             const maxMs = todayMs + 93 * 24 * 60 * 60 * 1000;
-            const trimmed = rangeScheds.filter((s) => {
-              const t = Date.parse(s.date);
-              return !Number.isNaN(t) && t >= minMs && t <= maxMs;
-            });
-            localStorage.setItem("cached_schedules", JSON.stringify(trimmed));
+            // fetch 실패(null)면 캐시도 건드리지 않음 — 기존 캐시 보존
+            if (rangeScheds) {
+              const trimmed = rangeScheds.filter((s) => {
+                const t = Date.parse(s.date);
+                return !Number.isNaN(t) && t >= minMs && t <= maxMs;
+              });
+              localStorage.setItem("cached_schedules", JSON.stringify(trimmed));
+            }
             // 미배정 일정도 캐시 — 배정탭 진입 시 즉시 표시
-            localStorage.setItem("cached_unassigned", JSON.stringify(unassignedScheds));
+            if (unassignedScheds) localStorage.setItem("cached_unassigned", JSON.stringify(unassignedScheds));
           } catch {}
         }, 0);
       } else {
-        const rangeScheds = await fetchSchedules(start, end);
+        const rangeScheds = await fetchSchedulesOrNull(start, end);
         if (seq !== loadSeqRef.current) return; // stale 응답 무시
-        if (Date.now() >= scheduleReloadSuppressRef.current) {
+        // null 이면 fetch 실패 → 기존 일정 유지(빈배열로 안 지움)
+        if (rangeScheds && Date.now() >= scheduleReloadSuppressRef.current) {
           setSchedules(rangeScheds);
         }
       }
@@ -447,15 +452,15 @@ export default function Home() {
       const start = format(startOfMonth(subMonths(d, 3)), "yyyy-MM-dd");
       const end = format(endOfMonth(addMonths(d, 3)), "yyyy-MM-dd");
       const seq = ++loadSeqRef.current;
-      fetchSchedules(start, end).then(s => {
+      fetchSchedulesOrNull(start, end).then(s => {
         if (seq !== loadSeqRef.current) return; // 더 최근 fetch 가 있으면 stale 응답 버림
         if (Date.now() < scheduleReloadSuppressRef.current) return;
-        setSchedules(s);
+        if (s) setSchedules(s); // null(실패) 이면 기존 일정 유지
       }).catch(() => {});
-      fetchUnassignedSchedules().then(s => {
+      fetchUnassignedSchedulesOrNull().then(s => {
         // unassigned 는 월 범위 안 타므로 seq 가드 생략
         if (Date.now() < scheduleReloadSuppressRef.current) return;
-        setUnassignedSchedules(s);
+        if (s) setUnassignedSchedules(s); // null(실패) 이면 기존 유지
       }).catch(() => {});
     }
     function reloadNotifications() {
