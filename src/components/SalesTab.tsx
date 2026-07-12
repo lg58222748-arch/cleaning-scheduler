@@ -109,11 +109,16 @@ function wishDateToISO(wish: string): string {
   const month = parseInt(m[1], 10);
   const day = parseInt(m[2], 10);
   if (month < 1 || month > 12 || day < 1 || day > 31) return "";
+  // 년도 미기재 → '현재 년도' 기준. 예전엔 candidate < now 이면 무조건 다음 해로 넘겨서
+  // (예: 7월에 '5월 5일' 입력 → 2027-05-05) 27년으로 잘못 저장되는 문제가 있었음.
+  // 이제 기본은 올해로 고정하고, 6개월 넘게 과거인 날짜만 연말→연초 경계로 보고 +1년.
+  // (예: 12월에 '1월 3일' → 내년 1월. / 7월에 '5월 5일' → 올해 5월.)
   const now = new Date();
-  let year = now.getFullYear();
+  const year = now.getFullYear();
   const candidate = new Date(year, month - 1, day);
-  if (candidate < now) year++;
-  return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+  const sixMonthsAgo = new Date(year, now.getMonth() - 6, now.getDate());
+  const finalYear = candidate < sixMonthsAgo ? year + 1 : year;
+  return `${finalYear}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 }
 
 // 유연한 필드 탐지 — 번호(1/2/3..) 위치가 다르거나 빠져도 라벨/내용 패턴으로 추출.
