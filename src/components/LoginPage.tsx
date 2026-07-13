@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { loginApi, registerApi } from "@/lib/api";
 import { User } from "@/types";
 
@@ -39,25 +39,41 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
   const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState(false);
 
-  // Daum 우편번호 팝업 — 한국 주소 표준 (도로명/지번 자동 채움)
+  // Daum 우편번호 — 모바일 앱(WebView)에서 .open() 팝업은 결과 클릭이 안 먹혀서
+  // 창만 떠 있는 문제가 있음. 그래서 페이지 안에 삽입하는 embed 방식으로 변경.
+  const [showAddrModal, setShowAddrModal] = useState(false);
+  const addrEmbedRef = useRef<HTMLDivElement | null>(null);
+
+  type DaumWin = { daum?: { Postcode: new (opts: {
+    oncomplete: (data: { roadAddress?: string; jibunAddress?: string; zonecode?: string }) => void;
+    width?: string; height?: string;
+  }) => { embed: (el: HTMLElement) => void } } };
+
+  // 모달이 열리면 컨테이너에 우편번호 검색 UI 를 embed
+  useEffect(() => {
+    if (!showAddrModal) return;
+    const W = window as unknown as DaumWin;
+    const el = addrEmbedRef.current;
+    if (!W.daum?.Postcode || !el) return;
+    el.innerHTML = ""; // 재열기 시 중복 렌더 방지
+    new W.daum.Postcode({
+      oncomplete: (data) => {
+        setAddress(data.roadAddress || data.jibunAddress || "");
+        setShowAddrModal(false); // 선택 즉시 닫힘
+      },
+      width: "100%",
+      height: "100%",
+    }).embed(el);
+  }, [showAddrModal]);
+
   function openAddressSearch() {
-    const run = () => {
-      const W = window as unknown as { daum?: { Postcode: new (opts: { oncomplete: (data: { roadAddress?: string; jibunAddress?: string; zonecode?: string }) => void }) => { open: () => void } } };
-      if (!W.daum?.Postcode) return;
-      new W.daum.Postcode({
-        oncomplete: (data) => {
-          const addr = data.roadAddress || data.jibunAddress || "";
-          setAddress(addr);
-        },
-      }).open();
-    };
     const W = window as unknown as { daum?: unknown };
-    if (W.daum) { run(); return; }
+    if (W.daum) { setShowAddrModal(true); return; }
     // 동적 로드 — 회원가입 안 들어가는 사람은 다운로드 안 함
     const script = document.createElement("script");
     script.src = "//t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js";
     script.async = true;
-    script.onload = run;
+    script.onload = () => setShowAddrModal(true);
     document.body.appendChild(script);
   }
 
@@ -307,6 +323,26 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
                   {address || "🔍 주소 검색 (탭하세요)"}
                 </button>
               </div>
+              {/* 주소 검색 모달 — embed 방식 (모바일 앱에서 팝업 클릭 안 먹는 문제 해결) */}
+              {showAddrModal && (
+                <div
+                  className="fixed inset-0 z-[70] bg-black/40 flex items-end sm:items-center justify-center"
+                  onClick={() => setShowAddrModal(false)}
+                  style={{ paddingTop: "env(safe-area-inset-top, 0px)" }}
+                >
+                  <div
+                    className="bg-white w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl overflow-hidden flex flex-col"
+                    style={{ maxHeight: "88vh" }}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 shrink-0">
+                      <span className="font-bold text-gray-800">주소 검색</span>
+                      <button type="button" onClick={() => setShowAddrModal(false)} className="p-1.5 text-gray-500 active:bg-gray-100 rounded-lg text-lg leading-none">✕</button>
+                    </div>
+                    <div ref={addrEmbedRef} style={{ height: "70vh" }} className="w-full" />
+                  </div>
+                </div>
+              )}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">상세 주소</label>
                 <input
