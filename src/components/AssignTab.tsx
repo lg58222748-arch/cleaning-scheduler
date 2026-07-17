@@ -108,6 +108,12 @@ function AssignTab({ members, schedules, onAssigned, onDeleted, onOpenDetail, on
       existing.push(s);
       map.set(s.date, existing);
     }
+    // 미입금(배정불가) 건은 각 날짜의 맨 위로 — 달력 칸은 2개까지만 보이므로
+    // 먼저 처리해야 할 미입금이 "+N" 에 숨지 않게 함. 날짜 팝업 목록에도 동일 적용.
+    const isUnpaid = (s: Schedule) => s.title.includes("/미입금");
+    for (const list of map.values()) {
+      list.sort((a, b) => Number(isUnpaid(b)) - Number(isUnpaid(a)));
+    }
     return map;
   }, [unassigned]);
 
