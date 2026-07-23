@@ -1245,12 +1245,72 @@ function SalesStatsSection({ userName, userRole, schedules, unassignedSchedules 
     }).sort((a, b) => (a.date < b.date ? -1 : 1));
   }, [schedules, unassignedSchedules, isCeo, userName]);
 
+  // 이번달 현황 — 일정 날짜(청소 날짜) 기준.
+  // schedules 테이블에 생성일 컬럼이 없어 '접수 시점' 기준 집계는 불가.
+  const monthStats = useMemo(() => {
+    const now = new Date();
+    const ym = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+    // 휴무/마감 같은 블로커는 고객 건이 아니므로 제외
+    const isBlocker = (t: string) => /^(휴무|마감)$/.test(t.replace(/^\[.+?\]\s*/, "").trim());
+    const seen = new Set<string>();
+    const inMonth = [...schedules, ...unassignedSchedules].filter((s) => {
+      if (seen.has(s.id)) return false;
+      seen.add(s.id);
+      return s.date.startsWith(ym) && !isBlocker(s.title);
+    });
+    // 영업 role 은 본인 명의 건만 (미입금 목록과 동일 규칙)
+    const mine = isCeo ? inMonth : inMonth.filter((s) => {
+      const title = s.title.replace(/^\[.+?\]\s*/, "");
+      return (
+        title.includes(`/${userName}/`) ||
+        title.includes(`/${userName}[`) ||
+        title.endsWith(`/${userName}`) ||
+        title.startsWith(`u${userName}/`)
+      );
+    });
+    const unassignedCnt = mine.filter((s) => s.status === "unassigned" || s.memberName === "미배정").length;
+    return {
+      label: `${now.getFullYear()}년 ${now.getMonth() + 1}월`,
+      total: mine.length,
+      assigned: mine.length - unassignedCnt,
+      unassigned: unassignedCnt,
+      unpaid: mine.filter((s) => isUnpaid(s.title)).length,
+    };
+  }, [schedules, unassignedSchedules, isCeo, userName]);
+
   return (
     <div className="px-4 py-4 space-y-3">
       {/* 헤더 */}
       <div className="text-center">
         <div className="mt-1 text-2xl font-extrabold text-gray-800">
           미입금 <span className="text-red-500">{unpaidSchedules.length}</span>건
+        </div>
+      </div>
+
+      {/* 이번달 현황 통계표 */}
+      <div className="rounded-xl border border-gray-200 bg-white overflow-hidden">
+        <div className="px-3 py-2 border-b border-gray-100 flex items-center justify-between">
+          <span className="text-xs font-bold text-gray-700">
+            {monthStats.label} 일정 {isCeo ? "(전체)" : "(내 건)"}
+          </span>
+          <span className="text-sm font-extrabold text-blue-600">{monthStats.total}건</span>
+        </div>
+        <div className="grid grid-cols-3 divide-x divide-gray-100">
+          <div className="px-2 py-3 text-center">
+            <div className="text-lg font-extrabold text-gray-800">{monthStats.assigned}</div>
+            <div className="text-[10px] text-gray-500 mt-0.5">배정완료</div>
+          </div>
+          <div className="px-2 py-3 text-center">
+            <div className="text-lg font-extrabold text-orange-500">{monthStats.unassigned}</div>
+            <div className="text-[10px] text-gray-500 mt-0.5">미배정</div>
+          </div>
+          <div className="px-2 py-3 text-center">
+            <div className="text-lg font-extrabold text-purple-500">{monthStats.unpaid}</div>
+            <div className="text-[10px] text-gray-500 mt-0.5">미입금</div>
+          </div>
+        </div>
+        <div className="px-3 py-1.5 border-t border-gray-100 text-[10px] text-gray-400 text-center">
+          청소 날짜 기준 · 배정완료+미배정=전체 · 미입금은 미배정에 포함 · 휴무/마감 제외
         </div>
       </div>
 
