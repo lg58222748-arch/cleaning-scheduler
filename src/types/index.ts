@@ -24,6 +24,7 @@ export interface Schedule {
   note?: string;
   color?: string; // 일정 색상 (#FDDCCC, #DBEAFE, #D1FAE5, #E9D5FF, #FEF3C7)
   assignedAt?: string; // 배정탭 → 달력으로 배정된 시각 (ISO). 미배정이면 없음
+  createdAt?: string; // 일정이 등록(영업 파싱→배정으로 넘김)된 시각 (ISO). 과거 건은 없음
 }
 
 export interface SwapRequest {

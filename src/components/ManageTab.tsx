@@ -1269,12 +1269,34 @@ function SalesStatsSection({ userName, userRole, schedules, unassignedSchedules 
       );
     });
     const unassignedCnt = mine.filter((s) => s.status === "unassigned" || s.memberName === "미배정").length;
+
+    // 영업 등록(영업 파싱 → 배정으로 넘긴) 건수 — created_at 이 이번달인 것.
+    // 청소 날짜와 무관하게 '등록 시점' 기준이므로 전체 일정에서 다시 집계한다.
+    const seen2 = new Set<string>();
+    const registered = [...schedules, ...unassignedSchedules].filter((s) => {
+      if (seen2.has(s.id)) return false;
+      seen2.add(s.id);
+      if (!s.createdAt || isBlocker(s.title)) return false;
+      const c = new Date(s.createdAt);
+      if (isNaN(c.getTime())) return false;
+      if (c.getFullYear() !== now.getFullYear() || c.getMonth() !== now.getMonth()) return false;
+      if (isCeo) return true;
+      const title = s.title.replace(/^\[.+?\]\s*/, "");
+      return (
+        title.includes(`/${userName}/`) ||
+        title.includes(`/${userName}[`) ||
+        title.endsWith(`/${userName}`) ||
+        title.startsWith(`u${userName}/`)
+      );
+    }).length;
+
     return {
       label: `${now.getFullYear()}년 ${now.getMonth() + 1}월`,
       total: mine.length,
       assigned: mine.length - unassignedCnt,
       unassigned: unassignedCnt,
       unpaid: mine.filter((s) => isUnpaid(s.title)).length,
+      registered,
     };
   }, [schedules, unassignedSchedules, isCeo, userName]);
 
@@ -1289,11 +1311,21 @@ function SalesStatsSection({ userName, userRole, schedules, unassignedSchedules 
 
       {/* 이번달 현황 통계표 */}
       <div className="rounded-xl border border-gray-200 bg-white overflow-hidden">
+        {/* 영업 등록 = 영업 파싱 → 배정으로 넘긴 건수 (등록 시점 기준) */}
+        <div className="px-3 py-3 bg-blue-50 border-b border-blue-100 flex items-center justify-between">
+          <div>
+            <div className="text-xs font-bold text-blue-800">
+              {monthStats.label} 영업 등록 {isCeo ? "(전체)" : "(내 건)"}
+            </div>
+            <div className="text-[10px] text-blue-500 mt-0.5">배정으로 넘긴 신규 건수</div>
+          </div>
+          <span className="text-2xl font-extrabold text-blue-600">{monthStats.registered}건</span>
+        </div>
         <div className="px-3 py-2 border-b border-gray-100 flex items-center justify-between">
           <span className="text-xs font-bold text-gray-700">
-            {monthStats.label} 일정 {isCeo ? "(전체)" : "(내 건)"}
+            {monthStats.label} 청소일 기준 {isCeo ? "(전체)" : "(내 건)"}
           </span>
-          <span className="text-sm font-extrabold text-blue-600">{monthStats.total}건</span>
+          <span className="text-sm font-extrabold text-gray-700">{monthStats.total}건</span>
         </div>
         <div className="grid grid-cols-3 divide-x divide-gray-100">
           <div className="px-2 py-3 text-center">
@@ -1309,8 +1341,9 @@ function SalesStatsSection({ userName, userRole, schedules, unassignedSchedules 
             <div className="text-[10px] text-gray-500 mt-0.5">미입금</div>
           </div>
         </div>
-        <div className="px-3 py-1.5 border-t border-gray-100 text-[10px] text-gray-400 text-center">
-          청소 날짜 기준 · 배정완료+미배정=전체 · 미입금은 미배정에 포함 · 휴무/마감 제외
+        <div className="px-3 py-1.5 border-t border-gray-100 text-[10px] text-gray-400 text-center leading-relaxed">
+          영업 등록 = 등록 시각 기준(2026-07-13 이후 집계 시작)<br />
+          아래 3칸은 청소 날짜 기준 · 미입금은 미배정에 포함 · 휴무/마감 제외
         </div>
       </div>
 
