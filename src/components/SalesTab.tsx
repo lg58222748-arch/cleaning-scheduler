@@ -27,6 +27,18 @@ interface ParsedSchedule {
   time: string;
 }
 
+/**
+ * 지역별 예약금 가산금 (calcAutoDeposit 참고)
+ *   - 수도권/기본: +20,000원 (기본값)
+ *   - 부산/대구/울산: +10,000원
+ * 지역이 다르면 입주청소·거주청소·인테리어청소·사이청소·외부유리창 카테고리의 예약금 자동 계산이 달라짐.
+ */
+export type SalesRegion = "default" | "south";  // south = 부산·대구·울산
+export const REGION_DEPOSIT_ADDON: Record<SalesRegion, number> = {
+  default: 20000,
+  south: 10000,
+};
+
 interface FormSession {
   id: string;
   name: string;
@@ -37,6 +49,7 @@ interface FormSession {
   salesNote: string;
   copied: Set<string>;
   formText: string; // 양식 미리보기 편집 텍스트 (빈값이면 auto-generate)
+  region: SalesRegion; // 지역 (예약금 가산금 결정)
 }
 
 interface ConfirmSession {
@@ -246,7 +259,7 @@ function detectFields(text: string, seed: { name?: string; phone?: string; addr?
 }
 
 function makeFormSession(name: string): FormSession {
-  return { id: "f-" + Date.now() + "-" + Math.random().toString(36).slice(2, 6), name, services: [], pyeong: "", buildType: "선택", pyeongNote: "", salesNote: "", copied: new Set(), formText: "" };
+  return { id: "f-" + Date.now() + "-" + Math.random().toString(36).slice(2, 6), name, services: [], pyeong: "", buildType: "선택", pyeongNote: "", salesNote: "", copied: new Set(), formText: "", region: "default" };
 }
 
 function makeConfirmSession(name: string): ConfirmSession {
@@ -445,11 +458,12 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
     setServices((prev) => prev.filter((s) => s.name !== name));
   }
 
-  function calcAutoDeposit(svcName: string, quote: number): number | null {
+  function calcAutoDeposit(svcName: string, quote: number, region: SalesRegion = activeForm.region): number | null {
     // ALL_SERVICES 의 '에어컨청소(완전분해)' 같은 변형 이름도 매칭되도록 includes 사용
     const highGroup = ["입주청소", "거주청소", "인테리어청소", "사이청소", "외부유리창"];
     const lowGroup = ["줄눈시공", "탄성코트", "에어컨청소", "나노코팅", "상판코팅"];
-    if (highGroup.some((h) => svcName.includes(h)) && quote > 0) return Math.ceil(((quote - 10000) * 0.24 + 20000) / 10000) * 10000;
+    const addon = REGION_DEPOSIT_ADDON[region]; // 수도권 20000 / 부산·대구·울산 10000
+    if (highGroup.some((h) => svcName.includes(h)) && quote > 0) return Math.ceil(((quote - 10000) * 0.24 + addon) / 10000) * 10000;
     if (svcName.includes("새집증후군") && quote > 0) return Math.ceil((quote * 0.2) / 10000) * 10000;
     if (lowGroup.some((l) => svcName.includes(l)) && quote > 0) return Math.ceil((quote * 0.1) / 10000) * 10000;
     return null;
@@ -464,6 +478,18 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
       }
       return { ...s, [field]: value };
     }));
+  }
+
+  /** 지역 변경 시 기존 견적금액이 있는 서비스들의 예약금을 재계산 (사용자가 다시 입력 안 해도 됨). */
+  function changeRegion(nextRegion: SalesRegion) {
+    if (nextRegion === activeForm.region) return;
+    const recalculated = activeForm.services.map((s) => {
+      const qNum = parseInt(s.quote) || 0;
+      if (qNum <= 0) return s;
+      const auto = calcAutoDeposit(s.name, qNum, nextRegion);
+      return auto !== null ? { ...s, deposit: String(auto) } : s;
+    });
+    updateForm({ region: nextRegion, services: recalculated });
   }
 
   function getBalance(s: ServiceEntry) {
@@ -1103,6 +1129,42 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
         {/* 양식발송은 단일 세션 — 탭 바 제거. 파싱할 때마다 자동 초기화되어 다음 고객에 재사용. */}
         <div className="p-3 flex flex-col md:flex-row md:gap-6">
         <div className="space-y-3 md:flex-1">
+          {/* 지역 선택 (예약금 가산금 결정 — 수도권 +20,000 / 부산·대구·울산 +10,000) */}
+          <div>
+            <label className="text-xs font-bold text-green-700 mb-2 block">
+              지역 <span className="text-gray-400 font-normal">(예약금 가산금 결정)</span>
+            </label>
+            <div className="flex gap-2">
+              {([
+                { key: "default" as SalesRegion, label: "수도권 · 기타", addon: 20000 },
+                { key: "south" as SalesRegion, label: "부산 · 대구 · 울산", addon: 10000 },
+              ]).map((opt) => {
+                const selected = activeForm.region === opt.key;
+                return (
+                  <button
+                    key={opt.key}
+                    type="button"
+                    onClick={() => changeRegion(opt.key)}
+                    className={`flex-1 px-3 py-2 rounded-lg border text-xs font-bold transition-colors ${
+                      selected
+                        ? "bg-green-700 text-white border-green-700"
+                        : "bg-white text-gray-600 border-gray-200 active:bg-gray-50"
+                    }`}
+                  >
+                    <div>{opt.label}</div>
+                    <div
+                      className={`text-[10px] mt-0.5 font-medium ${
+                        selected ? "text-green-100" : "text-gray-400"
+                      }`}
+                    >
+                      예약금 +{opt.addon.toLocaleString()}원
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
           {/* 서비스 선택 (복수) */}
           <div>
             <label className="text-xs font-bold text-green-700 mb-2 block">서비스 종류 (복수 선택 가능)</label>
