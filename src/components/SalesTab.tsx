@@ -1129,42 +1129,6 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
         {/* 양식발송은 단일 세션 — 탭 바 제거. 파싱할 때마다 자동 초기화되어 다음 고객에 재사용. */}
         <div className="p-3 flex flex-col md:flex-row md:gap-6">
         <div className="space-y-3 md:flex-1">
-          {/* 지역 선택 (예약금 가산금 결정 — 수도권 +20,000 / 부산·대구·울산 +10,000) */}
-          <div>
-            <label className="text-xs font-bold text-green-700 mb-2 block">
-              지역 <span className="text-gray-400 font-normal">(예약금 가산금 결정)</span>
-            </label>
-            <div className="flex gap-2">
-              {([
-                { key: "default" as SalesRegion, label: "수도권 · 기타", addon: 20000 },
-                { key: "south" as SalesRegion, label: "부산 · 대구 · 울산", addon: 10000 },
-              ]).map((opt) => {
-                const selected = activeForm.region === opt.key;
-                return (
-                  <button
-                    key={opt.key}
-                    type="button"
-                    onClick={() => changeRegion(opt.key)}
-                    className={`flex-1 px-3 py-2 rounded-lg border text-xs font-bold transition-colors ${
-                      selected
-                        ? "bg-green-700 text-white border-green-700"
-                        : "bg-white text-gray-600 border-gray-200 active:bg-gray-50"
-                    }`}
-                  >
-                    <div>{opt.label}</div>
-                    <div
-                      className={`text-[10px] mt-0.5 font-medium ${
-                        selected ? "text-green-100" : "text-gray-400"
-                      }`}
-                    >
-                      예약금 +{opt.addon.toLocaleString()}원
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
           {/* 서비스 선택 (복수) */}
           <div>
             <label className="text-xs font-bold text-green-700 mb-2 block">서비스 종류 (복수 선택 가능)</label>
@@ -1245,6 +1209,31 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
                 </div>
               </div>
             ))}
+
+            {/* 지역별 예약금 가산금 (컴팩트) — 부산·대구·울산은 +1만, 그 외 +2만 */}
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-[11px] text-gray-400 shrink-0">지역별 예약금</span>
+              {([
+                { key: "default" as SalesRegion, label: "수도권 +2만" },
+                { key: "south" as SalesRegion, label: "부산·대구·울산 +1만" },
+              ]).map((opt) => {
+                const selected = activeForm.region === opt.key;
+                return (
+                  <button
+                    key={opt.key}
+                    type="button"
+                    onClick={() => changeRegion(opt.key)}
+                    className={`px-2 py-1 rounded-md border text-[11px] font-bold transition-colors ${
+                      selected
+                        ? "bg-green-700 text-white border-green-700"
+                        : "bg-white text-gray-500 border-gray-200 active:bg-gray-50"
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
           {/* 상담사 특이사항 */}
