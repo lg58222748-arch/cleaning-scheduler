@@ -1182,6 +1182,31 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
                 style={{ fontSize: "12px" }} className="w-full px-3 py-2 border border-gray-200 rounded-lg outline-none focus:border-green-500" />
             </div>
 
+            {/* 지역별 예약금 가산금 (컴팩트) — 부산·대구·울산은 +1만, 그 외 +2만. 견적금액 위. */}
+            <div className="flex items-center gap-2 flex-wrap mb-3">
+              <span className="text-[11px] text-gray-400 shrink-0">지역별 예약금</span>
+              {([
+                { key: "default" as SalesRegion, label: "수도권 +2만" },
+                { key: "south" as SalesRegion, label: "부산·대구·울산 +1만" },
+              ]).map((opt) => {
+                const selected = activeForm.region === opt.key;
+                return (
+                  <button
+                    key={opt.key}
+                    type="button"
+                    onClick={() => changeRegion(opt.key)}
+                    className={`px-2 py-1 rounded-md border text-[11px] font-bold transition-colors ${
+                      selected
+                        ? "bg-green-700 text-white border-green-700"
+                        : "bg-white text-gray-500 border-gray-200 active:bg-gray-50"
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                );
+              })}
+            </div>
+
             {/* 서비스별 견적 */}
             {services.map((s, i) => (
               <div key={s.name} className="border border-gray-200 rounded-xl p-3 mb-2">
@@ -1209,31 +1234,6 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
                 </div>
               </div>
             ))}
-
-            {/* 지역별 예약금 가산금 (컴팩트) — 부산·대구·울산은 +1만, 그 외 +2만 */}
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-[11px] text-gray-400 shrink-0">지역별 예약금</span>
-              {([
-                { key: "default" as SalesRegion, label: "수도권 +2만" },
-                { key: "south" as SalesRegion, label: "부산·대구·울산 +1만" },
-              ]).map((opt) => {
-                const selected = activeForm.region === opt.key;
-                return (
-                  <button
-                    key={opt.key}
-                    type="button"
-                    onClick={() => changeRegion(opt.key)}
-                    className={`px-2 py-1 rounded-md border text-[11px] font-bold transition-colors ${
-                      selected
-                        ? "bg-green-700 text-white border-green-700"
-                        : "bg-white text-gray-500 border-gray-200 active:bg-gray-50"
-                    }`}
-                  >
-                    {opt.label}
-                  </button>
-                );
-              })}
-            </div>
           </div>
 
           {/* 상담사 특이사항 */}
