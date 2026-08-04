@@ -460,9 +460,11 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
 
   function calcAutoDeposit(svcName: string, quote: number, region: SalesRegion = activeForm.region): number | null {
     // ALL_SERVICES 의 '에어컨청소(완전분해)' 같은 변형 이름도 매칭되도록 includes 사용
-    const highGroup = ["입주청소", "거주청소", "인테리어청소", "사이청소", "외부유리창"];
+    const highGroup = ["입주청소", "거주청소", "인테리어청소", "사이청소"]; // 외부유리창은 별도 처리(가산금 없음)
     const lowGroup = ["줄눈시공", "탄성코트", "에어컨청소", "나노코팅", "상판코팅"];
     const addon = REGION_DEPOSIT_ADDON[region]; // 수도권 20000 / 부산·대구·울산 10000
+    // 외부유리창: 지역 가산금·기본액 없이 그냥 견적 × 24% → 만원 올림
+    if (svcName.includes("외부유리창") && quote > 0) return Math.ceil((quote * 0.24) / 10000) * 10000;
     if (highGroup.some((h) => svcName.includes(h)) && quote > 0) return Math.ceil(((quote - 10000) * 0.24 + addon) / 10000) * 10000;
     if (svcName.includes("새집증후군") && quote > 0) return Math.ceil((quote * 0.2) / 10000) * 10000;
     if (lowGroup.some((l) => svcName.includes(l)) && quote > 0) return Math.ceil((quote * 0.1) / 10000) * 10000;
