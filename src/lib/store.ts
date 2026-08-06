@@ -339,17 +339,18 @@ export async function rejectSwap(swapId: string): Promise<boolean> {
 }
 
 // ===== Notifications =====
+// 최근 300건만 조회. 예전엔 전체(수만 건)를 페이지네이션으로 다 긁어와서
+// /api/notifications 가 504 타임아웃 + 대용량 전송 + 재시도 폭주를 유발했음.
+// 클라이언트는 최근 알림만 필요하므로(오래된 건 패널에서 안 봄) 상한을 둔다.
+const NOTIFICATION_FETCH_LIMIT = 300;
 export async function getNotifications(): Promise<Notification[]> {
-  // 자동 페이지네이션 — 알림 누적 시 잘리는 것 방지
-  const all: Notification[] = [];
-  const pageSize = 1000;
-  for (let offset = 0; offset < 50000; offset += pageSize) {
-    const { data, error } = await supabase.from("notifications").select("*").order("created_at", { ascending: false }).range(offset, offset + pageSize - 1);
-    if (error || !data) break;
-    all.push(...data.map(rowToNotification));
-    if (data.length < pageSize) break;
-  }
-  return all;
+  const { data, error } = await supabase
+    .from("notifications")
+    .select("*")
+    .order("created_at", { ascending: false })
+    .limit(NOTIFICATION_FETCH_LIMIT);
+  if (error || !data) return [];
+  return data.map(rowToNotification);
 }
 
 export async function getUnreadCount(): Promise<number> {
