@@ -353,6 +353,19 @@ export async function getNotifications(): Promise<Notification[]> {
   return data.map(rowToNotification);
 }
 
+// 오래된 알림 자동 정리 — 30일 지난 알림 삭제 (매일 크론에서 호출).
+// 알림 수만 건 누적 시 조회가 무거워지는 것 방지. notifications 테이블만 건드림.
+export async function purgeOldNotifications(days = 30): Promise<number> {
+  const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+  const { data, error } = await supabase
+    .from("notifications")
+    .delete()
+    .lt("created_at", cutoff)
+    .select("id");
+  if (error) { console.error("[purgeOldNotifications]", error.message); return 0; }
+  return data?.length || 0;
+}
+
 export async function getUnreadCount(): Promise<number> {
   const { count } = await supabase.from("notifications").select("*", { count: "exact", head: true }).eq("read", false);
   return count || 0;
