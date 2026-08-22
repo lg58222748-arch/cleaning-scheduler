@@ -12,13 +12,20 @@ interface SearchPanelProps {
 }
 
 export default function SearchPanel({ onSelectSchedule, onClose, filterResults }: SearchPanelProps) {
+  const PAGE_SIZE = 50; // 서버 searchSchedules 페이지 크기와 동일
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<Schedule[]>([]);
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
   const [includeDeleted, setIncludeDeleted] = useState(false);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+  // 지금까지 서버에서 받아온 raw 건수 (역할 필터로 걸러지기 전 기준 = 다음 offset)
+  const rawOffsetRef = useRef(0);
+  // 새 검색이 시작되면 진행중이던 더보기 응답은 버림 (검색어 바뀐 뒤 stale append 방지)
+  const seqRef = useRef(0);
 
   useEffect(() => {
     inputRef.current?.focus();
@@ -27,14 +34,20 @@ export default function SearchPanel({ onSelectSchedule, onClose, filterResults }
 
   function runSearch(q: string, withDeleted: boolean) {
     if (timerRef.current) clearTimeout(timerRef.current);
+    seqRef.current++;
     if (!q.trim()) {
       setResults([]);
       setSearched(false);
+      setHasMore(false);
       return;
     }
     timerRef.current = setTimeout(async () => {
+      const seq = ++seqRef.current;
       setLoading(true);
       const data = await searchSchedules(q.trim(), withDeleted);
+      if (seq !== seqRef.current) return; // 그 사이 새 검색 시작됨 — 이 응답 버림
+      rawOffsetRef.current = data.length;
+      setHasMore(data.length === PAGE_SIZE);
       setResults(filterResults ? filterResults(data) : data);
       setSearched(true);
       setLoading(false);
@@ -51,13 +64,34 @@ export default function SearchPanel({ onSelectSchedule, onClose, filterResults }
     setIncludeDeleted(next);
     // 현재 검색어 즉시 재검색 (debounce 없이 바로)
     if (query.trim()) {
+      const seq = ++seqRef.current;
       setLoading(true);
       searchSchedules(query.trim(), next).then((data) => {
+        if (seq !== seqRef.current) return;
+        rawOffsetRef.current = data.length;
+        setHasMore(data.length === PAGE_SIZE);
         setResults(filterResults ? filterResults(data) : data);
         setSearched(true);
         setLoading(false);
       });
     }
+  }
+
+  // 더보기 — 다음 50건 이어받아 아래에 붙임
+  async function loadMore() {
+    if (loadingMore || !query.trim()) return;
+    const seq = seqRef.current;
+    setLoadingMore(true);
+    const data = await searchSchedules(query.trim(), includeDeleted, rawOffsetRef.current);
+    if (seq !== seqRef.current) { setLoadingMore(false); return; } // 새 검색 시작됨
+    rawOffsetRef.current += data.length;
+    setHasMore(data.length === PAGE_SIZE);
+    const filtered = filterResults ? filterResults(data) : data;
+    setResults((prev) => {
+      const seen = new Set(prev.map((s) => s.id));
+      return [...prev, ...filtered.filter((s) => !seen.has(s.id))];
+    });
+    setLoadingMore(false);
   }
 
   // 날짜별 그룹핑
@@ -177,6 +211,18 @@ export default function SearchPanel({ onSelectSchedule, onClose, filterResults }
                 })}
               </div>
             ))}
+            {/* 더보기 — 서버에서 50건 단위로 이어받기 */}
+            {hasMore && (
+              <div className="p-3">
+                <button
+                  onClick={loadMore}
+                  disabled={loadingMore}
+                  className="w-full py-3 rounded-xl bg-gray-100 text-gray-700 text-sm font-bold active:bg-gray-200 disabled:opacity-60"
+                >
+                  {loadingMore ? "불러오는 중..." : "더보기"}
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>

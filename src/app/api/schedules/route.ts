@@ -13,7 +13,8 @@ export async function GET(req: NextRequest) {
 
   if (query) {
     const includeDeleted = searchParams.get("includeDeleted") === "true";
-    return Response.json(await searchSchedules(query, includeDeleted));
+    const offset = Math.max(0, parseInt(searchParams.get("offset") || "0", 10) || 0);
+    return Response.json(await searchSchedules(query, includeDeleted, offset));
   }
   if (deleted === "true") {
     return Response.json(await getDeletedSchedules());

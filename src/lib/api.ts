@@ -73,9 +73,10 @@ export async function fetchSchedulesOrNull(start?: string, end?: string): Promis
   }
 }
 
-export async function searchSchedules(query: string, includeDeleted = false): Promise<Schedule[]> {
+export async function searchSchedules(query: string, includeDeleted = false, offset = 0): Promise<Schedule[]> {
   const delParam = includeDeleted ? "&includeDeleted=true" : "";
-  return safeJson(`${BASE}/api/schedules?q=${encodeURIComponent(query)}${delParam}`, []);
+  const offParam = offset > 0 ? `&offset=${offset}` : "";
+  return safeJson(`${BASE}/api/schedules?q=${encodeURIComponent(query)}${delParam}${offParam}`, []);
 }
 
 export async function softDeleteSchedule(id: string): Promise<void> {

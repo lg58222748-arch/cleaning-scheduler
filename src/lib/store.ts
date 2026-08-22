@@ -153,11 +153,14 @@ export async function getUnassignedSchedules(): Promise<Schedule[]> {
   return all;
 }
 
-export async function searchSchedules(query: string, includeDeleted = false): Promise<Schedule[]> {
+export async function searchSchedules(query: string, includeDeleted = false, offset = 0): Promise<Schedule[]> {
+  // offset 페이지네이션 — 검색 결과 50건 제한을 "더보기" 로 이어서 불러올 수 있게.
+  // date 동률일 때 페이지 경계에서 중복/누락 안 생기도록 id 보조 정렬 추가.
   let q = supabase.from("schedules").select("*")
     .or(`title.ilike.%${query}%,note.ilike.%${query}%,member_name.ilike.%${query}%`)
     .order("date", { ascending: false })
-    .limit(50);
+    .order("id", { ascending: true })
+    .range(offset, offset + 49);
   // includeDeleted=false 면 휴지통(deleted) 제외 — 기본 동작
   if (!includeDeleted) q = q.neq("status", "deleted");
   const { data } = await q;
