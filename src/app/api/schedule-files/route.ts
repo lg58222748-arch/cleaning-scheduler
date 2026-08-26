@@ -23,11 +23,18 @@ export async function GET(req: NextRequest) {
   const items = await Promise.all((files || []).filter(f => f.name).map(async (f) => {
     const path = `${scheduleId}/${f.name}`;
     const { data: signed } = await supabase.storage.from(BUCKET).createSignedUrl(path, 3600);
-    // 키에서 원본 파일명 복원: "{ts}-{encoded명}" → decode
+    // 키에서 원본 파일명 복원: "{ts}-{base64url명}.{ext}" → decode
+    // (Storage 키에 %·한글 불가라 base64url 로 저장 — 알파벳/숫자/-/_ 만 사용됨)
     const dash = f.name.indexOf("-");
     let displayName = f.name;
     if (dash > 0) {
-      try { displayName = decodeURIComponent(f.name.slice(dash + 1)); } catch { displayName = f.name.slice(dash + 1); }
+      const rest = f.name.slice(dash + 1);
+      const dot = rest.lastIndexOf(".");
+      const b64 = dot > 0 ? rest.slice(0, dot) : rest;
+      try {
+        const decoded = Buffer.from(b64, "base64url").toString("utf8");
+        if (decoded) displayName = decoded;
+      } catch { displayName = rest; }
     }
     return {
       path,
@@ -76,9 +83,10 @@ export async function POST(req: NextRequest) {
       return Response.json({ error: "invalid_type", message: "이미지(jpg/png/heic/webp) 또는 PDF 만 가능합니다" }, { status: 400 });
     }
 
-    // 원본 이름 보존(인코딩) — 목록에서 복원해 표시
-    const safeName = encodeURIComponent(file.name).slice(0, 180);
-    const path = `${scheduleId}/${Date.now()}-${safeName}`;
+    // 원본 이름 보존 — Storage 키는 %·한글 불가라 base64url 인코딩 (목록에서 복원)
+    const ext = (file.name.split(".").pop() || "bin").toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 8) || "bin";
+    const b64name = Buffer.from(file.name, "utf8").toString("base64url").slice(0, 160);
+    const path = `${scheduleId}/${Date.now()}-${b64name}.${ext}`;
     const arrayBuffer = await file.arrayBuffer();
 
     const { error } = await supabase.storage.from(BUCKET).upload(path, arrayBuffer, {
