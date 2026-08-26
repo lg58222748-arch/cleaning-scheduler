@@ -74,8 +74,18 @@ export default function ScheduleDetail({
   type AttachedFile = { path: string; displayName: string; size: number; url: string };
   const [attachedFiles, setAttachedFiles] = useState<AttachedFile[]>([]);
   const [uploadingFile, setUploadingFile] = useState(false);
+  // 이미지 첨부는 새창(원본 크기) 대신 앱 안 뷰어로 화면에 맞춰 표시
+  const [viewerFile, setViewerFile] = useState<AttachedFile | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const isTempSchedule = schedule.id.startsWith("temp-");
+
+  const isImageFile = (f: AttachedFile) => /\.(jpe?g|png|webp|heic|heif|gif)$/i.test(f.displayName) || /\.(jpe?g|png|webp|heic|heif|gif)(\?|$)/i.test(f.path);
+
+  function openAttachedFile(f: AttachedFile) {
+    if (!f.url) return;
+    if (isImageFile(f)) setViewerFile(f); // 이미지: 화면 맞춤 뷰어
+    else window.open(f.url, "_blank");    // PDF 등: 새 창
+  }
 
   async function loadAttachedFiles() {
     if (isTempSchedule) return;
@@ -686,7 +696,7 @@ export default function ScheduleDetail({
                           {attachedFiles.map((f) => (
                             <div key={f.path} className="flex items-center gap-2 bg-blue-50/60 border border-blue-100 rounded-lg px-2.5 py-2">
                               <button
-                                onClick={() => { if (f.url) window.open(f.url, "_blank"); }}
+                                onClick={() => openAttachedFile(f)}
                                 className="flex-1 min-w-0 text-left flex items-center gap-1.5 active:opacity-70"
                               >
                                 <span className="shrink-0">📄</span>
@@ -702,6 +712,45 @@ export default function ScheduleDetail({
                         </div>
                       )}
                     </div>
+                  </div>
+                )}
+
+                {/* 이미지 뷰어 — 화면 크기에 맞춰 표시 (원본 크기로 안 커짐) */}
+                {viewerFile && (
+                  <div
+                    className="fixed inset-0 z-[80] bg-black/90 flex flex-col"
+                    style={{ paddingTop: "env(safe-area-inset-top, 0px)", paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
+                    onClick={() => setViewerFile(null)}
+                  >
+                    <div className="flex items-center justify-between px-4 py-3 shrink-0" onClick={(e) => e.stopPropagation()}>
+                      <span className="text-white text-sm font-medium truncate pr-3">📄 {viewerFile.displayName}</span>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <button
+                          onClick={() => window.open(viewerFile.url, "_blank")}
+                          className="text-[11px] px-2.5 py-1.5 rounded-lg bg-white/15 text-white font-bold active:bg-white/25"
+                        >
+                          원본 보기
+                        </button>
+                        <button
+                          onClick={() => setViewerFile(null)}
+                          className="w-9 h-9 rounded-full bg-white/15 text-white text-lg leading-none active:bg-white/25"
+                          aria-label="닫기"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    </div>
+                    <div className="flex-1 min-h-0 flex items-center justify-center px-3 pb-4" onClick={() => setViewerFile(null)}>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={viewerFile.url}
+                        alt={viewerFile.displayName}
+                        className="max-w-full max-h-full object-contain rounded-lg select-none"
+                        onClick={(e) => e.stopPropagation()}
+                        draggable={false}
+                      />
+                    </div>
+                    <div className="text-center text-white/40 text-[11px] pb-3 shrink-0">배경을 탭하면 닫힙니다</div>
                   </div>
                 )}
 
