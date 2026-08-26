@@ -70,6 +70,55 @@ export default function ScheduleDetail({
   const [showPostPaymentModal, setShowPostPaymentModal] = useState(false);
   const [copiedPostMsgs, setCopiedPostMsgs] = useState<Set<number>>(new Set());
 
+  // 첨부파일 (견적서 등) — schedule-files 버킷
+  type AttachedFile = { path: string; displayName: string; size: number; url: string };
+  const [attachedFiles, setAttachedFiles] = useState<AttachedFile[]>([]);
+  const [uploadingFile, setUploadingFile] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const isTempSchedule = schedule.id.startsWith("temp-");
+
+  async function loadAttachedFiles() {
+    if (isTempSchedule) return;
+    try {
+      const res = await fetch(`/api/schedule-files?scheduleId=${schedule.id}`);
+      const data = await res.json();
+      if (Array.isArray(data.files)) setAttachedFiles(data.files);
+    } catch { /* 목록 실패는 조용히 — 다음 열람 때 재시도 */ }
+  }
+
+  async function handleFileUpload(file: File) {
+    if (uploadingFile) return;
+    setUploadingFile(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      fd.append("scheduleId", schedule.id);
+      const res = await fetch("/api/schedule-files", { method: "POST", body: fd });
+      const data = await res.json();
+      if (data.path) {
+        setAttachedFiles((prev) => [{ path: data.path, displayName: data.displayName, size: data.size, url: data.url }, ...prev]);
+      } else {
+        showAlert(data.message || "업로드에 실패했습니다. 다시 시도해주세요.");
+      }
+    } catch {
+      showAlert("업로드에 실패했습니다. 네트워크를 확인해주세요.");
+    } finally {
+      setUploadingFile(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  }
+
+  async function handleFileDelete(f: AttachedFile) {
+    const ok = await showConfirm(`"${f.displayName}"\n\n첨부파일을 삭제하시겠습니까?`);
+    if (!ok) return;
+    setAttachedFiles((prev) => prev.filter((x) => x.path !== f.path));
+    fetch("/api/schedule-files", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "delete", path: f.path }),
+    }).catch(() => { /* 실패해도 다음 목록 로드 때 되살아남 */ });
+  }
+
   // 탭 히스토리 (뒤로가기 지원)
   const tabHistoryRef = useRef<DetailTab[]>([]);
   const dateInputRef = useRef<HTMLInputElement>(null);
@@ -183,6 +232,7 @@ export default function ScheduleDetail({
 
   useEffect(() => {
     loadComments();
+    loadAttachedFiles();
     const t = setTimeout(() => {
       setPreloadChecklist(true);
       setPreloadSettlement(true);
@@ -585,6 +635,52 @@ export default function ScheduleDetail({
                     ))}
                   </div>
                 </div>
+
+                {/* 첨부파일 (견적서 등) — temp 일정(저장 전)에는 비노출 */}
+                {!isTempSchedule && (
+                  <div className="flex items-start gap-3">
+                    <svg className="w-5 h-5 text-gray-400 shrink-0 mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                    </svg>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-gray-500">첨부파일 {attachedFiles.length > 0 && `(${attachedFiles.length})`}</span>
+                        <button
+                          onClick={() => fileInputRef.current?.click()}
+                          disabled={uploadingFile}
+                          className="text-[11px] px-2 py-0.5 rounded-full bg-blue-50 text-blue-600 font-bold active:bg-blue-100 disabled:opacity-60"
+                        >
+                          {uploadingFile ? "업로드 중..." : "+ 추가"}
+                        </button>
+                        <input
+                          ref={fileInputRef}
+                          type="file"
+                          accept="image/*,application/pdf"
+                          className="hidden"
+                          onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFileUpload(f); }}
+                        />
+                      </div>
+                      {attachedFiles.length > 0 && (
+                        <div className="mt-1.5 space-y-1">
+                          {attachedFiles.map((f) => (
+                            <div key={f.path} className="flex items-center gap-2 bg-gray-50 rounded-lg px-2.5 py-1.5">
+                              <button
+                                onClick={() => { if (f.url) window.open(f.url, "_blank"); }}
+                                className="flex-1 min-w-0 text-left text-xs text-blue-700 font-medium truncate active:underline"
+                              >
+                                📄 {f.displayName}
+                              </button>
+                              <span className="text-[10px] text-gray-400 shrink-0">
+                                {f.size > 0 ? `${(f.size / 1024 / 1024).toFixed(1)}MB` : ""}
+                              </span>
+                              <button onClick={() => handleFileDelete(f)} className="text-red-400 text-xs font-bold shrink-0 px-1">✕</button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
 
                 {/* 본문 - 메모장처럼 항상 편집 가능, 화면 꽉 채움 */}
                 <div className="flex items-start gap-3 flex-1">
