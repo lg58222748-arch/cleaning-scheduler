@@ -90,17 +90,35 @@ export default function ScheduleDetail({
     if (uploadingFile) return;
     setUploadingFile(true);
     try {
-      const fd = new FormData();
-      fd.append("file", file);
-      fd.append("scheduleId", schedule.id);
-      const res = await fetch("/api/schedule-files", { method: "POST", body: fd });
-      const data = await res.json();
-      if (data.path) {
-        setAttachedFiles((prev) => [{ path: data.path, displayName: data.displayName, size: data.size, url: data.url }, ...prev]);
-      } else {
-        showAlert(data.message || "업로드에 실패했습니다. 다시 시도해주세요.");
+      if (file.size > 10 * 1024 * 1024) {
+        showAlert("파일은 10MB 이하만 가능합니다.");
+        return;
       }
-    } catch {
+      // 1) 서명 업로드 URL 발급 (JSON — 작은 요청이라 크기 제한 무관)
+      const signRes = await fetch("/api/schedule-files", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "sign-upload", scheduleId: schedule.id, fileName: file.name, fileType: file.type, size: file.size }),
+      });
+      const sign = await signRes.json().catch(() => ({}));
+      if (!sign.signedUrl) {
+        showAlert(sign.message || `업로드 준비에 실패했습니다 (${signRes.status}). 다시 시도해주세요.`);
+        return;
+      }
+      // 2) Storage 로 직접 업로드 — Vercel 을 안 거쳐서 대용량(10MB)도 OK
+      const putRes = await fetch(sign.signedUrl, {
+        method: "PUT",
+        headers: { "Content-Type": file.type || "application/octet-stream" },
+        body: file,
+      });
+      if (!putRes.ok) {
+        showAlert(`업로드에 실패했습니다 (HTTP ${putRes.status}). 다시 시도해주세요.`);
+        return;
+      }
+      // 3) 목록 재조회 (서명 열람 URL 포함해서 받아옴)
+      await loadAttachedFiles();
+    } catch (e) {
+      console.error("[첨부파일 업로드]", e);
       showAlert("업로드에 실패했습니다. 네트워크를 확인해주세요.");
     } finally {
       setUploadingFile(false);
@@ -644,13 +662,13 @@ export default function ScheduleDetail({
                     </svg>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
-                        <span className="text-xs text-gray-500">첨부파일 {attachedFiles.length > 0 && `(${attachedFiles.length})`}</span>
+                        <span className="text-xs text-gray-500 font-medium">첨부파일 {attachedFiles.length > 0 && `(${attachedFiles.length})`}</span>
                         <button
                           onClick={() => fileInputRef.current?.click()}
                           disabled={uploadingFile}
-                          className="text-[11px] px-2 py-0.5 rounded-full bg-blue-50 text-blue-600 font-bold active:bg-blue-100 disabled:opacity-60"
+                          className="text-xs px-3 py-1.5 rounded-lg bg-blue-500 text-white font-bold active:bg-blue-600 disabled:opacity-60 shadow-sm"
                         >
-                          {uploadingFile ? "업로드 중..." : "+ 추가"}
+                          {uploadingFile ? "⏳ 업로드 중..." : "📎 파일 첨부"}
                         </button>
                         <input
                           ref={fileInputRef}
@@ -660,20 +678,25 @@ export default function ScheduleDetail({
                           onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFileUpload(f); }}
                         />
                       </div>
+                      {attachedFiles.length === 0 && !uploadingFile && (
+                        <div className="mt-1 text-[10px] text-gray-400">견적서 등 사진·PDF 첨부 (10MB 이하)</div>
+                      )}
                       {attachedFiles.length > 0 && (
-                        <div className="mt-1.5 space-y-1">
+                        <div className="mt-2 space-y-1.5">
                           {attachedFiles.map((f) => (
-                            <div key={f.path} className="flex items-center gap-2 bg-gray-50 rounded-lg px-2.5 py-1.5">
+                            <div key={f.path} className="flex items-center gap-2 bg-blue-50/60 border border-blue-100 rounded-lg px-2.5 py-2">
                               <button
                                 onClick={() => { if (f.url) window.open(f.url, "_blank"); }}
-                                className="flex-1 min-w-0 text-left text-xs text-blue-700 font-medium truncate active:underline"
+                                className="flex-1 min-w-0 text-left flex items-center gap-1.5 active:opacity-70"
                               >
-                                📄 {f.displayName}
+                                <span className="shrink-0">📄</span>
+                                <span className="text-xs text-blue-800 font-medium truncate">{f.displayName}</span>
+                                <span className="text-[10px] text-blue-500 font-bold shrink-0 ml-auto pl-2">열기 ›</span>
                               </button>
                               <span className="text-[10px] text-gray-400 shrink-0">
                                 {f.size > 0 ? `${(f.size / 1024 / 1024).toFixed(1)}MB` : ""}
                               </span>
-                              <button onClick={() => handleFileDelete(f)} className="text-red-400 text-xs font-bold shrink-0 px-1">✕</button>
+                              <button onClick={() => handleFileDelete(f)} className="text-red-400 text-xs font-bold shrink-0 px-1.5 py-1">✕</button>
                             </div>
                           ))}
                         </div>

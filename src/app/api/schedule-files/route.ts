@@ -51,9 +51,35 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const contentType = req.headers.get("content-type") || "";
 
-  // 삭제
+  // 삭제 / 서명 업로드 URL 발급
   if (contentType.includes("application/json")) {
     const body = await req.json();
+
+    // 서명 업로드 URL — 클라이언트가 Storage 에 직접 PUT (Vercel 4.5MB 요청 제한 우회)
+    if (body.action === "sign-upload") {
+      const scheduleId = String(body.scheduleId || "");
+      const fileName = String(body.fileName || "file.bin");
+      const fileType = String(body.fileType || "");
+      const size = Number(body.size) || 0;
+      if (!scheduleId || scheduleId.includes("/") || scheduleId.includes("..")) {
+        return Response.json({ error: "scheduleId_required" }, { status: 400 });
+      }
+      if (size > MAX_SIZE) {
+        return Response.json({ error: "size_exceeded", message: "파일은 10MB 이하만 가능합니다" }, { status: 400 });
+      }
+      if (fileType && !ALLOWED.includes(fileType)) {
+        return Response.json({ error: "invalid_type", message: "이미지(jpg/png/heic/webp) 또는 PDF 만 가능합니다" }, { status: 400 });
+      }
+      const ext = (fileName.split(".").pop() || "bin").toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 8) || "bin";
+      const b64name = Buffer.from(fileName, "utf8").toString("base64url").slice(0, 160);
+      const path = `${scheduleId}/${Date.now()}-${b64name}.${ext}`;
+      const { data, error } = await supabase.storage.from(BUCKET).createSignedUploadUrl(path);
+      if (error || !data) {
+        return Response.json({ error: "sign_failed", message: error?.message || "" }, { status: 500 });
+      }
+      return Response.json({ path, signedUrl: data.signedUrl });
+    }
+
     if (body.action === "delete" && body.path) {
       const path = String(body.path);
       // 경로 조작 방지 — {uuid}/{파일명} 형태만 허용
