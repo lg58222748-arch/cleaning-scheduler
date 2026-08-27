@@ -51,6 +51,12 @@ import { ko } from "date-fns/locale";
 
 type TabMode = "calendar" | "manage" | "assign" | "members" | "sales" | "area";
 
+// 현장팀 추가 열람 허용 — "보는 사람 username" → 추가로 보이는 담당자 이름들.
+// 단방향: 이재준은 포장이사 일정까지 보이지만, 포장이사 계정에는 이재준 일정이 안 보임.
+const FIELD_EXTRA_VIEW: Record<string, string[]> = {
+  wowns7480: ["포장이사"], // 이재준 → 포장이사 달력 열람
+};
+
 export default function Home() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [appReady, setAppReady] = useState(false);
@@ -1154,13 +1160,16 @@ export default function Home() {
   const baseCalendarSchedules = (() => {
     // 관리자/영업팀: 전체 일정 조회 (현장팀만 서로 일정 못 보게 제한)
     if (role === "ceo" || role === "admin" || role === "scheduler" || role === "sales") return schedules;
-    // 현장팀: 본인 일정만
+    // 현장팀: 본인 일정만 (+ 추가 열람 허용된 계정 일정)
     if (role === "field") {
+      const extraNames = FIELD_EXTRA_VIEW[currentUser.username] || [];
       return schedules.filter((s) =>
         s.memberName === currentUser.name ||
         s.assignedToName === currentUser.name ||
         s.assignedTo === currentUser.id ||
-        (myLinkedMember && s.memberId === myLinkedMember.id)
+        (myLinkedMember && s.memberId === myLinkedMember.id) ||
+        extraNames.includes(s.memberName) ||
+        (s.assignedToName ? extraNames.includes(s.assignedToName) : false)
       );
     }
     return [];
@@ -1988,13 +1997,16 @@ export default function Home() {
       {showSearch && (
         <SearchPanel
           filterResults={(list) => {
-            // 현장팀만 본인 일정만 검색되게 (달력과 동일 규칙). 관리자/영업팀은 전체.
+            // 현장팀만 본인 일정만 검색되게 (달력과 동일 규칙 — 추가 열람 포함). 관리자/영업팀은 전체.
             if (role !== "field") return list;
+            const extraNames = FIELD_EXTRA_VIEW[currentUser.username] || [];
             return list.filter((s) =>
               s.memberName === currentUser.name ||
               s.assignedToName === currentUser.name ||
               s.assignedTo === currentUser.id ||
-              (myLinkedMember && s.memberId === myLinkedMember.id)
+              (myLinkedMember && s.memberId === myLinkedMember.id) ||
+              extraNames.includes(s.memberName) ||
+              (s.assignedToName ? extraNames.includes(s.assignedToName) : false)
             );
           }}
           onSelectSchedule={(s) => {
