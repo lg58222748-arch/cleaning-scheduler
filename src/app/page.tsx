@@ -1039,6 +1039,7 @@ export default function Home() {
           if (!ns?.id) {
             // DB 중복으로 null 리턴된 경우: temp 만 제거 (real 은 realtime 이 이미 추가했을 수 있음)
             setUnassignedSchedules(prev => prev.filter(s => s.id !== tempId));
+            showAlert("이미 같은 제목·날짜의 일정이 있어 등록되지 않았습니다.\n배정탭에서 기존 일정을 확인해주세요.");
             return;
           }
           setUnassignedSchedules(prev => {

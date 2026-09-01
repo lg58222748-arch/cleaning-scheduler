@@ -190,13 +190,14 @@ export async function addUnassignedSchedule(input: Omit<Schedule, "id" | "status
   if (pendingInserts.has(key)) return null;
   pendingInserts.add(key);
   try {
-    // 중복 체크 1: googleEventId
+    // 중복 체크 1: googleEventId (휴지통 제외 — 삭제된 건이 재등록을 막으면 안 됨)
     if (input.googleEventId) {
-      const { data: existing } = await supabase.from("schedules").select("id").eq("google_event_id", input.googleEventId).limit(1);
+      const { data: existing } = await supabase.from("schedules").select("id").eq("google_event_id", input.googleEventId).neq("status", "deleted").limit(1);
       if (existing && existing.length > 0) return null;
     }
-    // 중복 체크 2: 같은 제목+날짜
-    const { data: dup } = await supabase.from("schedules").select("id").eq("title", input.title).eq("date", input.date).limit(1);
+    // 중복 체크 2: 같은 제목+날짜 (휴지통 제외)
+    // 이전엔 휴지통 건까지 중복으로 잡아서, 삭제했다가 다시 저장하면 조용히 무시되는 버그 있었음.
+    const { data: dup } = await supabase.from("schedules").select("id").eq("title", input.title).eq("date", input.date).neq("status", "deleted").limit(1);
     if (dup && dup.length > 0) return null;
     const { data, error } = await supabase.from("schedules").insert({
       member_id: "", member_name: "미배정", title: input.title, location: input.location || "", date: input.date, start_time: input.startTime, end_time: input.endTime, status: "unassigned", google_event_id: input.googleEventId || null, note: sanitizeNote(input.note),
@@ -239,7 +240,11 @@ export async function getDeletedSchedules(): Promise<Schedule[]> {
 
 // 휴지통에서 복원
 export async function restoreSchedule(id: string): Promise<Schedule | null> {
-  const { data } = await supabase.from("schedules").update({ status: "confirmed" }).eq("id", id).select().single();
+  // 담당자 없는(미배정) 건은 unassigned 로 복원해야 배정탭에 뜬다.
+  // 이전엔 무조건 confirmed 로 복원해서 미배정 건이 배정탭에서 안 보이는 고아가 됐음.
+  const { data: before } = await supabase.from("schedules").select("member_name,assigned_to").eq("id", id).maybeSingle();
+  const isUnassigned = !before || before.member_name === "미배정" || (!before.member_name && !before.assigned_to);
+  const { data } = await supabase.from("schedules").update({ status: isUnassigned ? "unassigned" : "confirmed" }).eq("id", id).select().single();
   return data ? rowToSchedule(data) : null;
 }
 

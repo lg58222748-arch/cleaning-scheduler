@@ -1073,6 +1073,7 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
 
     setSaving(true);
     const confirmSvcs = activeConfirm.services;
+    const failedSaves: string[] = [];
     for (let i = 0; i < schedules.length; i++) {
       const sched = schedules[i];
       const svc = confirmSvcs[i];
@@ -1086,15 +1087,20 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
       const serviceSuffix = schedules.length > 1 ? `/${svc.name}` : "";
       const displayTitle = `u${userName}/미입금/${parsedName}${serviceSuffix}`;
 
-      await addUnassignedSchedule({
+      const created = await addUnassignedSchedule({
         title: displayTitle,
         date: sched.date,
         startTime: sched.time === "오전" ? "07:00" : sched.time === "오후" ? "13:00" : "09:00",
         endTime: sched.time === "오전" ? "12:00" : sched.time === "오후" ? "18:00" : "18:00",
         note: `원래제목: ${calOriginal}\n${confirmMsg}`,
       });
+      // 중복/실패로 저장 안 된 건 사용자에게 알림 (이전엔 조용히 넘어가서 "저장했는데 안 보임" 발생)
+      if (!created || !(created as { id?: string }).id) failedSaves.push(`${sched.date} ${svc.name}`);
     }
     setSaving(false);
+    if (failedSaves.length > 0) {
+      showAlert(`⚠️ 아래 일정은 저장되지 않았습니다 (같은 제목·날짜 일정이 이미 있음):\n\n${failedSaves.join("\n")}\n\n배정탭에서 기존 일정을 확인해주세요.`);
+    }
     setConfirmed(true);
     setSavedDone(true);
     setConfirmedToast(true);
