@@ -28,6 +28,87 @@ interface ScheduleDetailProps {
 
 type DetailTab = "info" | "checklist" | "settlement";
 
+// 첨부 이미지 뷰어용 줌 이미지 — 앱은 viewport 에서 핀치줌이 막혀있어 자체 구현.
+// 핀치(두 손가락) 확대/축소 · 한 손가락 이동(확대 상태) · 더블탭 확대/원복 · 마우스 휠 줌.
+function ZoomableImage({ src, alt }: { src: string; alt: string }) {
+  const [t, setT] = useState({ scale: 1, x: 0, y: 0 });
+  const pointers = useRef(new Map<number, { x: number; y: number }>());
+  const start = useRef({ scale: 1, x: 0, y: 0, dist: 0, cx: 0, cy: 0 });
+  const lastTap = useRef(0);
+
+  function onPointerDown(e: React.PointerEvent) {
+    (e.currentTarget as Element).setPointerCapture?.(e.pointerId);
+    pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    const pts = Array.from(pointers.current.values());
+    if (pts.length === 2) {
+      start.current = {
+        scale: t.scale, x: t.x, y: t.y,
+        dist: Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y),
+        cx: (pts[0].x + pts[1].x) / 2, cy: (pts[0].y + pts[1].y) / 2,
+      };
+    } else if (pts.length === 1) {
+      start.current = { scale: t.scale, x: t.x, y: t.y, dist: 0, cx: pts[0].x, cy: pts[0].y };
+      const now = Date.now();
+      if (now - lastTap.current < 300) {
+        // 더블탭: 2.5배 ↔ 원복
+        setT((prev) => (prev.scale > 1 ? { scale: 1, x: 0, y: 0 } : { scale: 2.5, x: 0, y: 0 }));
+        lastTap.current = 0;
+      } else {
+        lastTap.current = now;
+      }
+    }
+  }
+  function onPointerMove(e: React.PointerEvent) {
+    if (!pointers.current.has(e.pointerId)) return;
+    pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    const pts = Array.from(pointers.current.values());
+    if (pts.length === 2) {
+      const dist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+      const cx = (pts[0].x + pts[1].x) / 2;
+      const cy = (pts[0].y + pts[1].y) / 2;
+      const scale = Math.min(6, Math.max(1, start.current.scale * (dist / (start.current.dist || 1))));
+      setT({ scale, x: start.current.x + (cx - start.current.cx), y: start.current.y + (cy - start.current.cy) });
+    } else if (pts.length === 1 && t.scale > 1) {
+      // 확대 상태에서 드래그 이동
+      setT((prev) => ({ ...prev, x: start.current.x + (pts[0].x - start.current.cx), y: start.current.y + (pts[0].y - start.current.cy) }));
+    }
+  }
+  function onPointerUp(e: React.PointerEvent) {
+    pointers.current.delete(e.pointerId);
+    // 축소해서 1배 이하가 되면 원위치로 스냅
+    setT((prev) => (prev.scale <= 1.02 ? { scale: 1, x: 0, y: 0 } : prev));
+  }
+  function onWheel(e: React.WheelEvent) {
+    const next = Math.min(6, Math.max(1, t.scale * (e.deltaY < 0 ? 1.2 : 1 / 1.2)));
+    setT((prev) => (next === 1 ? { scale: 1, x: 0, y: 0 } : { ...prev, scale: next }));
+  }
+
+  return (
+    <div
+      className="w-full h-full flex items-center justify-center overflow-hidden"
+      style={{ touchAction: "none" }}
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={onPointerUp}
+      onPointerCancel={onPointerUp}
+      onWheel={onWheel}
+      onClick={(e) => e.stopPropagation()}
+    >
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={src}
+        alt={alt}
+        draggable={false}
+        className="max-w-full max-h-full object-contain rounded-lg select-none"
+        style={{
+          transform: `translate(${t.x}px, ${t.y}px) scale(${t.scale})`,
+          transition: pointers.current.size > 0 ? "none" : "transform 0.15s ease-out",
+        }}
+      />
+    </div>
+  );
+}
+
 export default function ScheduleDetail({
   schedule,
   members,
@@ -740,17 +821,10 @@ export default function ScheduleDetail({
                         </button>
                       </div>
                     </div>
-                    <div className="flex-1 min-h-0 flex items-center justify-center px-3 pb-4" onClick={() => setViewerFile(null)}>
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={viewerFile.url}
-                        alt={viewerFile.displayName}
-                        className="max-w-full max-h-full object-contain rounded-lg select-none"
-                        onClick={(e) => e.stopPropagation()}
-                        draggable={false}
-                      />
+                    <div className="flex-1 min-h-0 px-3 pb-4" onClick={() => setViewerFile(null)}>
+                      <ZoomableImage src={viewerFile.url} alt={viewerFile.displayName} />
                     </div>
-                    <div className="text-center text-white/40 text-[11px] pb-3 shrink-0">배경을 탭하면 닫힙니다</div>
+                    <div className="text-center text-white/40 text-[11px] pb-3 shrink-0">두 손가락·더블탭으로 확대 · ✕ 로 닫기</div>
                   </div>
                 )}
 
