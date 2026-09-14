@@ -32,6 +32,7 @@ type DetailTab = "info" | "checklist" | "settlement";
 // 핀치(두 손가락) 확대/축소 · 한 손가락 이동(확대 상태) · 더블탭 확대/원복 · 마우스 휠 줌.
 function ZoomableImage({ src, alt }: { src: string; alt: string }) {
   const [t, setT] = useState({ scale: 1, x: 0, y: 0 });
+  const [imgLoaded, setImgLoaded] = useState(false);
   const pointers = useRef(new Map<number, { x: number; y: number }>());
   const start = useRef({ scale: 1, x: 0, y: 0, dist: 0, cx: 0, cy: 0 });
   const lastTap = useRef(0);
@@ -85,7 +86,7 @@ function ZoomableImage({ src, alt }: { src: string; alt: string }) {
 
   return (
     <div
-      className="w-full h-full flex items-center justify-center overflow-hidden"
+      className="relative w-full h-full flex items-center justify-center overflow-hidden"
       style={{ touchAction: "none" }}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
@@ -94,15 +95,23 @@ function ZoomableImage({ src, alt }: { src: string; alt: string }) {
       onWheel={onWheel}
       onClick={(e) => e.stopPropagation()}
     >
+      {!imgLoaded && (
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 pointer-events-none">
+          <div className="w-8 h-8 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+          <span className="text-white/60 text-xs">이미지 불러오는 중...</span>
+        </div>
+      )}
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src={src}
         alt={alt}
         draggable={false}
+        onLoad={() => setImgLoaded(true)}
         className="max-w-full max-h-full object-contain rounded-lg select-none"
         style={{
           transform: `translate(${t.x}px, ${t.y}px) scale(${t.scale})`,
           transition: pointers.current.size > 0 ? "none" : "transform 0.15s ease-out",
+          opacity: imgLoaded ? 1 : 0,
         }}
       />
     </div>
@@ -177,10 +186,36 @@ export default function ScheduleDetail({
     } catch { /* 목록 실패는 조용히 — 다음 열람 때 재시도 */ }
   }
 
-  async function handleFileUpload(file: File) {
+  // 이미지 자동 압축 — 폰 원본(4~8MB)을 그대로 올리면 열람이 너무 느림.
+  // 최대 1800px / JPEG 82% 로 축소 (견적서 글씨 읽기에 충분). 실패하면 원본 그대로.
+  async function compressImage(file: File): Promise<{ blob: Blob; name: string; type: string }> {
+    const asIs = { blob: file as Blob, name: file.name, type: file.type };
+    if (!/^image\/(jpeg|png|webp|heic|heif)$/i.test(file.type) || file.size < 600 * 1024) return asIs;
+    try {
+      const bmp = await createImageBitmap(file);
+      const MAX = 1800;
+      const ratio = Math.min(1, MAX / Math.max(bmp.width, bmp.height));
+      const w = Math.round(bmp.width * ratio);
+      const h = Math.round(bmp.height * ratio);
+      const canvas = document.createElement("canvas");
+      canvas.width = w; canvas.height = h;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return asIs;
+      ctx.drawImage(bmp, 0, 0, w, h);
+      const blob = await new Promise<Blob | null>((r) => canvas.toBlob(r, "image/jpeg", 0.82));
+      if (blob && blob.size < file.size) {
+        return { blob, name: file.name.replace(/\.\w+$/, "") + ".jpg", type: "image/jpeg" };
+      }
+      return asIs;
+    } catch { return asIs; } // HEIC 미지원 브라우저 등 — 원본 업로드
+  }
+
+  async function handleFileUpload(rawFile: File) {
     if (uploadingFile) return;
     setUploadingFile(true);
     try {
+      const { blob, name, type } = await compressImage(rawFile);
+      const file = { size: blob.size, name, type } ;
       if (file.size > 10 * 1024 * 1024) {
         showAlert("파일은 10MB 이하만 가능합니다.");
         return;
@@ -200,7 +235,7 @@ export default function ScheduleDetail({
       const putRes = await fetch(sign.signedUrl, {
         method: "PUT",
         headers: { "Content-Type": file.type || "application/octet-stream" },
-        body: file,
+        body: blob,
       });
       if (!putRes.ok) {
         showAlert(`업로드에 실패했습니다 (HTTP ${putRes.status}). 다시 시도해주세요.`);
