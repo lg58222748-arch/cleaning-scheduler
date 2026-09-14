@@ -20,9 +20,16 @@ export async function GET(req: NextRequest) {
   });
   if (error) return Response.json({ error: error.message }, { status: 500 });
 
-  const items = await Promise.all((files || []).filter(f => f.name).map(async (f) => {
+  // 서명 URL 일괄 발급 — 파일마다 개별 요청하면 목록 표시가 느려짐
+  const realFiles = (files || []).filter(f => f.name);
+  const paths = realFiles.map(f => `${scheduleId}/${f.name}`);
+  const { data: signedList } = paths.length > 0
+    ? await supabase.storage.from(BUCKET).createSignedUrls(paths, 3600)
+    : { data: [] as { signedUrl: string | null }[] };
+
+  const items = realFiles.map((f, idx) => {
     const path = `${scheduleId}/${f.name}`;
-    const { data: signed } = await supabase.storage.from(BUCKET).createSignedUrl(path, 3600);
+    const signed = signedList?.[idx];
     // 키에서 원본 파일명 복원: "{ts}-{base64url명}.{ext}" → decode
     // (Storage 키에 %·한글 불가라 base64url 로 저장 — 알파벳/숫자/-/_ 만 사용됨)
     const dash = f.name.indexOf("-");
@@ -43,7 +50,7 @@ export async function GET(req: NextRequest) {
       createdAt: f.created_at || "",
       url: signed?.signedUrl || "",
     };
-  }));
+  });
   return Response.json({ files: items });
 }
 

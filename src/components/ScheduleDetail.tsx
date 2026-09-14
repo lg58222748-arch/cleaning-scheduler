@@ -28,6 +28,11 @@ interface ScheduleDetailProps {
 
 type DetailTab = "info" | "checklist" | "settlement";
 
+// 첨부파일 목록 캐시 — 같은 일정을 다시 열면 목록이 즉시 뜨고, 백그라운드로 최신화.
+// (서명 URL 은 1시간 유효라 세션 내 재사용 안전)
+type AttachedFile = { path: string; displayName: string; size: number; url: string };
+const attachedFilesCache = new Map<string, AttachedFile[]>();
+
 // 첨부 이미지 뷰어용 줌 이미지 — 앱은 viewport 에서 핀치줌이 막혀있어 자체 구현.
 // 핀치(두 손가락) 확대/축소 · 한 손가락 이동(확대 상태) · 더블탭 확대/원복 · 마우스 휠 줌.
 function ZoomableImage({ src, alt }: { src: string; alt: string }) {
@@ -160,9 +165,8 @@ export default function ScheduleDetail({
   const [showPostPaymentModal, setShowPostPaymentModal] = useState(false);
   const [copiedPostMsgs, setCopiedPostMsgs] = useState<Set<number>>(new Set());
 
-  // 첨부파일 (견적서 등) — schedule-files 버킷
-  type AttachedFile = { path: string; displayName: string; size: number; url: string };
-  const [attachedFiles, setAttachedFiles] = useState<AttachedFile[]>([]);
+  // 첨부파일 (견적서 등) — schedule-files 버킷. 캐시 있으면 즉시 표시 후 백그라운드 갱신.
+  const [attachedFiles, setAttachedFiles] = useState<AttachedFile[]>(() => attachedFilesCache.get(schedule.id) || []);
   const [uploadingFile, setUploadingFile] = useState(false);
   // 이미지 첨부는 새창(원본 크기) 대신 앱 안 뷰어로 화면에 맞춰 표시
   const [viewerFile, setViewerFile] = useState<AttachedFile | null>(null);
@@ -182,7 +186,10 @@ export default function ScheduleDetail({
     try {
       const res = await fetch(`/api/schedule-files?scheduleId=${schedule.id}`);
       const data = await res.json();
-      if (Array.isArray(data.files)) setAttachedFiles(data.files);
+      if (Array.isArray(data.files)) {
+        attachedFilesCache.set(schedule.id, data.files); // 다음에 열 때 즉시 표시용
+        setAttachedFiles(data.files);
+      }
     } catch { /* 목록 실패는 조용히 — 다음 열람 때 재시도 */ }
   }
 
@@ -255,7 +262,11 @@ export default function ScheduleDetail({
   async function handleFileDelete(f: AttachedFile) {
     const ok = await showConfirm(`"${f.displayName}"\n\n첨부파일을 삭제하시겠습니까?`);
     if (!ok) return;
-    setAttachedFiles((prev) => prev.filter((x) => x.path !== f.path));
+    setAttachedFiles((prev) => {
+      const next = prev.filter((x) => x.path !== f.path);
+      attachedFilesCache.set(schedule.id, next);
+      return next;
+    });
     fetch("/api/schedule-files", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
