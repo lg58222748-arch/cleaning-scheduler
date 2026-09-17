@@ -153,7 +153,7 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
   const inputClass = "w-full px-4 py-3 border border-gray-300 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent";
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4 overflow-y-auto" style={{ paddingTop: "env(safe-area-inset-top, 0px)", paddingBottom: "env(safe-area-inset-bottom, 0px)" }}>
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4 overflow-y-auto" style={{ paddingTop: "var(--safe-top)", paddingBottom: "var(--safe-bottom)" }}>
       <div className="bg-white rounded-2xl shadow-lg w-full max-w-sm overflow-hidden">
         {/* Header */}
         <div className="bg-[#3a9ad9] px-6 py-5 text-center">
@@ -328,7 +328,7 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
                 <div
                   className="fixed inset-0 z-[70] bg-black/40 flex items-end sm:items-center justify-center"
                   onClick={() => setShowAddrModal(false)}
-                  style={{ paddingTop: "env(safe-area-inset-top, 0px)" }}
+                  style={{ paddingTop: "var(--safe-top)" }}
                 >
                   <div
                     className="bg-white w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl overflow-hidden flex flex-col"

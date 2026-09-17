@@ -3,6 +3,13 @@
 :root {
   --background: #f9fafb;
   --foreground: #111827;
+
+  /* 안전영역(노치/상태바/제스처바) — 앱 전역에서 이 변수만 사용한다.
+     안드로이드 15+ edge-to-edge 에서 env(safe-area-inset-*) 가 0 으로 오는 기기가 있어
+     (갤럭시 S26 등) 화면이 상태바·네비게이션바에 가려지던 문제가 있었음.
+     page.tsx 의 프로브가 env() 실측값이 0 이면 --safe-*-fallback 을 채워준다. */
+  --safe-top: max(env(safe-area-inset-top, 0px), var(--safe-top-fallback, 0px));
+  --safe-bottom: max(env(safe-area-inset-bottom, 0px), var(--safe-bottom-fallback, 0px));
 }
 
 @theme inline {

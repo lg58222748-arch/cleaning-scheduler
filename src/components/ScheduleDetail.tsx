@@ -517,7 +517,7 @@ export default function ScheduleDetail({
     <div
       ref={detailRef}
       className="fixed inset-0 z-50 md:flex md:items-center md:justify-center md:bg-black/30 animate-[modalIn_0.15s_ease-out]"
-      style={{ paddingTop: "env(safe-area-inset-top, 0px)", paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
+      style={{ paddingTop: "var(--safe-top)", paddingBottom: "var(--safe-bottom)" }}
       // 빈 backdrop 영역을 '진짜로 클릭'했을 때만 닫기.
       // mousedown 과 mouseup(=click) 둘 다 backdrop(currentTarget) 에서 일어나야 함.
       // → 본문에서 드래그 시작해 backdrop 에서 뗀 경우(텍스트 선택) 는 닫지 않음.
@@ -846,7 +846,7 @@ export default function ScheduleDetail({
                 {viewerFile && (
                   <div
                     className="fixed inset-0 z-[80] bg-black/90 flex flex-col"
-                    style={{ paddingTop: "env(safe-area-inset-top, 0px)", paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
+                    style={{ paddingTop: "var(--safe-top)", paddingBottom: "var(--safe-bottom)" }}
                     onClick={() => setViewerFile(null)}
                   >
                     <div className="flex items-center justify-between px-4 py-3 shrink-0" onClick={(e) => e.stopPropagation()}>

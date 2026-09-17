@@ -76,6 +76,40 @@ export default function Home() {
     };
   }, []);
 
+  // 안전영역 보정 — 안드로이드 15+ edge-to-edge 기기(갤럭시 S26 등)에서
+  // env(safe-area-inset-*) 가 0 으로 와서 화면이 상태바/네비바에 가려지는 문제 방지.
+  // env() 실측값이 0 일 때만 fallback 을 채우므로, 정상 동작하는 기기·브라우저는 영향 없음.
+  useEffect(() => {
+    function applySafeAreaFallback() {
+      try {
+        const probe = document.createElement("div");
+        probe.style.cssText =
+          "position:fixed;top:0;left:0;width:0;height:0;visibility:hidden;pointer-events:none;" +
+          "padding-top:var(--safe-top);padding-bottom:var(--safe-bottom);";
+        document.body.appendChild(probe);
+        const cs = getComputedStyle(probe);
+        const top = parseFloat(cs.paddingTop) || 0;
+        const bottom = parseFloat(cs.paddingBottom) || 0;
+        probe.remove();
+
+        const root = document.documentElement;
+        // 화면 전체를 차지하는(=시스템 바 밑으로 파고드는) 상태인지 확인
+        const fullBleed = window.innerHeight >= (window.screen?.height || 0) - 2;
+        if (top < 1 && fullBleed) root.style.setProperty("--safe-top-fallback", "32px");
+        else root.style.removeProperty("--safe-top-fallback");
+        if (bottom < 1 && fullBleed) root.style.setProperty("--safe-bottom-fallback", "40px");
+        else root.style.removeProperty("--safe-bottom-fallback");
+      } catch { /* 측정 실패 시 기존 동작 유지 */ }
+    }
+    applySafeAreaFallback();
+    window.addEventListener("orientationchange", applySafeAreaFallback);
+    window.addEventListener("resize", applySafeAreaFallback);
+    return () => {
+      window.removeEventListener("orientationchange", applySafeAreaFallback);
+      window.removeEventListener("resize", applySafeAreaFallback);
+    };
+  }, []);
+
   // 클라이언트에서만 localStorage 복원 + 캐시 즉시 로드
   useEffect(() => {
     let hasCachedData = false;
@@ -936,7 +970,7 @@ export default function Home() {
   // 스플래시: 1초, 로고 이미지 배경과 동일 색상
   if (showSplash) {
     return (
-      <div className="fixed inset-0 bg-white flex flex-col items-center justify-center" style={{ paddingTop: "env(safe-area-inset-top, 0px)", paddingBottom: "env(safe-area-inset-bottom, 0px)" }}>
+      <div className="fixed inset-0 bg-white flex flex-col items-center justify-center" style={{ paddingTop: "var(--safe-top)", paddingBottom: "var(--safe-bottom)" }}>
         <img src="/logo.jpg" alt="새집느낌" className="w-64 h-64 object-contain" loading="eager" />
         <span className="text-2xl font-bold text-[#3a9ad9] mt-2 tracking-wider">파트너</span>
       </div>
@@ -1222,12 +1256,17 @@ export default function Home() {
   })();
 
   return (
-    <div className="h-[100dvh] bg-white pb-14 flex flex-col overflow-hidden" style={{ paddingTop: "env(safe-area-inset-top, 0px)" }}>
+    <div
+      className="h-[100dvh] bg-white flex flex-col overflow-hidden"
+      // 하단 여백 = 탭바 높이(3.5rem) + 안전영역. 예전엔 pb-14 고정이라
+      // 안전영역만큼 탭바가 콘텐츠를 덮어 아래가 잘렸음.
+      style={{ paddingTop: "var(--safe-top)", paddingBottom: "calc(3.5rem + var(--safe-bottom))" }}
+    >
       {/* 오프라인 배너 — 인터넷 끊김 알림 (action 시도 전에 사용자가 인지) */}
       {!isOnline && (
         <div
           className="fixed top-0 left-0 right-0 z-[200] bg-red-500 text-white text-center text-xs font-medium py-1.5 shadow-md"
-          style={{ paddingTop: "calc(env(safe-area-inset-top, 0px) + 6px)" }}
+          style={{ paddingTop: "calc(var(--safe-top) + 6px)" }}
         >
           ⚠️ 인터넷 연결이 끊겼어요. 작업이 저장되지 않을 수 있습니다.
         </div>
@@ -1238,7 +1277,7 @@ export default function Home() {
 
       {/* 카카오톡 인앱브라우저 감지 → 외부 브라우저 이동 */}
       {isInApp && (
-        <div className="fixed inset-0 bg-black/80 z-[100] flex items-center justify-center p-6" style={{ paddingTop: "env(safe-area-inset-top, 0px)", paddingBottom: "env(safe-area-inset-bottom, 0px)" }}>
+        <div className="fixed inset-0 bg-black/80 z-[100] flex items-center justify-center p-6" style={{ paddingTop: "var(--safe-top)", paddingBottom: "var(--safe-bottom)" }}>
           <div className="bg-white rounded-2xl p-6 text-center max-w-sm w-full">
             <div className="text-3xl mb-3">⚠️</div>
             <h2 className="text-lg font-bold text-gray-900 mb-2">외부 브라우저에서 열어주세요</h2>
@@ -1261,7 +1300,7 @@ export default function Home() {
 
       {/* PWA 설치 - 대문짝만하게 */}
       {showInstallBanner && !isInApp && (
-        <div className="fixed inset-0 bg-black/70 z-[90] flex items-center justify-center p-6" style={{ paddingTop: "env(safe-area-inset-top, 0px)", paddingBottom: "env(safe-area-inset-bottom, 0px)" }}>
+        <div className="fixed inset-0 bg-black/70 z-[90] flex items-center justify-center p-6" style={{ paddingTop: "var(--safe-top)", paddingBottom: "var(--safe-bottom)" }}>
           <div className="bg-white rounded-2xl p-6 text-center max-w-sm w-full">
             <div className="text-4xl mb-3">📲</div>
             <h2 className="text-xl font-bold text-gray-900 mb-2">새집느낌 파트너 설치</h2>
@@ -1739,7 +1778,7 @@ export default function Home() {
 
 
       {/* Bottom tab bar - mobile style */}
-      <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-40" style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}>
+      <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-40" style={{ paddingBottom: "var(--safe-bottom)" }}>
         <div className="flex items-center justify-around h-14 max-w-lg mx-auto">
           {/* 영업 */}
           {canSales && (
@@ -1867,7 +1906,7 @@ export default function Home() {
       )}
       {/* 날짜 클릭 팝업 - 삼성 캘린더 스타일 (달력탭에서만) */}
       {showDayPopup && activeTab === "calendar" && (
-        <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50 px-5" style={{ paddingTop: "env(safe-area-inset-top, 0px)", paddingBottom: "env(safe-area-inset-bottom, 0px)" }} onClick={(e) => { if (e.target === e.currentTarget) { setShowDayPopup(false); consumeHash(); } }}>
+        <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50 px-5" style={{ paddingTop: "var(--safe-top)", paddingBottom: "var(--safe-bottom)" }} onClick={(e) => { if (e.target === e.currentTarget) { setShowDayPopup(false); consumeHash(); } }}>
           <div className="bg-white rounded-3xl shadow-2xl w-full max-w-[380px] animate-[modalIn_0.15s_ease-out]">
             {/* 날짜 헤더 */}
             <div className="px-5 pt-5 pb-3 flex items-center justify-between">
@@ -2026,7 +2065,7 @@ export default function Home() {
         const pu = profileUser;
         const canEdit = isAdmin && pu.username !== currentUser.username;
         return (
-        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center px-6" style={{ paddingTop: "env(safe-area-inset-top, 0px)", paddingBottom: "env(safe-area-inset-bottom, 0px)" }} onClick={(e) => { if (e.target === e.currentTarget) { setProfileUser(null); consumeHash(); } }}>
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center px-6" style={{ paddingTop: "var(--safe-top)", paddingBottom: "var(--safe-bottom)" }} onClick={(e) => { if (e.target === e.currentTarget) { setProfileUser(null); consumeHash(); } }}>
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm animate-[modalIn_0.15s_ease-out]">
             <div className="px-5 pt-5 pb-3 flex items-center justify-between">
               <h3 className="text-base font-bold text-gray-800">신상정보</h3>

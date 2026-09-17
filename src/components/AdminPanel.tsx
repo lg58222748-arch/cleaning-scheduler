@@ -184,8 +184,8 @@ export default function AdminPanel({ onClose, onRefresh }: AdminPanelProps) {
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50" style={{ paddingTop: "env(safe-area-inset-top, 0px)", paddingBottom: "env(safe-area-inset-bottom, 0px)" }}>
-      <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-xl w-full sm:max-w-lg max-h-[85vh] flex flex-col" style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}>
+    <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50" style={{ paddingTop: "var(--safe-top)", paddingBottom: "var(--safe-bottom)" }}>
+      <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-xl w-full sm:max-w-lg max-h-[85vh] flex flex-col" style={{ paddingBottom: "var(--safe-bottom)" }}>
         <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
           <h3 className="text-base font-bold text-gray-800">설정</h3>
           <button onClick={onClose} className="p-1 active:bg-gray-100 rounded-lg">

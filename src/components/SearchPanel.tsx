@@ -113,7 +113,7 @@ export default function SearchPanel({ onSelectSchedule, onClose, filterResults }
   }
 
   return (
-    <div className="fixed inset-0 bg-white z-50 flex flex-col animate-[modalIn_0.15s_ease-out]" style={{ paddingTop: "env(safe-area-inset-top, 0px)", paddingBottom: "env(safe-area-inset-bottom, 0px)" }}>
+    <div className="fixed inset-0 bg-white z-50 flex flex-col animate-[modalIn_0.15s_ease-out]" style={{ paddingTop: "var(--safe-top)", paddingBottom: "var(--safe-bottom)" }}>
       {/* 검색 헤더 */}
       <div className="px-4 py-3 border-b border-gray-100 flex items-center gap-3">
         <button onClick={onClose} className="p-1.5 active:bg-gray-100 rounded-lg shrink-0">
