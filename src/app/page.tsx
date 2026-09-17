@@ -93,11 +93,17 @@ export default function Home() {
         probe.remove();
 
         const root = document.documentElement;
-        // 화면 전체를 차지하는(=시스템 바 밑으로 파고드는) 상태인지 확인
-        const fullBleed = window.innerHeight >= (window.screen?.height || 0) - 2;
-        if (top < 1 && fullBleed) root.style.setProperty("--safe-top-fallback", "32px");
+        // 보정 대상: Capacitor 네이티브 앱(안드로이드 edge-to-edge) 또는
+        // 시스템 바 밑까지 콘텐츠가 깔리는 모바일 전체화면. 데스크톱 브라우저는 제외.
+        const cap = (window as unknown as { Capacitor?: { isNativePlatform?: () => boolean; isNative?: boolean } }).Capacitor;
+        const isNative = !!(cap && (typeof cap.isNativePlatform === "function" ? cap.isNativePlatform() : cap.isNative));
+        const coarse = typeof window.matchMedia === "function" && window.matchMedia("(pointer: coarse)").matches;
+        const fullBleed = window.innerHeight > 0 && window.innerHeight >= (window.screen?.height || 0) - 2;
+        const needFallback = isNative || (coarse && fullBleed);
+
+        if (needFallback && top < 1) root.style.setProperty("--safe-top-fallback", "32px");
         else root.style.removeProperty("--safe-top-fallback");
-        if (bottom < 1 && fullBleed) root.style.setProperty("--safe-bottom-fallback", "40px");
+        if (needFallback && bottom < 1) root.style.setProperty("--safe-bottom-fallback", "40px");
         else root.style.removeProperty("--safe-bottom-fallback");
       } catch { /* 측정 실패 시 기존 동작 유지 */ }
     }
