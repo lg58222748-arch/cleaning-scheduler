@@ -28,6 +28,12 @@ interface ScheduleDetailProps {
 
 type DetailTab = "info" | "checklist" | "settlement";
 
+// 선택 상자·입력칸을 쓰는 중인지 — 이때 생긴 스와이프/배경 클릭은 창 닫기로 보지 않는다.
+function isEditingControl(el: HTMLElement | null): boolean {
+  if (!el || typeof el.closest !== "function") return false;
+  return !!el.closest("select, input, textarea, [contenteditable='true']");
+}
+
 // 첨부파일 목록 캐시 — 같은 일정을 다시 열면 목록이 즉시 뜨고, 백그라운드로 최신화.
 // (서명 URL 은 1시간 유효라 세션 내 재사용 안전)
 type AttachedFile = { path: string; displayName: string; size: number; url: string };
@@ -528,7 +534,9 @@ export default function ScheduleDetail({
       // 터치 제스처만 닫기 트리거가 되도록 제한.
       mc = new Hammer.default(detailRef.current, { inputClass: Hammer.default.TouchInput });
       mc.get("swipe").set({ direction: Hammer.default.DIRECTION_RIGHT });
-      mc.on("swiperight", () => {
+      mc.on("swiperight", (ev) => {
+        // 선택 상자(배정 팀장 등)·입력칸을 손가락으로 끌다가 옆으로 움직임이 섞인 건 닫기로 보지 않음
+        if (isEditingControl(ev.target as HTMLElement | null)) return;
         if (tabHistoryRef.current.length > 0) {
           const prev = tabHistoryRef.current.pop()!;
           setActiveTab(prev);
@@ -550,8 +558,16 @@ export default function ScheduleDetail({
       // → 본문에서 드래그 시작해 backdrop 에서 뗀 경우(텍스트 선택) 는 닫지 않음.
       onMouseDown={(e) => { backdropMouseDownRef.current = e.target === e.currentTarget; }}
       onClick={(e) => {
-        if (e.target === e.currentTarget && backdropMouseDownRef.current) onClose();
+        const fromBackdrop = e.target === e.currentTarget && backdropMouseDownRef.current;
         backdropMouseDownRef.current = false;
+        if (!fromBackdrop) return;
+        // 드롭다운 목록을 끌다가 목록 밖에서 손을 떼면 브라우저가 배경에 클릭을 보내는 경우가 있음.
+        // 선택 상자·입력칸을 쓰던 중이면 창을 닫지 않고 포커스만 해제 (한 번 더 누르면 닫힘)
+        if (isEditingControl(document.activeElement as HTMLElement | null)) {
+          (document.activeElement as HTMLElement).blur();
+          return;
+        }
+        onClose();
       }}
     >
       <div className="h-full w-full md:h-[85vh] md:w-[480px] md:rounded-2xl md:shadow-2xl bg-white flex flex-col overflow-hidden">
