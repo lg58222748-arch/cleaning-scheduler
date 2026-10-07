@@ -9,9 +9,11 @@ interface SearchPanelProps {
   onClose: () => void;
   // 역할별 필터 — 현장팀은 본인 일정만 검색되게. 없으면 전체 노출.
   filterResults?: (list: Schedule[]) => Schedule[];
+  // 현장팀 검색 범위 — 서버에서 본인(+추가 열람) 일정 안에서만 검색
+  scope?: { uid?: string; names?: string[] };
 }
 
-export default function SearchPanel({ onSelectSchedule, onClose, filterResults }: SearchPanelProps) {
+export default function SearchPanel({ onSelectSchedule, onClose, filterResults, scope }: SearchPanelProps) {
   const PAGE_SIZE = 50; // 서버 searchSchedules 페이지 크기와 동일
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<Schedule[]>([]);
@@ -44,7 +46,7 @@ export default function SearchPanel({ onSelectSchedule, onClose, filterResults }
     timerRef.current = setTimeout(async () => {
       const seq = ++seqRef.current;
       setLoading(true);
-      const data = await searchSchedules(q.trim(), withDeleted);
+      const data = await searchSchedules(q.trim(), withDeleted, 0, scope);
       if (seq !== seqRef.current) return; // 그 사이 새 검색 시작됨 — 이 응답 버림
       rawOffsetRef.current = data.length;
       setHasMore(data.length === PAGE_SIZE);
@@ -66,7 +68,7 @@ export default function SearchPanel({ onSelectSchedule, onClose, filterResults }
     if (query.trim()) {
       const seq = ++seqRef.current;
       setLoading(true);
-      searchSchedules(query.trim(), next).then((data) => {
+      searchSchedules(query.trim(), next, 0, scope).then((data) => {
         if (seq !== seqRef.current) return;
         rawOffsetRef.current = data.length;
         setHasMore(data.length === PAGE_SIZE);
@@ -82,7 +84,7 @@ export default function SearchPanel({ onSelectSchedule, onClose, filterResults }
     if (loadingMore || !query.trim()) return;
     const seq = seqRef.current;
     setLoadingMore(true);
-    const data = await searchSchedules(query.trim(), includeDeleted, rawOffsetRef.current);
+    const data = await searchSchedules(query.trim(), includeDeleted, rawOffsetRef.current, scope);
     if (seq !== seqRef.current) { setLoadingMore(false); return; } // 새 검색 시작됨
     rawOffsetRef.current += data.length;
     setHasMore(data.length === PAGE_SIZE);
@@ -159,8 +161,11 @@ export default function SearchPanel({ onSelectSchedule, onClose, filterResults }
 
       {/* 검색 결과 */}
       <div className="flex-1 overflow-y-auto">
-        {loading && (
+        {loading && results.length === 0 && (
           <div className="py-12 text-center text-gray-400 text-sm">검색 중...</div>
+        )}
+        {loading && results.length > 0 && (
+          <div className="h-0.5 bg-blue-400 animate-pulse" />
         )}
 
         {!loading && searched && results.length === 0 && (
@@ -169,14 +174,14 @@ export default function SearchPanel({ onSelectSchedule, onClose, filterResults }
           </div>
         )}
 
-        {!loading && !searched && (
+        {!loading && !searched && results.length === 0 && (
           <div className="py-12 text-center text-gray-400 text-sm">
             이름, 주소, 내용으로 검색하세요
           </div>
         )}
 
-        {!loading && results.length > 0 && (
-          <div>
+        {results.length > 0 && (
+          <div className={loading ? "opacity-60 transition-opacity" : "transition-opacity"}>
             {Object.entries(grouped).map(([date, schedules]) => (
               <div key={date}>
                 <div className="px-4 py-2 bg-gray-50 text-xs font-medium text-gray-500">

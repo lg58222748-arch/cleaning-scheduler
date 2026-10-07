@@ -40,7 +40,7 @@ function rowToMember(r: Record<string, unknown>): Member {
   return { id: String(r.id), name: String(r.name), color: String(r.color), phone: String(r.phone || ""), availableDays: (r.available_days as number[]) || [1,2,3,4,5], active: Boolean(r.active), linkedUsername: r.linked_username ? String(r.linked_username) : undefined };
 }
 function rowToSchedule(r: Record<string, unknown>): Schedule {
-  return { id: String(r.id), memberId: String(r.member_id || ""), memberName: String(r.member_name || "미배정"), title: String(r.title), location: String(r.location || ""), date: String(r.date), startTime: String(r.start_time), endTime: String(r.end_time), status: String(r.status) as Schedule["status"], assignedTo: r.assigned_to ? String(r.assigned_to) : undefined, assignedToName: r.assigned_to_name ? String(r.assigned_to_name) : undefined, googleEventId: r.google_event_id ? String(r.google_event_id) : undefined, note: sanitizeNote(r.note as string | null | undefined), color: r.color ? String(r.color) : undefined, assignedAt: r.assigned_at ? String(r.assigned_at) : undefined, createdAt: r.created_at ? String(r.created_at) : undefined };
+  return { id: String(r.id), memberId: String(r.member_id || ""), memberName: String(r.member_name || "미배정"), title: String(r.title), location: String(r.location || ""), date: String(r.date), startTime: String(r.start_time), endTime: String(r.end_time), status: String(r.status) as Schedule["status"], assignedTo: r.assigned_to ? String(r.assigned_to) : undefined, assignedToName: r.assigned_to_name ? String(r.assigned_to_name) : undefined, googleEventId: r.google_event_id ? String(r.google_event_id) : undefined, note: sanitizeNote(r.note as string | null | undefined), color: r.color ? String(r.color) : undefined, assignedAt: r.assigned_at ? String(r.assigned_at) : undefined, createdAt: r.created_at ? String(r.created_at) : undefined, deletedAt: r.deleted_at ? String(r.deleted_at) : undefined };
 }
 function rowToSwapRequest(r: Record<string, unknown>): SwapRequest {
   return { id: String(r.id), fromScheduleId: String(r.from_schedule_id), toScheduleId: String(r.to_schedule_id), fromMemberId: String(r.from_member_id), toMemberId: String(r.to_member_id), status: String(r.status) as SwapRequest["status"], createdAt: String(r.created_at) };
@@ -98,18 +98,65 @@ export async function deleteMember(id: string): Promise<boolean> {
   return !error;
 }
 
+// ===== 안정 페이지네이션 =====
+// Supabase 는 한 번에 최대 1000행 → 여러 페이지로 나눠 받는다.
+// 정렬 키가 date 하나뿐이면 같은 날짜 행끼리 순서가 쿼리마다 달라져서, 페이지 경계에서
+// 같은 일정이 두 번 오거나(달력 중복 표시) 아예 빠지는(일정 누락) 버그가 있었음.
+// → id 를 마지막 정렬 키로 붙여 순서를 고정하고, 페이지는 병렬로 받아 로딩 시간도 단축.
+// 한 페이지라도 실패하면 throw → API 500 → 클라이언트는 기존 데이터를 유지한다(부분 데이터로 덮어쓰기 방지).
+const PAGE_SIZE = 1000;
+type PageResult = { data: Record<string, unknown>[] | null; error: { message: string } | null };
+type OrderableQuery = {
+  order: (column: string, opts: { ascending: boolean }) => OrderableQuery;
+  range: (from: number, to: number) => PromiseLike<PageResult>;
+};
+async function fetchAllPaged(
+  makeQuery: (countOnly: boolean) => unknown,
+  orders: Array<[string, boolean]>,
+): Promise<Record<string, unknown>[]> {
+  const head = await (makeQuery(true) as PromiseLike<{ count: number | null; error: { message: string } | null }>);
+  if (head.error) throw new Error(head.error.message);
+  const fetchPage = (i: number) => {
+    let q = makeQuery(false) as OrderableQuery;
+    for (const [col, asc] of orders) q = q.order(col, { ascending: asc });
+    q = q.order("id", { ascending: true });
+    return q.range(i * PAGE_SIZE, i * PAGE_SIZE + PAGE_SIZE - 1);
+  };
+  // 개수 조회 직후 새 행이 들어올 수 있어 한 페이지 여유분까지 병렬 요청
+  const pageCount = Math.floor((head.count ?? 0) / PAGE_SIZE) + 1;
+  const pages = await Promise.all(Array.from({ length: pageCount }, (_, i) => fetchPage(i)));
+  const rows: Record<string, unknown>[] = [];
+  for (const p of pages) {
+    if (p.error) throw new Error(p.error.message);
+    rows.push(...(p.data || []));
+  }
+  // 그 사이 더 늘어나 마지막 페이지가 꽉 찼으면 이어서 순차로 받기
+  let next = pageCount;
+  let lastLen = pages[pages.length - 1]?.data?.length ?? 0;
+  while (lastLen === PAGE_SIZE && next < 60) {
+    const p = await fetchPage(next++);
+    if (p.error) throw new Error(p.error.message);
+    rows.push(...(p.data || []));
+    lastLen = p.data?.length ?? 0;
+  }
+  // 최종 안전장치: id 중복 제거
+  const seen = new Set<string>();
+  return rows.filter((r) => {
+    const id = String(r.id);
+    if (seen.has(id)) return false;
+    seen.add(id);
+    return true;
+  });
+}
+const countOpt = (countOnly: boolean) => (countOnly ? { count: "exact" as const, head: true } : undefined);
+
 // ===== Schedules =====
 export async function getSchedules(): Promise<Schedule[]> {
-  // 자동 페이지네이션 — Supabase 1000건 cap 우회
-  const all: Schedule[] = [];
-  const pageSize = 1000;
-  for (let offset = 0; offset < 50000; offset += pageSize) {
-    const { data, error } = await supabase.from("schedules").select("*").neq("status", "deleted").order("date").range(offset, offset + pageSize - 1);
-    if (error || !data) break;
-    all.push(...data.map(rowToSchedule));
-    if (data.length < pageSize) break;
-  }
-  return all;
+  const rows = await fetchAllPaged(
+    (c) => supabase.from("schedules").select("*", countOpt(c)).neq("status", "deleted"),
+    [["date", true]],
+  );
+  return rows.map(rowToSchedule);
 }
 
 export async function getSchedule(id: string): Promise<Schedule | undefined> {
@@ -119,51 +166,62 @@ export async function getSchedule(id: string): Promise<Schedule | undefined> {
 
 export async function getSchedulesByRange(start: string, end: string): Promise<Schedule[]> {
   // 배정된 일정만 (unassigned, deleted 제외)
-  // 자동 페이지네이션 — Supabase 서버측 1000건 cap 우회. 일정이 1000개 넘으면 미래분 잘리던 버그 방지.
-  const all: Schedule[] = [];
-  const pageSize = 1000;
-  for (let offset = 0; offset < 50000; offset += pageSize) {
-    const { data, error } = await supabase.from("schedules").select("*")
+  const rows = await fetchAllPaged(
+    (c) => supabase.from("schedules").select("*", countOpt(c))
       .gte("date", start).lte("date", end)
-      .not("status", "in", '("deleted","unassigned")')
-      .order("date")
-      .range(offset, offset + pageSize - 1);
-    if (error || !data) break;
-    all.push(...data.map(rowToSchedule));
-    if (data.length < pageSize) break;
-  }
-  return all;
+      .not("status", "in", '("deleted","unassigned")'),
+    [["date", true]],
+  );
+  return rows.map(rowToSchedule);
 }
 
 export async function getUnassignedSchedules(): Promise<Schedule[]> {
   // 자동 페이지네이션
   // status='unassigned' 뿐 아니라 member_name='미배정' 도 포함한다.
   // (담당=미배정 인데 status 가 confirmed 로 남은 "고아" 일정이 배정탭에서 누락되던 버그 방지)
-  const all: Schedule[] = [];
-  const pageSize = 1000;
-  for (let offset = 0; offset < 50000; offset += pageSize) {
-    const { data, error } = await supabase.from("schedules").select("*")
+  const rows = await fetchAllPaged(
+    (c) => supabase.from("schedules").select("*", countOpt(c))
       .or("status.eq.unassigned,member_name.eq.미배정")
-      .neq("status", "deleted")
-      .order("date").range(offset, offset + pageSize - 1);
-    if (error || !data) break;
-    all.push(...data.map(rowToSchedule));
-    if (data.length < pageSize) break;
-  }
-  return all;
+      .neq("status", "deleted"),
+    [["date", true]],
+  );
+  return rows.map(rowToSchedule);
 }
 
-export async function searchSchedules(query: string, includeDeleted = false, offset = 0): Promise<Schedule[]> {
+// PostgREST 필터 값 — 쉼표·괄호가 섞여도 문법이 깨지지 않게 큰따옴표로 감싼다.
+// 값 안의 큰따옴표·역슬래시는 따옴표 문법을 깨뜨리므로 제거(일정 검색에서 의미 없는 문자).
+function pgQuoted(value: string): string {
+  return `"${value.replace(/["\\]/g, "")}"`;
+}
+
+export type SearchScope = { uid?: string; names?: string[] };
+
+export async function searchSchedules(query: string, includeDeleted = false, offset = 0, scope?: SearchScope): Promise<Schedule[]> {
   // offset 페이지네이션 — 검색 결과 50건 제한을 "더보기" 로 이어서 불러올 수 있게.
   // date 동률일 때 페이지 경계에서 중복/누락 안 생기도록 id 보조 정렬 추가.
+  const pattern = pgQuoted(`%${query}%`);
   let q = supabase.from("schedules").select("*")
-    .or(`title.ilike.%${query}%,note.ilike.%${query}%,member_name.ilike.%${query}%`)
+    .or(`title.ilike.${pattern},note.ilike.${pattern},member_name.ilike.${pattern}`);
+  // 현장팀은 본인(+추가 열람 허용) 일정 안에서만 검색.
+  // 예전엔 전체 상위 50건을 받아 앱에서 본인 것만 걸러서, 본인 일정이 50건 밖에 있으면
+  // "검색 결과 없음"이나 몇 건만 뜨던 문제가 있었음.
+  if (scope) {
+    const conds: string[] = [];
+    if (scope.uid) conds.push(`assigned_to.eq.${pgQuoted(scope.uid)}`);
+    const names = (scope.names || []).map((n) => n.trim()).filter(Boolean);
+    if (names.length > 0) {
+      const list = `(${names.map(pgQuoted).join(",")})`;
+      conds.push(`member_name.in.${list}`, `assigned_to_name.in.${list}`);
+    }
+    if (conds.length > 0) q = q.or(conds.join(","));
+  }
+  // includeDeleted=false 면 휴지통(deleted) 제외 — 기본 동작
+  if (!includeDeleted) q = q.neq("status", "deleted");
+  const { data, error } = await q
     .order("date", { ascending: false })
     .order("id", { ascending: true })
     .range(offset, offset + 49);
-  // includeDeleted=false 면 휴지통(deleted) 제외 — 기본 동작
-  if (!includeDeleted) q = q.neq("status", "deleted");
-  const { data } = await q;
+  if (error) throw new Error(error.message);
   return (data || []).map(rowToSchedule);
 }
 
@@ -221,21 +279,28 @@ export async function deleteAllSchedules(): Promise<number> {
 // 소프트 삭제 (휴지통)
 export async function softDeleteSchedule(id: string): Promise<Schedule | null> {
   const { data } = await supabase.from("schedules").update({ status: "deleted" }).eq("id", id).select().single();
-  return data ? rowToSchedule(data) : null;
+  if (!data) return null;
+  // 삭제 시각 기록 — 휴지통 최근삭제순 정렬용. deleted_at 컬럼이 아직 없어도 삭제 자체는 위에서 끝남.
+  const nowIso = new Date().toISOString();
+  const { error: tsErr } = await supabase.from("schedules").update({ deleted_at: nowIso }).eq("id", id);
+  return rowToSchedule(tsErr ? data : { ...data, deleted_at: nowIso });
 }
 
 // 휴지통 목록
 export async function getDeletedSchedules(): Promise<Schedule[]> {
-  // 자동 페이지네이션
-  const all: Schedule[] = [];
-  const pageSize = 1000;
-  for (let offset = 0; offset < 50000; offset += pageSize) {
-    const { data, error } = await supabase.from("schedules").select("*").eq("status", "deleted").order("date", { ascending: false }).range(offset, offset + pageSize - 1);
-    if (error || !data) break;
-    all.push(...data.map(rowToSchedule));
-    if (data.length < pageSize) break;
-  }
-  return all;
+  const rows = await fetchAllPaged(
+    (c) => supabase.from("schedules").select("*", countOpt(c)).eq("status", "deleted"),
+    [["date", false]],
+  );
+  // 휴지통은 "최근에 삭제한 순". 삭제 시각(deleted_at)이 기록된 건이 위로, 기록 시작 전에
+  // 삭제돼 시각을 모르는 예전 건은 그 아래 날짜 최신순. (컬럼이 없어도 동작)
+  const list = rows.map(rowToSchedule);
+  return list.sort((a, b) => {
+    const ta = a.deletedAt ? Date.parse(a.deletedAt) || 0 : 0;
+    const tb = b.deletedAt ? Date.parse(b.deletedAt) || 0 : 0;
+    if (ta !== tb) return tb - ta;
+    return a.date < b.date ? 1 : a.date > b.date ? -1 : 0;
+  });
 }
 
 // 휴지통에서 복원
@@ -245,7 +310,10 @@ export async function restoreSchedule(id: string): Promise<Schedule | null> {
   const { data: before } = await supabase.from("schedules").select("member_name,assigned_to").eq("id", id).maybeSingle();
   const isUnassigned = !before || before.member_name === "미배정" || (!before.member_name && !before.assigned_to);
   const { data } = await supabase.from("schedules").update({ status: isUnassigned ? "unassigned" : "confirmed" }).eq("id", id).select().single();
-  return data ? rowToSchedule(data) : null;
+  if (!data) return null;
+  // 복원되면 삭제 시각 초기화 (best-effort — 컬럼 없으면 무시)
+  await supabase.from("schedules").update({ deleted_at: null }).eq("id", id);
+  return rowToSchedule({ ...data, deleted_at: null });
 }
 
 // 휴지통 비우기

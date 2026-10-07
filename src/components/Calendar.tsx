@@ -214,7 +214,12 @@ export default memo(function Calendar({
 
   const scheduleMap = useMemo(() => {
     const map = new Map<string, Schedule[]>();
+    // 같은 일정(id)이 두 번 들어와도 한 번만 그린다 — 중복 키는 React 가 칸을 꼬이게 그려
+    // "1개 일정이 2~3개로 보이는" 증상을 만든다.
+    const seen = new Set<string>();
     for (const s of schedules) {
+      if (seen.has(s.id)) continue;
+      seen.add(s.id);
       const existing = map.get(s.date) || [];
       existing.push(s);
       map.set(s.date, existing);

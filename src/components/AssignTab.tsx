@@ -103,7 +103,10 @@ function AssignTab({ members, schedules, onAssigned, onDeleted, onOpenDetail, on
   // 날짜별 미배정 맵
   const scheduleMap = useMemo(() => {
     const map = new Map<string, Schedule[]>();
+    const seen = new Set<string>(); // 같은 일정 중복 표시 방지
     for (const s of unassigned) {
+      if (seen.has(s.id)) continue;
+      seen.add(s.id);
       const existing = map.get(s.date) || [];
       existing.push(s);
       map.set(s.date, existing);

@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { updateSchedule, deleteSchedule, addNotification, getSchedules } from "@/lib/store";
+import { updateSchedule, deleteSchedule, addNotification, getSchedule } from "@/lib/store";
 import { supabase } from "@/lib/supabase";
 
 export async function PUT(
@@ -41,8 +41,8 @@ export async function DELETE(
 ) {
   const { id } = await params;
 
-  const allSchedules = await getSchedules();
-  const schedule = allSchedules.find((s) => s.id === id);
+  // 1건만 조회 (예전엔 전체 일정 수천 건을 다 불러와서 찾았음)
+  const schedule = await getSchedule(id);
   const deleted = await deleteSchedule(id);
   if (!deleted) return Response.json({ error: "Not found" }, { status: 404 });
 

@@ -2042,6 +2042,9 @@ export default function Home() {
       )}
       {showSearch && (
         <SearchPanel
+          scope={role === "field"
+            ? { uid: currentUser.id, names: [currentUser.name, ...(FIELD_EXTRA_VIEW[currentUser.username] || [])] }
+            : undefined}
           filterResults={(list) => {
             // 현장팀만 본인 일정만 검색되게 (달력과 동일 규칙 — 추가 열람 포함). 관리자/영업팀은 전체.
             if (role !== "field") return list;

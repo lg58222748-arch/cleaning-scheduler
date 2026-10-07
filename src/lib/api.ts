@@ -73,10 +73,19 @@ export async function fetchSchedulesOrNull(start?: string, end?: string): Promis
   }
 }
 
-export async function searchSchedules(query: string, includeDeleted = false, offset = 0): Promise<Schedule[]> {
+export async function searchSchedules(
+  query: string,
+  includeDeleted = false,
+  offset = 0,
+  scope?: { uid?: string; names?: string[] },
+): Promise<Schedule[]> {
   const delParam = includeDeleted ? "&includeDeleted=true" : "";
   const offParam = offset > 0 ? `&offset=${offset}` : "";
-  return safeJson(`${BASE}/api/schedules?q=${encodeURIComponent(query)}${delParam}${offParam}`, []);
+  // 현장팀 범위 — 서버에서 본인 일정 안에서만 검색
+  let scopeParam = "";
+  if (scope?.uid) scopeParam += `&uid=${encodeURIComponent(scope.uid)}`;
+  for (const n of scope?.names || []) if (n) scopeParam += `&names=${encodeURIComponent(n)}`;
+  return safeJson(`${BASE}/api/schedules?q=${encodeURIComponent(query)}${delParam}${offParam}${scopeParam}`, []);
 }
 
 export async function softDeleteSchedule(id: string): Promise<void> {

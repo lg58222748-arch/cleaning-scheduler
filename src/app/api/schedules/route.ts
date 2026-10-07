@@ -14,7 +14,11 @@ export async function GET(req: NextRequest) {
   if (query) {
     const includeDeleted = searchParams.get("includeDeleted") === "true";
     const offset = Math.max(0, parseInt(searchParams.get("offset") || "0", 10) || 0);
-    return Response.json(await searchSchedules(query, includeDeleted, offset));
+    // 현장팀 검색 범위 (본인 + 추가 열람 허용 계정)
+    const uid = searchParams.get("uid") || undefined;
+    const names = searchParams.getAll("names").filter(Boolean);
+    const scope = uid || names.length > 0 ? { uid, names } : undefined;
+    return Response.json(await searchSchedules(query, includeDeleted, offset, scope));
   }
   if (deleted === "true") {
     return Response.json(await getDeletedSchedules());
