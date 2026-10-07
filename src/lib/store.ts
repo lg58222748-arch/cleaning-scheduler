@@ -40,7 +40,7 @@ function rowToMember(r: Record<string, unknown>): Member {
   return { id: String(r.id), name: String(r.name), color: String(r.color), phone: String(r.phone || ""), availableDays: (r.available_days as number[]) || [1,2,3,4,5], active: Boolean(r.active), linkedUsername: r.linked_username ? String(r.linked_username) : undefined };
 }
 function rowToSchedule(r: Record<string, unknown>): Schedule {
-  return { id: String(r.id), memberId: String(r.member_id || ""), memberName: String(r.member_name || "미배정"), title: String(r.title), location: String(r.location || ""), date: String(r.date), startTime: String(r.start_time), endTime: String(r.end_time), status: String(r.status) as Schedule["status"], assignedTo: r.assigned_to ? String(r.assigned_to) : undefined, assignedToName: r.assigned_to_name ? String(r.assigned_to_name) : undefined, googleEventId: r.google_event_id ? String(r.google_event_id) : undefined, note: sanitizeNote(r.note as string | null | undefined), color: r.color ? String(r.color) : undefined, assignedAt: r.assigned_at ? String(r.assigned_at) : undefined, createdAt: r.created_at ? String(r.created_at) : undefined, deletedAt: r.deleted_at ? String(r.deleted_at) : undefined };
+  return { id: String(r.id), memberId: String(r.member_id || ""), memberName: String(r.member_name || "미배정"), title: String(r.title), location: String(r.location || ""), date: String(r.date), startTime: String(r.start_time), endTime: String(r.end_time), status: String(r.status) as Schedule["status"], assignedTo: r.assigned_to ? String(r.assigned_to) : undefined, assignedToName: r.assigned_to_name ? String(r.assigned_to_name) : undefined, googleEventId: r.google_event_id ? String(r.google_event_id) : undefined, note: "note" in r ? sanitizeNote(r.note as string | null | undefined) : undefined, color: r.color ? String(r.color) : undefined, assignedAt: r.assigned_at ? String(r.assigned_at) : undefined, createdAt: r.created_at ? String(r.created_at) : undefined, deletedAt: r.deleted_at ? String(r.deleted_at) : undefined };
 }
 function rowToSwapRequest(r: Record<string, unknown>): SwapRequest {
   return { id: String(r.id), fromScheduleId: String(r.from_schedule_id), toScheduleId: String(r.to_schedule_id), fromMemberId: String(r.from_member_id), toMemberId: String(r.to_member_id), status: String(r.status) as SwapRequest["status"], createdAt: String(r.created_at) };
@@ -150,11 +150,26 @@ async function fetchAllPaged(
 }
 const countOpt = (countOnly: boolean) => (countOnly ? { count: "exact" as const, head: true } : undefined);
 
+// 목록 조회용 컬럼 — 예약 본문(note)은 뺀다. 본문이 달력 데이터의 56%(1.6MB)를 차지해
+// 앱 시작·복귀가 느렸음. 본문은 일정을 열 때 getSchedule(id) 로 그 건만 받는다.
+// (note 키가 아예 없으면 rowToSchedule 이 note=undefined 로 만들어 "아직 안 받음"을 표시)
+const LIST_COLUMNS = "id,member_id,member_name,title,location,date,start_time,end_time,status,assigned_to,assigned_to_name,google_event_id,color,assigned_at,created_at";
+
 // ===== Schedules =====
 export async function getSchedules(): Promise<Schedule[]> {
   const rows = await fetchAllPaged(
-    (c) => supabase.from("schedules").select("*", countOpt(c)).neq("status", "deleted"),
+    (c) => supabase.from("schedules").select(LIST_COLUMNS, countOpt(c)).neq("status", "deleted"),
     [["date", true]],
+  );
+  return rows.map(rowToSchedule);
+}
+
+// 특정 시각 이후 등록된 일정 (영업 등록 통계용 — 청소 날짜와 무관하게 접수 시점 기준)
+export async function getSchedulesCreatedSince(sinceIso: string): Promise<Schedule[]> {
+  const rows = await fetchAllPaged(
+    (c) => supabase.from("schedules").select(LIST_COLUMNS, countOpt(c))
+      .gte("created_at", sinceIso).neq("status", "deleted"),
+    [["created_at", true]],
   );
   return rows.map(rowToSchedule);
 }
@@ -167,7 +182,7 @@ export async function getSchedule(id: string): Promise<Schedule | undefined> {
 export async function getSchedulesByRange(start: string, end: string): Promise<Schedule[]> {
   // 배정된 일정만 (unassigned, deleted 제외)
   const rows = await fetchAllPaged(
-    (c) => supabase.from("schedules").select("*", countOpt(c))
+    (c) => supabase.from("schedules").select(LIST_COLUMNS, countOpt(c))
       .gte("date", start).lte("date", end)
       .not("status", "in", '("deleted","unassigned")'),
     [["date", true]],
@@ -180,7 +195,7 @@ export async function getUnassignedSchedules(): Promise<Schedule[]> {
   // status='unassigned' 뿐 아니라 member_name='미배정' 도 포함한다.
   // (담당=미배정 인데 status 가 confirmed 로 남은 "고아" 일정이 배정탭에서 누락되던 버그 방지)
   const rows = await fetchAllPaged(
-    (c) => supabase.from("schedules").select("*", countOpt(c))
+    (c) => supabase.from("schedules").select(LIST_COLUMNS, countOpt(c))
       .or("status.eq.unassigned,member_name.eq.미배정")
       .neq("status", "deleted"),
     [["date", true]],
@@ -361,8 +376,24 @@ export async function updateSchedule(id: string, input: Partial<Schedule>): Prom
   if (input.status !== undefined) update.status = input.status;
   if (input.assignedTo !== undefined) update.assigned_to = input.assignedTo;
   if (input.assignedToName !== undefined) update.assigned_to_name = input.assignedToName;
-  if (input.note !== undefined) update.note = sanitizeNote(input.note);
+  if (input.note !== undefined) {
+    const incoming = sanitizeNote(input.note);
+    if (incoming.trim()) {
+      update.note = incoming;
+    } else {
+      // 데이터 보호: 기존 본문(예약 내용)이 있는데 빈 값으로 덮어쓰려는 요청은 무시한다.
+      // 목록 조회에서 본문을 빼고 받기 때문에, 본문을 못 받은 화면이 실수로 빈 값을 보내도
+      // 예약 내용이 지워지지 않게 하는 최종 안전장치.
+      const { data: cur } = await supabase.from("schedules").select("note").eq("id", id).maybeSingle();
+      if (cur?.note && String(cur.note).trim()) {
+        console.warn("[updateSchedule] 본문 빈 값 덮어쓰기 차단:", id);
+      } else {
+        update.note = incoming;
+      }
+    }
+  }
   if (input.color !== undefined) update.color = input.color;
+  if (Object.keys(update).length === 0) return (await getSchedule(id)) ?? null; // 바꿀 게 없으면 현재 값 반환
   const { data, error } = await supabase.from("schedules").update(update).eq("id", id).select().single();
   if (error) console.error("[updateSchedule] supabase error:", error);
   return data ? rowToSchedule(data) : null;

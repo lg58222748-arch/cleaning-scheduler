@@ -21,24 +21,24 @@ const SalesTab = dynamic(() => import("@/components/SalesTab"), { ssr: false });
 const BranchMapSection = dynamic(() => import("@/components/ManageTab").then(m => ({ default: m.BranchMap })), { ssr: false });
 import { sbClient } from "@/lib/supabase-client";
 import {
-  fetchMembers,
   createMember,
   updateMember as apiUpdateMember,
   deleteMember as apiDeleteMember,
   fetchSchedulesOrNull,
   fetchUnassignedSchedulesOrNull,
+  fetchMembersOrNull,
+  fetchSwapRequestsOrNull,
+  fetchNotificationsOrNull,
+  fetchUsersOrNull,
   createSchedule,
   updateSchedule as apiUpdateSchedule,
   softDeleteSchedule,
   unassignScheduleApi,
   assignScheduleApi,
-  fetchSwapRequests,
   createSwapRequest,
   approveSwapRequest,
   rejectSwapRequest,
   addUnassignedSchedule,
-  fetchNotifications,
-  fetchUsers,
   approveUserApi,
   rejectUserApi,
   changeUserRoleApi,
@@ -53,6 +53,56 @@ type TabMode = "calendar" | "manage" | "assign" | "members" | "sales" | "area";
 
 // 현장팀 추가 열람 허용 — "보는 사람 username" → 추가로 보이는 담당자 이름들.
 // 단방향: 이재준은 포장이사 일정까지 보이지만, 포장이사 계정에는 이재준 일정이 안 보임.
+// ===== 데이터 갱신 도우미 =====
+// 달력 조회 범위 — 보는 달 기준 앞뒤 1개월. 달을 넘기면 그 달 기준으로 다시 받는다.
+// (예전 앞뒤 3개월은 매번 3천 건 넘게 받아 시작·복귀가 느렸음)
+function scheduleRange(d: Date) {
+  return {
+    start: format(startOfMonth(subMonths(d, 1)), "yyyy-MM-dd"),
+    end: format(endOfMonth(addMonths(d, 1)), "yyyy-MM-dd"),
+  };
+}
+
+// 화면에 보이는 값이 같은지 비교 — 같으면 상태를 안 바꿔서 달력이 다시 그려지며 깜빡이지 않게 한다.
+// (본문 note 는 목록에 없으므로 비교에서 제외)
+function scheduleSig(s: Schedule): string {
+  return JSON.stringify([s.id, s.date, s.title, s.status, s.memberId, s.memberName, s.assignedTo || "", s.assignedToName || "", s.color || "", s.startTime, s.endTime, s.location || "", s.assignedAt || ""]);
+}
+function sameScheduleList(a: Schedule[], b: Schedule[]): boolean {
+  if (a === b) return true;
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    if (a[i].id !== b[i].id || scheduleSig(a[i]) !== scheduleSig(b[i])) return false;
+  }
+  return true;
+}
+function sameJson(a: unknown, b: unknown): boolean {
+  if (a === b) return true;
+  try { return JSON.stringify(a) === JSON.stringify(b); } catch { return false; }
+}
+
+// 내 알림만 추리기 — 처음 불러올 때와 실시간 갱신 때 같은 규칙을 쓰도록 하나로 통일.
+// (예전엔 두 곳의 규칙이 달라 해피콜 알림이 생겼다 사라지며 알림 개수가 깜빡였음)
+// - 가입 이전 알림 제외 / 전체공지는 모두 / 영업은 전체공지만
+// - 일정 반환: 관리자 + 본인 이름 포함 / 해피콜: 관리자 + 담당 이름 포함 / 그 외: 관리자 또는 본인 이름 포함
+function filterMyNotifications(all: Notification[], user: User | null, deleted: Set<string>, localRead: Set<string>): Notification[] {
+  const uName = user?.name || "";
+  const uRole = user?.role || "";
+  const uCreatedAt = user?.createdAt || "";
+  const isAdminOrScheduler = uRole === "ceo" || uRole === "admin" || uRole === "scheduler";
+  const isReturn = (n: Notification) => n.type === "schedule_returned" || n.title === "일정 반환";
+  return all.filter((n) => {
+    if (deleted.has(n.id)) return false;
+    if (uCreatedAt && n.createdAt && n.createdAt < uCreatedAt) return false;
+    if (n.type === "system_notice") return true;
+    if (uRole === "sales") return false;
+    if (isReturn(n)) return isAdminOrScheduler || (!!uName && n.message.includes(uName));
+    if (n.type === "happy_call_reminder") return isAdminOrScheduler || (!!uName && n.message.includes(uName));
+    if (isAdminOrScheduler) return true;
+    return !!uName && (n.message.includes(uName) || n.title.includes(uName));
+  }).map((n) => (localRead.has(n.id) ? { ...n, read: true } : n));
+}
+
 const FIELD_EXTRA_VIEW: Record<string, string[]> = {
   wowns7480: ["포장이사"], // 이재준 → 포장이사 달력 열람
 };
@@ -148,6 +198,9 @@ export default function Home() {
   const [unassignedSchedules, setUnassignedSchedules] = useState<Schedule[]>([]);
   const [swapRequests, setSwapRequests] = useState<SwapRequest[]>([]);
   const [selectedDate, setSelectedDate] = useState(new Date());
+  // 콜백·실시간 핸들러가 최신 선택 날짜를 읽게 하는 ref (의존성에 넣으면 날짜 탭마다 재구독됨)
+  const selectedDateRef = useRef(selectedDate);
+  selectedDateRef.current = selectedDate;
   const [activeTab, setActiveTab] = useState<TabMode>("calendar");
   const [showScheduleForm, setShowScheduleForm] = useState(false);
   const [editingSchedule, setEditingSchedule] = useState<Schedule | null>(null);
@@ -218,104 +271,57 @@ export default function Home() {
 
   const loadData = useCallback(async (monthDate?: Date, fullRefresh = false) => {
     const seq = ++loadSeqRef.current;
-    try {
-      // 우선순위: 명시적 monthDate > 현재 보고 있는 달력 월 > selectedDate
-      const d = monthDate || viewingMonthRef.current || selectedDate;
-      // 다음 reload 들도 동일 월 기준으로 찾게 ref 업데이트
-      viewingMonthRef.current = d;
-      // ±3개월 range — 초기 로딩 가벼움. pagination 으로 7월 사라짐 버그 이미 해결됨.
-      // 더 먼 미래 일정은 사용자가 달력 스와이프 시 handleCalendarMonthChange 가 자동 fetch.
-      const start = format(startOfMonth(subMonths(d, 3)), "yyyy-MM-dd");
-      const end = format(endOfMonth(addMonths(d, 3)), "yyyy-MM-dd");
+    // 우선순위: 명시적 monthDate > 현재 보고 있는 달력 월 > selectedDate
+    const d = monthDate || viewingMonthRef.current || selectedDateRef.current;
+    // 다음 reload 들도 동일 월 기준으로 찾게 ref 업데이트
+    viewingMonthRef.current = d;
+    const { start, end } = scheduleRange(d);
+    // 일정은 "가장 최근 요청"의 응답만, 배정·수정 직후 보호 구간이 아닐 때만 반영
+    const canApplySchedules = () => seq === loadSeqRef.current && Date.now() >= scheduleReloadSuppressRef.current;
+    const saveCache = (key: string, value: unknown) => {
+      setTimeout(() => { try { localStorage.setItem(key, JSON.stringify(value)); } catch { /* 용량 초과 등 무시 */ } }, 0);
+    };
 
-      if (fullRefresh) {
-        const [m, rangeScheds, unassignedScheds, sw, notif, usersData] = await Promise.all([
-          fetchMembers(),
-          fetchSchedulesOrNull(start, end),
-          fetchUnassignedSchedulesOrNull(),
-          fetchSwapRequests(),
-          fetchNotifications(),
-          fetchUsers(),
-        ]);
-        // stale 응답이면 schedule 관련은 덮어쓰지 않음 (월 이동 race)
-        const isStale = seq !== loadSeqRef.current;
-        setMembers(m);
-        // 일정 액션 중이거나 stale 이면 schedule 덮어쓰지 않음.
-        // rangeScheds/unassignedScheds 가 null 이면 fetch 실패 → 기존 데이터 유지(빈배열로 덮어쓰지 않음)
-        if (!isStale && Date.now() >= scheduleReloadSuppressRef.current) {
-          if (rangeScheds) setSchedules(rangeScheds);
-          if (unassignedScheds) setUnassignedSchedules(unassignedScheds);
-        }
-        setSwapRequests(sw);
-        // 알림 액션(모두읽음/지우기) 직후엔 loadData 결과로 덮어쓰지 않음 (깜빡임 방지)
-        if (Date.now() >= notifReloadSuppressRef.current) {
-          // 알림 필터:
-          // - 가입 시점 이전 알림은 신규 가입자에게 안 보여줌 (누적된 히스토리 제외)
-          // - system_notice: 모두
-          // - 일정 반환: 대표/admin/일정관리자/영업팀 (현장팀 제외)
-          // - 그 외: 본인 이름 포함된 것만 (현장팀 포함)
-          const allNotifs = notif.notifications as Notification[];
-          const uName = currentUser?.name || "";
-          const uRole = currentUser?.role || "";
-          const uCreatedAt = currentUser?.createdAt || "";
-          const deleted = deletedNotifIdsRef.current;
-          const isReturn = (n: Notification) => n.type === "schedule_returned" || n.title === "일정 반환";
-          const isAdminOrScheduler = uRole === "ceo" || uRole === "admin" || uRole === "scheduler";
-          const localRead = localReadIdsRef.current;
-          const myNotifs = allNotifs.filter(n => {
-            if (deleted.has(n.id)) return false;
-            // 가입 이전 알림 제외 (ISO 날짜 문자열 비교)
-            if (uCreatedAt && n.createdAt && n.createdAt < uCreatedAt) return false;
-            if (n.type === "system_notice") return true; // 전체공지는 모두(영업 포함)
-            if (uRole === "sales") return false; // 영업: 전체공지 외 모두 제외
-            if (isReturn(n)) {
-              if (isAdminOrScheduler) return true;
-              if (uName && n.message.includes(uName)) return true;
-              return false;
-            }
-            if (n.type === "happy_call_reminder") return isAdminOrScheduler || (!!uName && n.message.includes(uName));
-            if (isAdminOrScheduler) return true;
-            return uName && (n.message.includes(uName) || n.title.includes(uName));
-          }).map(n => localRead.has(n.id) ? { ...n, read: true } : n);
-          setNotifications(myNotifs);
-          setUnreadCount(myNotifs.filter(n => !n.read).length);
-        }
-        setAllUsers(usersData.users);
-        setPendingUsers(usersData.pendingUsers);
-        // 캐시 저장 — 비동기로 (메인 스레드 양보, 대용량 JSON.stringify 지연 숨김)
-        setTimeout(() => {
-          try {
-            localStorage.setItem("cached_members", JSON.stringify(m));
-            localStorage.setItem("cached_users", JSON.stringify(usersData));
-            // schedules 캐시: 과거 1달 / 미래 3달 — JSON.parse 부담 줄여서 콜드 스타트 빠르게.
-            // 미래분은 달력 스와이프 시 handleCalendarMonthChange 가 그때 fetch.
-            const todayMs = Date.now();
-            const minMs = todayMs - 31 * 24 * 60 * 60 * 1000;
-            const maxMs = todayMs + 93 * 24 * 60 * 60 * 1000;
-            // fetch 실패(null)면 캐시도 건드리지 않음 — 기존 캐시 보존
-            if (rangeScheds) {
-              const trimmed = rangeScheds.filter((s) => {
-                const t = Date.parse(s.date);
-                return !Number.isNaN(t) && t >= minMs && t <= maxMs;
-              });
-              localStorage.setItem("cached_schedules", JSON.stringify(trimmed));
-            }
-            // 미배정 일정도 캐시 — 배정탭 진입 시 즉시 표시
-            if (unassignedScheds) localStorage.setItem("cached_unassigned", JSON.stringify(unassignedScheds));
-          } catch {}
-        }, 0);
-      } else {
-        const rangeScheds = await fetchSchedulesOrNull(start, end);
-        if (seq !== loadSeqRef.current) return; // stale 응답 무시
-        // null 이면 fetch 실패 → 기존 일정 유지(빈배열로 안 지움)
-        if (rangeScheds && Date.now() >= scheduleReloadSuppressRef.current) {
-          setSchedules(rangeScheds);
-        }
-      }
-    } catch {
-      // 데이터 로드 실패 - 자동 재시도됨
-    }
-  }, [selectedDate]);
+    // 일정 — 실패(null)면 기존 화면·캐시 그대로 유지. 내용이 같으면 상태를 안 바꿔 깜빡임 방지.
+    const schedTask = fetchSchedulesOrNull(start, end).then((list) => {
+      if (!list || !canApplySchedules()) return;
+      setSchedules((prev) => (sameScheduleList(prev, list) ? prev : list));
+      if (fullRefresh) saveCache("cached_schedules", list);
+    });
+    if (!fullRefresh) { await schedTask.catch(() => {}); return; }
+
+    // 전체 새로고침: 각 데이터를 도착하는 대로 반영 — 가장 느린 요청을 기다리지 않아 달력이 먼저 뜬다.
+    await Promise.allSettled([
+      schedTask,
+      fetchUnassignedSchedulesOrNull().then((list) => {
+        if (!list || Date.now() < scheduleReloadSuppressRef.current) return;
+        setUnassignedSchedules((prev) => (sameScheduleList(prev, list) ? prev : list));
+        saveCache("cached_unassigned", list);
+      }),
+      fetchMembersOrNull().then((m) => {
+        if (!m) return;
+        setMembers((prev) => (sameJson(prev, m) ? prev : m));
+        saveCache("cached_members", m);
+      }),
+      fetchSwapRequestsOrNull().then((sw) => {
+        if (!sw) return;
+        setSwapRequests((prev) => (sameJson(prev, sw) ? prev : sw));
+      }),
+      fetchNotificationsOrNull().then((notif) => {
+        // 알림 액션(모두읽음/지우기) 직후엔 덮어쓰지 않음 (깜빡임 방지)
+        if (!notif || Date.now() < notifReloadSuppressRef.current) return;
+        const mine = filterMyNotifications(notif.notifications as Notification[], currentUserRef.current, deletedNotifIdsRef.current, localReadIdsRef.current);
+        setNotifications((prev) => (sameJson(prev, mine) ? prev : mine));
+        setUnreadCount(mine.filter((n) => !n.read).length);
+      }),
+      fetchUsersOrNull().then((u) => {
+        if (!u) return;
+        setAllUsers((prev) => (sameJson(prev, u.users) ? prev : u.users));
+        setPendingUsers((prev) => (sameJson(prev, u.pendingUsers) ? prev : u.pendingUsers));
+        saveCache("cached_users", u);
+      }),
+    ]);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // 필터 상태: 로그인한 사용자별로 localStorage 분리
   useEffect(() => {
@@ -486,71 +492,46 @@ export default function Home() {
   // Realtime + 경량 폴링 (알림만 30초, 일정은 Realtime으로)
   useEffect(() => {
     if (!currentUser) return;
-    const uName = currentUser?.name || "";
-    const uRole = currentUser?.role || "";
 
     function reloadSchedules() {
       // 일정 액션(반환/배정/생성/수정/삭제) 중엔 억제 - 낙관적 업데이트가 stale fetch 에 덮이는 것 방지
       if (Date.now() < scheduleReloadSuppressRef.current) return;
-      // 현재 보고 있는 달력 월 기준 (스크롤해서 먼 달 보고 있어도 해당 월 데이터 유지)
-      // ±3개월 range — loadData 와 동일
-      const d = viewingMonthRef.current || selectedDate;
-      const start = format(startOfMonth(subMonths(d, 3)), "yyyy-MM-dd");
-      const end = format(endOfMonth(addMonths(d, 3)), "yyyy-MM-dd");
+      // 현재 보고 있는 달력 월 기준 (loadData 와 같은 범위)
+      const { start, end } = scheduleRange(viewingMonthRef.current || selectedDateRef.current);
       const seq = ++loadSeqRef.current;
-      fetchSchedulesOrNull(start, end).then(s => {
-        if (seq !== loadSeqRef.current) return; // 더 최근 fetch 가 있으면 stale 응답 버림
-        if (Date.now() < scheduleReloadSuppressRef.current) return;
-        if (s) setSchedules(s); // null(실패) 이면 기존 일정 유지
-      }).catch(() => {});
-      fetchUnassignedSchedulesOrNull().then(s => {
-        // unassigned 는 월 범위 안 타므로 seq 가드 생략
-        if (Date.now() < scheduleReloadSuppressRef.current) return;
-        if (s) setUnassignedSchedules(s); // null(실패) 이면 기존 유지
-      }).catch(() => {});
+      fetchSchedulesOrNull(start, end).then((list) => {
+        // 실패(null)·더 최근 요청 있음·보호 구간이면 기존 유지. 내용 같으면 상태 안 바꿈(깜빡임 방지)
+        if (!list || seq !== loadSeqRef.current || Date.now() < scheduleReloadSuppressRef.current) return;
+        setSchedules((prev) => (sameScheduleList(prev, list) ? prev : list));
+      });
+      fetchUnassignedSchedulesOrNull().then((list) => {
+        if (!list || Date.now() < scheduleReloadSuppressRef.current) return;
+        setUnassignedSchedules((prev) => (sameScheduleList(prev, list) ? prev : list));
+      });
     }
     function reloadNotifications() {
       // 알림 액션 중이면 reload 억제
       if (Date.now() < notifReloadSuppressRef.current) return;
-      fetchNotifications().then(notif => {
-        // fetch 응답 도착 시점에도 재확인 (in-flight 중 액션 발생 케이스 방어)
-        if (Date.now() < notifReloadSuppressRef.current) return;
-        const allNotifs = notif.notifications as Notification[];
-        const uCreatedAt = currentUser?.createdAt || "";
-        const deleted = deletedNotifIdsRef.current;
-        const isReturn = (n: Notification) => n.type === "schedule_returned" || n.title === "일정 반환";
-        const isAdminOrScheduler = uRole === "ceo" || uRole === "admin" || uRole === "scheduler";
-        const localRead = localReadIdsRef.current;
-        const myNotifs = allNotifs.filter(n => {
-          if (deleted.has(n.id)) return false;
-          // 가입 이전 알림 제외
-          if (uCreatedAt && n.createdAt && n.createdAt < uCreatedAt) return false;
-          if (n.type === "system_notice") return true; // 전체공지는 모두(영업 포함)
-          if (uRole === "sales") return false;
-          if (isReturn(n)) {
-            if (isAdminOrScheduler) return true;
-            if (uName && n.message.includes(uName)) return true;
-            return false;
-          }
-          if (n.type === "happy_call_reminder") return isAdminOrScheduler;
-          if (isAdminOrScheduler) return true;
-          return uName && (n.message.includes(uName) || n.title.includes(uName));
-        }).map(n => localRead.has(n.id) ? { ...n, read: true } : n);
-        setNotifications(myNotifs);
-        setUnreadCount(myNotifs.filter(n => !n.read).length);
-      }).catch(() => {});
+      fetchNotificationsOrNull().then((notif) => {
+        // 응답 도착 시점에도 재확인 (in-flight 중 액션 발생 케이스 방어)
+        if (!notif || Date.now() < notifReloadSuppressRef.current) return;
+        const mine = filterMyNotifications(notif.notifications as Notification[], currentUserRef.current, deletedNotifIdsRef.current, localReadIdsRef.current);
+        setNotifications((prev) => (sameJson(prev, mine) ? prev : mine));
+        setUnreadCount(mine.filter((n) => !n.read).length);
+      });
     }
     function reloadUsers() {
       if (Date.now() < userReloadSuppressRef.current) return;
-      fetchUsers().then(d => {
-        // 응답 도착 시점에도 재확인 (in-flight 중 액션 발생 케이스 방어)
-        if (Date.now() < userReloadSuppressRef.current) return;
-        setAllUsers(d.users);
-        setPendingUsers(d.pendingUsers);
-      }).catch(() => {});
+      fetchUsersOrNull().then((u) => {
+        if (!u || Date.now() < userReloadSuppressRef.current) return;
+        setAllUsers((prev) => (sameJson(prev, u.users) ? prev : u.users));
+        setPendingUsers((prev) => (sameJson(prev, u.pendingUsers) ? prev : u.pendingUsers));
+      });
     }
     function reloadMembers() {
-      fetchMembers().then(m => setMembers(m)).catch(() => {});
+      fetchMembersOrNull().then((m) => {
+        if (m) setMembers((prev) => (sameJson(prev, m) ? prev : m));
+      });
     }
     function reloadAll() {
       reloadSchedules();
@@ -624,8 +605,14 @@ export default function Home() {
     // 앱이 백그라운드 → 포그라운드로 돌아올 때 강제 전체 갱신
     // (Chrome/WebView 는 백그라운드에서 Realtime 연결을 끊음 → 복귀 시 스냅샷 동기화 필요)
     // 단, 직전 낙관적 업데이트(배정/해제/삭제) 보호 구간이면 schedules reload 는 스킵.
+    // 복귀할 때 visibilitychange·focus·online 이 연달아 터져 전체 새로고침이 2~3번 겹치던 것 → 3초에 한 번만.
+    // 시작 직후엔 초기 로딩이 이미 진행 중이므로 같은 이유로 3초간 무시.
+    let lastResumeReload = Date.now();
     const onVisible = () => {
       if (document.visibilityState !== "visible") return;
+      const nowMs = Date.now();
+      if (nowMs - lastResumeReload < 3000) return;
+      lastResumeReload = nowMs;
       if (Date.now() < scheduleReloadSuppressRef.current) {
         console.log("[VIS] 포그라운드 복귀 → schedules 보호중, 그 외만 갱신");
         reloadNotifications();
@@ -656,7 +643,7 @@ export default function Home() {
       window.removeEventListener("focus", onVisible);
       window.removeEventListener("online", onVisible);
     };
-  }, [currentUser, selectedDate]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [currentUser]); // eslint-disable-line react-hooks/exhaustive-deps — 날짜는 selectedDateRef 로 읽음(탭마다 재구독 방지)
 
   // PWA 서비스워커 등록 + 설치 배너
   const [installPrompt, setInstallPrompt] = useState<Event | null>(null);

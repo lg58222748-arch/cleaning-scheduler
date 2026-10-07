@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useLayoutEffect, useRef, useCallback } from "react";
 import { Schedule, Member, Comment } from "@/types";
-import { fetchComments, createComment, deleteCommentApi, updateSchedule as apiUpdateSchedule } from "@/lib/api";
+import { fetchComments, createComment, deleteCommentApi, updateSchedule as apiUpdateSchedule, fetchSchedule } from "@/lib/api";
 import { showConfirm, showAlert } from "@/lib/dialog";
 import { POST_PAYMENT_MESSAGES } from "@/lib/customerMessages";
 import ScheduleChecklist from "./ScheduleChecklist";
@@ -156,6 +156,31 @@ export default function ScheduleDetail({
   const [titleText, setTitleText] = useState(schedule.title);
   const [saving, setSaving] = useState(false);
   const [noteChanged, setNoteChanged] = useState(false);
+  // 예약 본문 로딩 상태 — 목록은 본문 없이 오므로(note=undefined) 열 때 이 일정만 받아온다.
+  // 받기 전엔 본문을 읽기 전용으로 두고 모든 저장 경로에서도 막아, 빈 값이 저장되는 일이 없게 한다.
+  const [noteLoaded, setNoteLoaded] = useState(schedule.note !== undefined);
+  const [noteLoadFailed, setNoteLoadFailed] = useState(false);
+  const noteChangedRef = useRef(false);
+  noteChangedRef.current = noteChanged;
+  const aliveRef = useRef(true);
+  useEffect(() => { aliveRef.current = true; return () => { aliveRef.current = false; }; }, []);
+
+  async function loadFullNote() {
+    if (schedule.id.startsWith("temp-")) { setNoteLoaded(true); return; }
+    setNoteLoadFailed(false);
+    const fresh = await fetchSchedule(schedule.id);
+    if (!aliveRef.current) return;
+    if (!fresh) {
+      // 캐시 등으로 이미 본문을 가지고 열렸으면 그대로 편집 허용, 아니면 읽기 전용 유지
+      if (schedule.note === undefined) setNoteLoadFailed(true);
+      return;
+    }
+    const freshNote = fresh.note ?? "";
+    schedule.note = freshNote; // 공유 객체 갱신 — 입금완료(원래제목)·정산·수정 폼이 최신 본문을 쓰도록
+    // 사용자가 이미 고치기 시작했으면 덮어쓰지 않음
+    if (!noteChangedRef.current) setNoteText(freshNote);
+    setNoteLoaded(true);
+  }
   const [schedColor, setSchedColor] = useState(schedule.color || "#FDDCCC");
   const [localDate, setLocalDate] = useState(schedule.date);
   const [showReturnModal, setShowReturnModal] = useState(false);
@@ -388,6 +413,7 @@ export default function ScheduleDetail({
   useEffect(() => {
     loadComments();
     loadAttachedFiles();
+    loadFullNote();
     const t = setTimeout(() => {
       setPreloadChecklist(true);
       setPreloadSettlement(true);
@@ -427,6 +453,7 @@ export default function ScheduleDetail({
   // 로컬 UI 는 즉시, 부모 상태/서버 동기화는 setTimeout(0) 으로 다음 tick 에 처리
   // (리스트 수백 개 재렌더가 현재 상호작용을 블로킹하지 않게)
   async function handleSaveNote() {
+    if (!noteLoaded) return; // 본문을 받기 전엔 저장 금지 (데이터 보호)
     schedule.note = noteText;
     setNoteChanged(false);
     setTimeout(() => {
@@ -883,11 +910,20 @@ export default function ScheduleDetail({
                     <textarea
                       ref={noteTextareaRef}
                       value={noteText}
-                      onChange={(e) => { setNoteText(e.target.value); setNoteChanged(true); }}
+                      readOnly={!noteLoaded}
+                      onChange={(e) => { if (!noteLoaded) return; setNoteText(e.target.value); setNoteChanged(true); }}
                       style={{ fontSize: "14px" }}
-                      className="w-full text-gray-700 leading-relaxed bg-transparent outline-none resize-none min-h-[60px]"
-                      placeholder="내용을 입력하세요..."
+                      className={"w-full leading-relaxed bg-transparent outline-none resize-none min-h-[60px] " + (noteLoaded ? "text-gray-700" : "text-gray-400")}
+                      placeholder={noteLoaded ? "내용을 입력하세요..." : noteLoadFailed ? "본문을 불러오지 못했습니다" : "본문 불러오는 중..."}
                     />
+                    {noteLoadFailed && !noteLoaded && (
+                      <button
+                        onClick={() => loadFullNote()}
+                        className="self-start mt-1 text-xs px-3 py-1.5 rounded-lg bg-blue-50 text-blue-600 font-bold active:bg-blue-100"
+                      >
+                        본문 다시 불러오기
+                      </button>
+                    )}
                   </div>
                 </div>
 
@@ -899,7 +935,7 @@ export default function ScheduleDetail({
             {preloadChecklist && <ScheduleChecklist scheduleId={schedule.id} onComplete={() => setActiveTab("settlement")} />}
           </div>
           <div style={{ display: activeTab === "settlement" ? "block" : "none" }}>
-            {preloadSettlement && <ScheduleSettlement
+            {preloadSettlement && (noteLoaded || noteLoadFailed) && <ScheduleSettlement
               scheduleId={schedule.id}
               scheduleTitle={schedule.title}
               scheduleNote={schedule.note}
@@ -1001,7 +1037,7 @@ export default function ScheduleDetail({
                 // 1) 펜딩 편집(제목/본문) 먼저 로컬 반영 — 부모가 새 제목으로 리스트 렌더하도록
                 const updates: Partial<Schedule> = {};
                 if (titleText !== schedule.title) { updates.title = titleText; schedule.title = titleText; setEditingTitle(false); }
-                if (noteChanged) { updates.note = noteText; schedule.note = noteText; setNoteChanged(false); }
+                if (noteChanged && noteLoaded) { updates.note = noteText; schedule.note = noteText; setNoteChanged(false); }
 
                 // 2) 배정 실행
                 let assigned = false;
@@ -1056,7 +1092,7 @@ export default function ScheduleDetail({
             onClick={() => {
               const updates: Partial<Schedule> = {};
               if (titleText !== schedule.title) { updates.title = titleText; schedule.title = titleText; setEditingTitle(false); }
-              if (noteChanged) { updates.note = noteText; schedule.note = noteText; setNoteChanged(false); }
+              if (noteChanged && noteLoaded) { updates.note = noteText; schedule.note = noteText; setNoteChanged(false); }
               // ★ UX 우선순위: 모달 즉시 닫기 → 리스트 갱신은 다음 tick → 서버는 백그라운드
               // 리스트 re-render 가 무겁기 때문에 (수백 개) 모달 close 부터 먼저 paint 해야 반응 느낌
               onClose();
@@ -1159,6 +1195,8 @@ export default function ScheduleDetail({
                   <div className="flex gap-2">
                     <button
                       onClick={() => {
+                        // 본문 속 "원래제목" 으로 제목을 복원하므로, 본문을 받기 전엔 처리하면 잘못된 제목이 됨
+                        if (!noteLoaded) { showAlert("일정 본문을 불러오는 중입니다. 잠시 후 다시 눌러주세요."); return; }
                         // 입금완료 처리 — title 에서 /미입금 제거 (없으면 변화 X)
                         const originalMatch = schedule.note?.match(/원래제목:\s*(.+)/);
                         const newTitle = originalMatch

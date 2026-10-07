@@ -2,6 +2,17 @@ import { NextRequest } from "next/server";
 import { updateSchedule, deleteSchedule, addNotification, getSchedule } from "@/lib/store";
 import { supabase } from "@/lib/supabase";
 
+// 일정 1건 전체 조회 (예약 본문 포함) — 목록은 본문을 빼고 받으므로 상세·수정 화면에서 사용
+export async function GET(
+  _req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params;
+  const schedule = await getSchedule(id);
+  if (!schedule) return Response.json({ error: "Not found" }, { status: 404 });
+  return Response.json(schedule);
+}
+
 export async function PUT(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }

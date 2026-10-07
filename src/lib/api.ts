@@ -27,6 +27,29 @@ async function safeJson<T>(url: string, fallback: T, options?: RequestInit): Pro
   }
 }
 
+// 배경 새로고침용 — 실패하면 null. 호출부는 null 이면 기존 화면 데이터를 그대로 둔다.
+// (빈 배열 fallback 으로 덮어쓰면 네트워크가 잠깐 끊길 때 목록이 통째로 사라졌다 돌아오는 깜빡임 발생)
+async function safeJsonOrNull<T>(url: string): Promise<T | null> {
+  try {
+    const res = await safeFetch(url);
+    return (await res.json()) as T;
+  } catch {
+    return null;
+  }
+}
+export function fetchMembersOrNull() {
+  return safeJsonOrNull<Member[]>(BASE + "/api/members");
+}
+export function fetchSwapRequestsOrNull() {
+  return safeJsonOrNull<SwapRequest[]>(BASE + "/api/schedules/swap");
+}
+export function fetchNotificationsOrNull() {
+  return safeJsonOrNull<{ notifications: import("@/types").Notification[]; unreadCount: number }>(BASE + "/api/notifications");
+}
+export function fetchUsersOrNull() {
+  return safeJsonOrNull<{ users: import("@/types").User[]; pendingUsers: import("@/types").User[] }>(BASE + "/api/users");
+}
+
 // Members
 export async function fetchMembers(): Promise<Member[]> {
   return safeJson(`${BASE}/api/members`, []);
@@ -133,6 +156,28 @@ export async function createSchedule(data: Omit<Schedule, "id" | "status">): Pro
     body: JSON.stringify(data),
   });
   return res.json();
+}
+
+// 일정 1건 전체(예약 본문 포함). 실패하면 null — 호출부는 본문 편집/저장을 막아야 한다.
+export async function fetchSchedule(id: string): Promise<Schedule | null> {
+  try {
+    const res = await safeFetch(BASE + "/api/schedules/" + encodeURIComponent(id));
+    const data = await res.json();
+    return data && data.id ? (data as Schedule) : null;
+  } catch {
+    return null;
+  }
+}
+
+// 특정 시각 이후 등록된 일정 (영업 등록 통계용). 실패하면 null.
+export async function fetchSchedulesCreatedSince(sinceIso: string): Promise<Schedule[] | null> {
+  try {
+    const res = await safeFetch(BASE + "/api/schedules?createdSince=" + encodeURIComponent(sinceIso));
+    const data = await res.json();
+    return Array.isArray(data) ? data : null;
+  } catch {
+    return null;
+  }
 }
 
 export async function fetchUnassignedSchedules(): Promise<Schedule[]> {

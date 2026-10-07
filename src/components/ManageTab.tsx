@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import dynamic from "next/dynamic";
 import { Schedule } from "@/types";
-import { fetchDeletedSchedules, restoreScheduleApi, emptyTrashApi, deleteAllSchedules, fetchSchedules, addUnassignedSchedule, assignScheduleApi, createSchedule } from "@/lib/api";
+import { fetchDeletedSchedules, restoreScheduleApi, emptyTrashApi, deleteAllSchedules, fetchSchedules, fetchSchedulesOrNull, fetchSchedulesCreatedSince, addUnassignedSchedule, assignScheduleApi, createSchedule } from "@/lib/api";
 import { showAlert, showConfirm } from "@/lib/dialog";
 
 const NoticeTab = dynamic(() => import("./NoticeTab"), { ssr: false });
@@ -1245,15 +1245,36 @@ function SalesStatsSection({ userName, userRole, schedules, unassignedSchedules 
     }).sort((a, b) => (a.date < b.date ? -1 : 1));
   }, [schedules, unassignedSchedules, isCeo, userName]);
 
+  // 이번달 데이터는 달력이 어느 달을 보고 있든 상관없이 직접 받아온다.
+  // (달력은 보는 달 앞뒤 1개월만 들고 있어서, 먼 달로 넘긴 채 관리탭을 열면 이번달이 범위 밖일 수 있음)
+  const [monthAssigned, setMonthAssigned] = useState<Schedule[] | null>(null);
+  const [monthRegistered, setMonthRegistered] = useState<Schedule[] | null>(null);
+  useEffect(() => {
+    let alive = true;
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = now.getMonth();
+    const ym = `${y}-${String(m + 1).padStart(2, "0")}`;
+    const lastDay = new Date(y, m + 1, 0).getDate();
+    fetchSchedulesOrNull(`${ym}-01`, `${ym}-${String(lastDay).padStart(2, "0")}`).then((d) => {
+      if (alive && d) setMonthAssigned(d);
+    });
+    // 영업 등록은 청소 날짜와 무관하게 '이번달에 접수된 것' — 먼 미래 예약도 포함되게 서버에서 따로 받음
+    fetchSchedulesCreatedSince(new Date(y, m, 1).toISOString()).then((d) => {
+      if (alive && d) setMonthRegistered(d);
+    });
+    return () => { alive = false; };
+  }, []);
+
   // 이번달 현황 — 일정 날짜(청소 날짜) 기준.
-  // schedules 테이블에 생성일 컬럼이 없어 '접수 시점' 기준 집계는 불가.
   const monthStats = useMemo(() => {
     const now = new Date();
     const ym = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
     // 휴무/마감 같은 블로커는 고객 건이 아니므로 제외
     const isBlocker = (t: string) => /^(휴무|마감)$/.test(t.replace(/^\[.+?\]\s*/, "").trim());
     const seen = new Set<string>();
-    const inMonth = [...schedules, ...unassignedSchedules].filter((s) => {
+    // 직접 받은 이번달 데이터가 오기 전엔 달력 데이터로 먼저 보여줌
+    const inMonth = [...(monthAssigned ?? schedules), ...unassignedSchedules].filter((s) => {
       if (seen.has(s.id)) return false;
       seen.add(s.id);
       return s.date.startsWith(ym) && !isBlocker(s.title);
@@ -1273,7 +1294,7 @@ function SalesStatsSection({ userName, userRole, schedules, unassignedSchedules 
     // 영업 등록(영업 파싱 → 배정으로 넘긴) 건수 — created_at 이 이번달인 것.
     // 청소 날짜와 무관하게 '등록 시점' 기준이므로 전체 일정에서 다시 집계한다.
     const seen2 = new Set<string>();
-    const registered = [...schedules, ...unassignedSchedules].filter((s) => {
+    const registered = (monthRegistered ?? [...schedules, ...unassignedSchedules]).filter((s) => {
       if (seen2.has(s.id)) return false;
       seen2.add(s.id);
       if (!s.createdAt || isBlocker(s.title)) return false;
@@ -1298,7 +1319,7 @@ function SalesStatsSection({ userName, userRole, schedules, unassignedSchedules 
       unpaid: mine.filter((s) => isUnpaid(s.title)).length,
       registered,
     };
-  }, [schedules, unassignedSchedules, isCeo, userName]);
+  }, [schedules, unassignedSchedules, monthAssigned, monthRegistered, isCeo, userName]);
 
   return (
     <div className="px-4 py-4 space-y-3">

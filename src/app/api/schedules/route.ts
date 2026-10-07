@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { getSchedules, getSchedulesByRange, getUnassignedSchedules, searchSchedules, addSchedule, addUnassignedSchedule, assignSchedule, unassignSchedule, addNotification, deleteAllSchedules, softDeleteSchedule, getDeletedSchedules, restoreSchedule, emptyTrash } from "@/lib/store";
+import { getSchedulesCreatedSince, getSchedules, getSchedulesByRange, getUnassignedSchedules, searchSchedules, addSchedule, addUnassignedSchedule, assignSchedule, unassignSchedule, addNotification, deleteAllSchedules, softDeleteSchedule, getDeletedSchedules, restoreSchedule, emptyTrash } from "@/lib/store";
 import { supabase } from "@/lib/supabase";
 
 export async function GET(req: NextRequest) {
@@ -19,6 +19,11 @@ export async function GET(req: NextRequest) {
     const names = searchParams.getAll("names").filter(Boolean);
     const scope = uid || names.length > 0 ? { uid, names } : undefined;
     return Response.json(await searchSchedules(query, includeDeleted, offset, scope));
+  }
+  // 특정 시각 이후 등록분 (영업 등록 통계)
+  const createdSince = searchParams.get("createdSince");
+  if (createdSince) {
+    return Response.json(await getSchedulesCreatedSince(createdSince));
   }
   if (deleted === "true") {
     return Response.json(await getDeletedSchedules());

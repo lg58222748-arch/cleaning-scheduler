@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { Schedule, Member } from "@/types";
 import { format } from "date-fns";
+import { fetchSchedule } from "@/lib/api";
 
 interface ScheduleFormProps {
   members: Member[];
@@ -34,9 +35,12 @@ export default function ScheduleForm({
   const [timeSlot, setTimeSlot] = useState<TimeSlot>("오전");
   const [date, setDate] = useState(format(selectedDate, "yyyy-MM-dd"));
   const [note, setNote] = useState("");
+  // 본문을 받았는지 — 받기 전엔 저장 시 본문을 아예 보내지 않는다 (빈 값 덮어쓰기 방지)
+  const [noteLoaded, setNoteLoaded] = useState(true);
   const [color, setColor] = useState(SCHEDULE_COLORS[0].value);
 
   useEffect(() => {
+    let cancelled = false;
     if (editingSchedule) {
       setMemberId(editingSchedule.memberId);
       // 제목에서 시간대 접두사 제거
@@ -50,14 +54,28 @@ export default function ScheduleForm({
       }
       setTitle(t);
       setDate(editingSchedule.date);
-      setNote(editingSchedule.note || "");
+      // 목록은 본문 없이 오므로(note=undefined) 이 일정만 받아온 뒤 편집 허용
+      if (editingSchedule.note !== undefined) {
+        setNote(editingSchedule.note || "");
+        setNoteLoaded(true);
+      } else {
+        setNote("");
+        setNoteLoaded(false);
+        fetchSchedule(editingSchedule.id).then((fresh) => {
+          if (cancelled || !fresh) return;
+          setNote(fresh.note || "");
+          setNoteLoaded(true);
+        });
+      }
       setColor(editingSchedule.color || SCHEDULE_COLORS[0].value);
       // 시간대 추정
       if (editingSchedule.startTime === "07:00") setTimeSlot("오전");
       else if (editingSchedule.startTime === "13:00") setTimeSlot("오후");
     } else {
       setDate(format(selectedDate, "yyyy-MM-dd"));
+      setNoteLoaded(true);
     }
+    return () => { cancelled = true; };
   }, [editingSchedule, selectedDate]);
 
   function handleSubmit(e: React.FormEvent) {
@@ -73,15 +91,18 @@ export default function ScheduleForm({
     };
     const [startTime, endTime] = times[timeSlot];
 
+    // 수정 시 담당자가 선택 목록에 없으면(목록 밖 팀장) 원래 담당자를 유지 — "미배정"으로 바뀌는 사고 방지
+    const keepOriginalMember = !!editingSchedule && !member && memberId === editingSchedule.memberId;
     onSave({
-      memberId: member?.id || "",
-      memberName: member?.name || "미배정",
+      memberId: keepOriginalMember ? editingSchedule!.memberId : (member?.id || ""),
+      memberName: keepOriginalMember ? editingSchedule!.memberName : (member?.name || "미배정"),
       title: `[${timeSlot}] ${title}`,
       location: "",
       date,
       startTime,
       endTime,
-      note,
+      // 본문을 받기 전이면 본문 필드를 아예 보내지 않아 기존 예약 내용이 유지되게 함
+      ...(noteLoaded ? { note } : {}),
       color,
     });
   }
@@ -196,9 +217,10 @@ export default function ScheduleForm({
             </label>
             <textarea
               value={note}
-              onChange={(e) => setNote(e.target.value)}
+              readOnly={!noteLoaded}
+              onChange={(e) => { if (noteLoaded) setNote(e.target.value); }}
               rows={10}
-              placeholder="예약양식 내용을 붙여넣으세요"
+              placeholder={noteLoaded ? "예약양식 내용을 붙여넣으세요" : "본문 불러오는 중..."}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-400 focus:border-transparent outline-none resize-y text-sm leading-relaxed"
             />
           </div>
