@@ -40,7 +40,7 @@ function rowToMember(r: Record<string, unknown>): Member {
   return { id: String(r.id), name: String(r.name), color: String(r.color), phone: String(r.phone || ""), availableDays: (r.available_days as number[]) || [1,2,3,4,5], active: Boolean(r.active), linkedUsername: r.linked_username ? String(r.linked_username) : undefined };
 }
 function rowToSchedule(r: Record<string, unknown>): Schedule {
-  return { id: String(r.id), memberId: String(r.member_id || ""), memberName: String(r.member_name || "미배정"), title: String(r.title), location: String(r.location || ""), date: String(r.date), startTime: String(r.start_time), endTime: String(r.end_time), status: String(r.status) as Schedule["status"], assignedTo: r.assigned_to ? String(r.assigned_to) : undefined, assignedToName: r.assigned_to_name ? String(r.assigned_to_name) : undefined, googleEventId: r.google_event_id ? String(r.google_event_id) : undefined, note: "note" in r ? sanitizeNote(r.note as string | null | undefined) : undefined, color: r.color ? String(r.color) : undefined, assignedAt: r.assigned_at ? String(r.assigned_at) : undefined, createdAt: r.created_at ? String(r.created_at) : undefined, deletedAt: r.deleted_at ? String(r.deleted_at) : undefined };
+  return { id: String(r.id), memberId: String(r.member_id || ""), memberName: String(r.member_name || "미배정"), title: String(r.title), location: String(r.location || ""), date: String(r.date), startTime: String(r.start_time), endTime: String(r.end_time), status: String(r.status) as Schedule["status"], assignedTo: r.assigned_to ? String(r.assigned_to) : undefined, assignedToName: r.assigned_to_name ? String(r.assigned_to_name) : undefined, googleEventId: r.google_event_id ? String(r.google_event_id) : undefined, note: "note" in r ? sanitizeNote(r.note as string | null | undefined) : undefined, color: r.color ? String(r.color) : undefined, assignedAt: r.assigned_at ? String(r.assigned_at) : undefined, createdAt: r.created_at ? String(r.created_at) : undefined, deletedAt: r.deleted_at ? String(r.deleted_at) : undefined, sortOrder: r.sort_order == null ? undefined : Number(r.sort_order) };
 }
 function rowToSwapRequest(r: Record<string, unknown>): SwapRequest {
   return { id: String(r.id), fromScheduleId: String(r.from_schedule_id), toScheduleId: String(r.to_schedule_id), fromMemberId: String(r.from_member_id), toMemberId: String(r.to_member_id), status: String(r.status) as SwapRequest["status"], createdAt: String(r.created_at) };
@@ -155,10 +155,38 @@ const countOpt = (countOnly: boolean) => (countOnly ? { count: "exact" as const,
 // (note 키가 아예 없으면 rowToSchedule 이 note=undefined 로 만들어 "아직 안 받음"을 표시)
 const LIST_COLUMNS = "id,member_id,member_name,title,location,date,start_time,end_time,status,assigned_to,assigned_to_name,google_event_id,color,assigned_at,created_at";
 
+// sort_order(같은 날 일정 순서) 컬럼은 마이그레이션 11 로 추가된다. 아직 없으면 빼고 조회해서
+// 달력이 절대 깨지지 않게 한다. 있으면 한 번 확인 후 계속 포함, 없으면 5분마다 다시 확인.
+let sortOrderColumnOk: boolean | null = null;
+let sortOrderCheckedAt = 0;
+async function listColumns(): Promise<string> {
+  if (sortOrderColumnOk !== true && Date.now() - sortOrderCheckedAt > 5 * 60 * 1000) {
+    const { error } = await supabase.from("schedules").select("sort_order").limit(1);
+    if (!error) sortOrderColumnOk = true;
+    else if (/sort_order/.test(error.message)) sortOrderColumnOk = false; // 컬럼 없음 확정
+    sortOrderCheckedAt = Date.now(); // 일시적 오류면 null 유지 → 5분 뒤 재확인
+  }
+  return sortOrderColumnOk ? LIST_COLUMNS + ",sort_order" : LIST_COLUMNS;
+}
+
+// 같은 날 일정 순서 저장 — sort_order 만 바꾼다 (알림 없음, 다른 칸은 절대 안 건드림)
+export async function reorderSchedules(items: Array<{ id: string; sortOrder: number }>): Promise<{ ok: boolean; error?: string }> {
+  const clean = (items || [])
+    .filter((it) => it && typeof it.id === "string" && it.id && Number.isFinite(it.sortOrder))
+    .slice(0, 100);
+  if (clean.length === 0) return { ok: true };
+  const results = await Promise.all(
+    clean.map((it) => supabase.from("schedules").update({ sort_order: Math.round(it.sortOrder) }).eq("id", it.id)),
+  );
+  const failed = results.find((r) => r.error);
+  return failed?.error ? { ok: false, error: failed.error.message } : { ok: true };
+}
+
 // ===== Schedules =====
 export async function getSchedules(): Promise<Schedule[]> {
+  const cols = await listColumns();
   const rows = await fetchAllPaged(
-    (c) => supabase.from("schedules").select(LIST_COLUMNS, countOpt(c)).neq("status", "deleted"),
+    (c) => supabase.from("schedules").select(cols, countOpt(c)).neq("status", "deleted"),
     [["date", true]],
   );
   return rows.map(rowToSchedule);
@@ -166,8 +194,9 @@ export async function getSchedules(): Promise<Schedule[]> {
 
 // 특정 시각 이후 등록된 일정 (영업 등록 통계용 — 청소 날짜와 무관하게 접수 시점 기준)
 export async function getSchedulesCreatedSince(sinceIso: string): Promise<Schedule[]> {
+  const cols = await listColumns();
   const rows = await fetchAllPaged(
-    (c) => supabase.from("schedules").select(LIST_COLUMNS, countOpt(c))
+    (c) => supabase.from("schedules").select(cols, countOpt(c))
       .gte("created_at", sinceIso).neq("status", "deleted"),
     [["created_at", true]],
   );
@@ -180,9 +209,10 @@ export async function getSchedule(id: string): Promise<Schedule | undefined> {
 }
 
 export async function getSchedulesByRange(start: string, end: string): Promise<Schedule[]> {
+  const cols = await listColumns();
   // 배정된 일정만 (unassigned, deleted 제외)
   const rows = await fetchAllPaged(
-    (c) => supabase.from("schedules").select(LIST_COLUMNS, countOpt(c))
+    (c) => supabase.from("schedules").select(cols, countOpt(c))
       .gte("date", start).lte("date", end)
       .not("status", "in", '("deleted","unassigned")'),
     [["date", true]],
@@ -191,11 +221,12 @@ export async function getSchedulesByRange(start: string, end: string): Promise<S
 }
 
 export async function getUnassignedSchedules(): Promise<Schedule[]> {
+  const cols = await listColumns();
   // 자동 페이지네이션
   // status='unassigned' 뿐 아니라 member_name='미배정' 도 포함한다.
   // (담당=미배정 인데 status 가 confirmed 로 남은 "고아" 일정이 배정탭에서 누락되던 버그 방지)
   const rows = await fetchAllPaged(
-    (c) => supabase.from("schedules").select(LIST_COLUMNS, countOpt(c))
+    (c) => supabase.from("schedules").select(cols, countOpt(c))
       .or("status.eq.unassigned,member_name.eq.미배정")
       .neq("status", "deleted"),
     [["date", true]],

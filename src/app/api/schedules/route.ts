@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { getSchedulesCreatedSince, getSchedules, getSchedulesByRange, getUnassignedSchedules, searchSchedules, addSchedule, addUnassignedSchedule, assignSchedule, unassignSchedule, addNotification, deleteAllSchedules, softDeleteSchedule, getDeletedSchedules, restoreSchedule, emptyTrash } from "@/lib/store";
+import { reorderSchedules, getSchedulesCreatedSince, getSchedules, getSchedulesByRange, getUnassignedSchedules, searchSchedules, addSchedule, addUnassignedSchedule, assignSchedule, unassignSchedule, addNotification, deleteAllSchedules, softDeleteSchedule, getDeletedSchedules, restoreSchedule, emptyTrash } from "@/lib/store";
 import { supabase } from "@/lib/supabase";
 
 export async function GET(req: NextRequest) {
@@ -99,6 +99,12 @@ export async function POST(req: NextRequest) {
 
     await addNotification("schedule_returned", "일정 반환", msg, schedule.id, targetNames.length > 0 ? targetNames : undefined, ["ceo", "admin", "scheduler"]);
     return Response.json(schedule);
+  }
+
+  // 같은 날 일정 순서 저장 — sort_order 만 바꿈, 알림 없음
+  if (body.action === "reorder" && Array.isArray(body.items)) {
+    const r = await reorderSchedules(body.items);
+    return Response.json(r, { status: r.ok ? 200 : 500 });
   }
 
   if (body.action === "addUnassigned") {

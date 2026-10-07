@@ -25,6 +25,7 @@ import {
   updateMember as apiUpdateMember,
   deleteMember as apiDeleteMember,
   fetchSchedulesOrNull,
+  reorderSchedulesApi,
   fetchUnassignedSchedulesOrNull,
   fetchMembersOrNull,
   fetchSwapRequestsOrNull,
@@ -47,6 +48,7 @@ import {
 } from "@/lib/api";
 import { format, startOfMonth, endOfMonth, addMonths, subMonths } from "date-fns";
 import { showAlert, showConfirm } from "@/lib/dialog";
+import { compareScheduleOrder } from "@/lib/scheduleOrder";
 import { ko } from "date-fns/locale";
 
 type TabMode = "calendar" | "manage" | "assign" | "members" | "sales" | "area";
@@ -66,7 +68,7 @@ function scheduleRange(d: Date) {
 // 화면에 보이는 값이 같은지 비교 — 같으면 상태를 안 바꿔서 달력이 다시 그려지며 깜빡이지 않게 한다.
 // (본문 note 는 목록에 없으므로 비교에서 제외)
 function scheduleSig(s: Schedule): string {
-  return JSON.stringify([s.id, s.date, s.title, s.status, s.memberId, s.memberName, s.assignedTo || "", s.assignedToName || "", s.color || "", s.startTime, s.endTime, s.location || "", s.assignedAt || ""]);
+  return JSON.stringify([s.id, s.date, s.title, s.status, s.memberId, s.memberName, s.assignedTo || "", s.assignedToName || "", s.color || "", s.startTime, s.endTime, s.location || "", s.assignedAt || "", s.sortOrder ?? null]);
 }
 function sameScheduleList(a: Schedule[], b: Schedule[]): boolean {
   if (a === b) return true;
@@ -235,6 +237,9 @@ export default function Home() {
   const dragNodeRef = useRef<HTMLDivElement | null>(null);
   const [profileUser, setProfileUser] = useState<User | null>(null);
   const [showDayPopup, setShowDayPopup] = useState(false);
+  // 날짜 팝업 '순서 변경' 모드 — 팝업이 닫히면 자동 해제
+  const [dayReorderMode, setDayReorderMode] = useState(false);
+  useEffect(() => { if (!showDayPopup) setDayReorderMode(false); }, [showDayPopup]);
   const [showSearch, setShowSearch] = useState(false);
   const [showMemberFilter, setShowMemberFilter] = useState(false);
   // 필터 상태는 사용자별 분리 (localStorage 키에 username 포함) - 로그인 후 로드
@@ -1230,7 +1235,29 @@ export default function Home() {
   const dateStr = format(selectedDate, "yyyy-MM-dd");
   const daySchedules = calendarSchedules
     .filter((s) => s.date === dateStr)
-    .sort((a, b) => a.startTime.localeCompare(b.startTime));
+    .sort(compareScheduleOrder); // 달력 칸과 같은 순서 (직접 정한 순서 → 시간대 → 등록순)
+
+  // 날짜 팝업에서 일정을 한 칸 위/아래로 — 그 날 일정 전체에 0,1,2… 순서를 매겨 저장
+  function moveDaySchedule(index: number, dir: -1 | 1) {
+    const j = index + dir;
+    if (j < 0 || j >= daySchedules.length) return;
+    const list = [...daySchedules];
+    [list[index], list[j]] = [list[j], list[index]];
+    const items = list.map((s, i) => ({ id: s.id, sortOrder: i }));
+    const order = new Map(items.map((it) => [it.id, it.sortOrder]));
+    const before = new Map(daySchedules.map((s) => [s.id, s.sortOrder]));
+    // 저장 중 실시간 갱신이 덜 바뀐 순서로 덮어 깜빡이지 않게 잠깐 보호
+    scheduleReloadSuppressRef.current = Date.now() + 3000;
+    setSchedules((prev) => prev.map((s) => (order.has(s.id) ? { ...s, sortOrder: order.get(s.id) } : s)));
+    reorderSchedulesApi(items).then((r) => {
+      if (r.ok) return;
+      // 실패 → 원래 순서로 되돌림
+      setSchedules((prev) => prev.map((s) => (before.has(s.id) ? { ...s, sortOrder: before.get(s.id) } : s)));
+      showAlert(r.error && /sort_order/.test(r.error)
+        ? "순서 저장 기능이 아직 꺼져 있어요. 관리자에게 DB 설정(순서 칸 추가)을 요청해주세요."
+        : "순서 저장에 실패했어요. 잠시 후 다시 시도해주세요.");
+    });
+  }
 
   // 반환 배너: 본인 포함 모든 관리자에게 표시. 24시간 이내 반환만 노출.
   // read 상태와 무관하게 유지 → 읽음/재동기화 경주로 인한 깜빡임 차단.
@@ -1907,15 +1934,30 @@ export default function Home() {
                 <span className="text-3xl font-bold text-gray-900">{format(selectedDate, "d")}</span>
                 <span className="text-sm text-gray-500">{format(selectedDate, "EEEE", { locale: ko })}</span>
               </div>
-              <button
-                onClick={() => { setShowDayPopup(false); consumeHash(); setEditingSchedule(null); setTimeout(() => openModal(setShowScheduleForm), 150); }}
-                className="w-9 h-9 bg-gray-100 rounded-full flex items-center justify-center active:bg-blue-100"
-              >
-                <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                </svg>
-              </button>
+              <div className="flex items-center gap-2">
+                {daySchedules.length >= 2 && !swapMode && (
+                  <button
+                    onClick={() => setDayReorderMode((v) => !v)}
+                    className={`h-9 px-3 rounded-full text-xs font-bold ${dayReorderMode ? "bg-blue-500 text-white active:bg-blue-600" : "bg-gray-100 text-gray-600 active:bg-blue-100"}`}
+                  >
+                    {dayReorderMode ? "완료" : "순서"}
+                  </button>
+                )}
+                {!dayReorderMode && (
+                  <button
+                    onClick={() => { setShowDayPopup(false); consumeHash(); setEditingSchedule(null); setTimeout(() => openModal(setShowScheduleForm), 150); }}
+                    className="w-9 h-9 bg-gray-100 rounded-full flex items-center justify-center active:bg-blue-100"
+                  >
+                    <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                    </svg>
+                  </button>
+                )}
+              </div>
             </div>
+            {dayReorderMode && (
+              <div className="px-5 -mt-1 pb-2 text-[11px] text-blue-600">▲▼ 로 순서를 바꾸면 달력에도 그 순서로 보여요</div>
+            )}
 
             {/* 일정 목록 */}
             <div className="px-4 pb-6 pt-1 space-y-3 overflow-y-auto" style={{ minHeight: "340px", maxHeight: "480px" }}>
@@ -1924,16 +1966,16 @@ export default function Home() {
                   일정이 없습니다
                 </div>
               ) : (
-                daySchedules.map((s) => {
+                daySchedules.map((s, idx) => {
                   const titleDisplay = s.title.replace(/^\[.+?\]\s*/, "").replace(/^U/, "") || s.title;
                   // 미입금 일정은 보라 #E9D5FF (4번째) 으로 자동 표시
                   const schedColor = s.title.includes("/미입금") ? "#E9D5FF" : (s.color || "#FDDCCC");
                   return (
                     <div
                       key={s.id}
-                      className="rounded-2xl cursor-pointer active:scale-[0.97] transition-transform"
+                      className={`rounded-2xl transition-transform ${dayReorderMode ? "" : "cursor-pointer active:scale-[0.97]"}`}
                       style={{ backgroundColor: schedColor }}
-                      onClick={() => { setShowDayPopup(false); swapMode ? (consumeHash(), handleSwapSelect(s)) : (() => { setDetailMode("calendar"); /* dayPopup 해시를 detail 해시로 교체 */ if (hashStackRef.current.length > 0) hashStackRef.current.pop(); setDetailSchedule(s); pushHash("d"); })(); }}
+                      onClick={() => { if (dayReorderMode) return; setShowDayPopup(false); swapMode ? (consumeHash(), handleSwapSelect(s)) : (() => { setDetailMode("calendar"); /* dayPopup 해시를 detail 해시로 교체 */ if (hashStackRef.current.length > 0) hashStackRef.current.pop(); setDetailSchedule(s); pushHash("d"); })(); }}
                     >
                       <div className="px-4 py-4 flex items-center gap-3">
                         <span className="text-xl">📅</span>
@@ -1941,9 +1983,30 @@ export default function Home() {
                           <div className="text-[15px] font-bold text-gray-900 truncate">{titleDisplay}</div>
                           <div className="text-xs text-gray-600 mt-0.5">{s.title.match(/^\[(.+?)\]/)?.[1] || "하루 종일"}</div>
                         </div>
-                        <svg className="w-4 h-4 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                        </svg>
+                        {dayReorderMode ? (
+                          <div className="flex flex-col gap-1 shrink-0">
+                            <button
+                              onClick={(e) => { e.stopPropagation(); moveDaySchedule(idx, -1); }}
+                              disabled={idx === 0}
+                              className="w-9 h-8 rounded-lg bg-white/70 text-gray-700 text-sm font-bold active:bg-white disabled:opacity-30"
+                              aria-label="위로"
+                            >
+                              ▲
+                            </button>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); moveDaySchedule(idx, 1); }}
+                              disabled={idx === daySchedules.length - 1}
+                              className="w-9 h-8 rounded-lg bg-white/70 text-gray-700 text-sm font-bold active:bg-white disabled:opacity-30"
+                              aria-label="아래로"
+                            >
+                              ▼
+                            </button>
+                          </div>
+                        ) : (
+                          <svg className="w-4 h-4 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                          </svg>
+                        )}
                       </div>
                     </div>
                   );

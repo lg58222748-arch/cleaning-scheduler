@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useCallback, useRef, memo } from "react";
 import { Schedule, Member } from "@/types";
+import { compareScheduleOrder } from "@/lib/scheduleOrder";
 import {
   format,
   startOfMonth,
@@ -224,6 +225,8 @@ export default memo(function Calendar({
       existing.push(s);
       map.set(s.date, existing);
     }
+    // 같은 날 일정은 직접 정한 순서 → 시간대 → 등록순 (날짜 팝업과 동일 규칙)
+    for (const list of map.values()) list.sort(compareScheduleOrder);
     return map;
   }, [schedules]);
 

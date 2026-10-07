@@ -180,6 +180,21 @@ export async function fetchSchedulesCreatedSince(sinceIso: string): Promise<Sche
   }
 }
 
+// 같은 날 일정 순서 저장. 실패하면 { ok:false, error } — 순서 칸이 DB 에 없으면 error 에 sort_order 포함
+export async function reorderSchedulesApi(items: Array<{ id: string; sortOrder: number }>): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const res = await fetch(BASE + "/api/schedules", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "reorder", items }),
+    });
+    const data = await res.json().catch(() => ({}));
+    return { ok: res.ok && data.ok !== false, error: data.error };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "network" };
+  }
+}
+
 export async function fetchUnassignedSchedules(): Promise<Schedule[]> {
   return safeJson(`${BASE}/api/schedules?unassigned=true`, []);
 }

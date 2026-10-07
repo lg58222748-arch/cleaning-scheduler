@@ -26,6 +26,7 @@ export interface Schedule {
   assignedAt?: string; // 배정탭 → 달력으로 배정된 시각 (ISO). 미배정이면 없음
   createdAt?: string; // 일정이 등록(영업 파싱→배정으로 넘김)된 시각 (ISO). 과거 건은 없음
   deletedAt?: string; // 휴지통으로 삭제된 시각 (ISO). 기록 시작 전 삭제분은 없음
+  sortOrder?: number; // 같은 날 일정 표시 순서 (직접 정한 경우만). 없으면 시간대·등록순
 }
 
 export interface SwapRequest {

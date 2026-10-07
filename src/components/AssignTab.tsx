@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useRef, useCallback, memo } from "react";
 import { Schedule, Member } from "@/types";
+import { compareScheduleOrder } from "@/lib/scheduleOrder";
 import { assignScheduleApi, softDeleteSchedule, fetchDeletedSchedules, restoreScheduleApi, emptyTrashApi } from "@/lib/api";
 import { showConfirm } from "@/lib/dialog";
 import {
@@ -115,7 +116,7 @@ function AssignTab({ members, schedules, onAssigned, onDeleted, onOpenDetail, on
     // 먼저 처리해야 할 미입금이 "+N" 에 숨지 않게 함. 날짜 팝업 목록에도 동일 적용.
     const isUnpaid = (s: Schedule) => s.title.includes("/미입금");
     for (const list of map.values()) {
-      list.sort((a, b) => Number(isUnpaid(b)) - Number(isUnpaid(a)));
+      list.sort((a, b) => (Number(isUnpaid(b)) - Number(isUnpaid(a))) || compareScheduleOrder(a, b));
     }
     return map;
   }, [unassigned]);
