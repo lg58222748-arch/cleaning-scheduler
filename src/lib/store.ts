@@ -156,15 +156,15 @@ const countOpt = (countOnly: boolean) => (countOnly ? { count: "exact" as const,
 const LIST_COLUMNS = "id,member_id,member_name,title,location,date,start_time,end_time,status,assigned_to,assigned_to_name,google_event_id,color,assigned_at,created_at";
 
 // sort_order(같은 날 일정 순서) 컬럼은 마이그레이션 11 로 추가된다. 아직 없으면 빼고 조회해서
-// 달력이 절대 깨지지 않게 한다. 있으면 한 번 확인 후 계속 포함, 없으면 5분마다 다시 확인.
+// 달력이 절대 깨지지 않게 한다. 있으면 한 번 확인 후 계속 포함, 없으면 1분마다 다시 확인.
 let sortOrderColumnOk: boolean | null = null;
 let sortOrderCheckedAt = 0;
 async function listColumns(): Promise<string> {
-  if (sortOrderColumnOk !== true && Date.now() - sortOrderCheckedAt > 5 * 60 * 1000) {
+  if (sortOrderColumnOk !== true && Date.now() - sortOrderCheckedAt > 60 * 1000) {
     const { error } = await supabase.from("schedules").select("sort_order").limit(1);
     if (!error) sortOrderColumnOk = true;
     else if (/sort_order/.test(error.message)) sortOrderColumnOk = false; // 컬럼 없음 확정
-    sortOrderCheckedAt = Date.now(); // 일시적 오류면 null 유지 → 5분 뒤 재확인
+    sortOrderCheckedAt = Date.now(); // 일시적 오류면 null 유지 → 1분 뒤 재확인
   }
   return sortOrderColumnOk ? LIST_COLUMNS + ",sort_order" : LIST_COLUMNS;
 }
@@ -179,7 +179,9 @@ export async function reorderSchedules(items: Array<{ id: string; sortOrder: num
     clean.map((it) => supabase.from("schedules").update({ sort_order: Math.round(it.sortOrder) }).eq("id", it.id)),
   );
   const failed = results.find((r) => r.error);
-  return failed?.error ? { ok: false, error: failed.error.message } : { ok: true };
+  if (failed?.error) return { ok: false, error: failed.error.message };
+  sortOrderColumnOk = true; // 저장 성공 = 컬럼 있음 → 목록 조회에 바로 포함 (순서가 원래대로 튀는 것 방지)
+  return { ok: true };
 }
 
 // ===== Schedules =====
