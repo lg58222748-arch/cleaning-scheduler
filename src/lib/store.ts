@@ -449,25 +449,34 @@ export async function rejectSwap(swapId: string): Promise<boolean> {
 // 최근 300건만 조회. 예전엔 전체(수만 건)를 페이지네이션으로 다 긁어와서
 // /api/notifications 가 504 타임아웃 + 대용량 전송 + 재시도 폭주를 유발했음.
 // 클라이언트는 최근 알림만 필요하므로(오래된 건 패널에서 안 봄) 상한을 둔다.
-const NOTIFICATION_FETCH_LIMIT = 300;
+// 알림 보관 기간 — 이 기간이 지나면 화면에서 빠지고, 매일 크론이 DB 에서도 지운다.
+// (하루 약 170건씩 쌓여 확인 안 하면 수백 건이 되던 문제. 전체공지는 공지 탭 기록으로 영구 보관)
+export const NOTIFICATION_RETENTION_DAYS = 3;
+// 보관 기간 안의 알림은 전부 내려준다. 예전엔 "최근 300건"만 줘서, 알림이 많은 날엔
+// 현장팀장 본인 알림이 300건 밖으로 밀려 안 보이는 문제가 있었음. 1000건은 비정상 폭증 대비 상한.
+const NOTIFICATION_FETCH_LIMIT = 1000;
 export async function getNotifications(): Promise<Notification[]> {
+  const since = new Date(Date.now() - NOTIFICATION_RETENTION_DAYS * 24 * 60 * 60 * 1000).toISOString();
   const { data, error } = await supabase
     .from("notifications")
     .select("*")
+    .gte("created_at", since)
     .order("created_at", { ascending: false })
     .limit(NOTIFICATION_FETCH_LIMIT);
   if (error || !data) return [];
   return data.map(rowToNotification);
 }
 
-// 오래된 알림 자동 정리 — 30일 지난 알림 삭제 (매일 크론에서 호출).
+// 오래된 알림 자동 정리 — 보관기간(NOTIFICATION_RETENTION_DAYS) 지난 알림 삭제, 전체공지 제외 (매일 크론에서 호출).
 // 알림 수만 건 누적 시 조회가 무거워지는 것 방지. notifications 테이블만 건드림.
-export async function purgeOldNotifications(days = 30): Promise<number> {
+export async function purgeOldNotifications(days = NOTIFICATION_RETENTION_DAYS): Promise<number> {
   const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+  // 전체공지(system_notice)는 절대 지우지 않는다 — 같은 테이블에 저장되고 공지 탭이 이 기록을 보여줌.
   const { data, error } = await supabase
     .from("notifications")
     .delete()
     .lt("created_at", cutoff)
+    .neq("type", "system_notice")
     .select("id");
   if (error) { console.error("[purgeOldNotifications]", error.message); return 0; }
   return data?.length || 0;
@@ -521,18 +530,19 @@ export async function markAllNotificationsRead(): Promise<void> {
   await supabase.from("notifications").update({ read: true }).eq("read", false);
 }
 
+// 전체공지(system_notice)는 제외 — 공지는 공지 탭의 deleteSystemNotice 로만 지운다.
 export async function deleteAllNotifications(): Promise<number> {
-  const { data } = await supabase.from("notifications").select("id").range(0, 9999);
+  const { data } = await supabase.from("notifications").select("id").neq("type", "system_notice").range(0, 9999);
   const count = data?.length || 0;
   if (count > 0) {
-    await supabase.from("notifications").delete().gte("id", "00000000-0000-0000-0000-000000000000");
+    await supabase.from("notifications").delete().gte("id", "00000000-0000-0000-0000-000000000000").neq("type", "system_notice");
   }
   return count;
 }
 
 export async function deleteNotificationsByIds(ids: string[]): Promise<number> {
   if (!ids || ids.length === 0) return 0;
-  await supabase.from("notifications").delete().in("id", ids);
+  await supabase.from("notifications").delete().in("id", ids).neq("type", "system_notice"); // 공지 제외
   return ids.length;
 }
 

@@ -14,8 +14,8 @@ export async function GET(req: NextRequest) {
   }
 
   const reminders = await checkHappyCallReminders();
-  // 30일 지난 알림 자동 정리 (실패해도 해피콜 결과는 반환)
+  // 보관기간 지난 알림 자동 정리 — 전체공지 제외 (실패해도 해피콜 결과는 반환)
   let purged = 0;
-  try { purged = await purgeOldNotifications(30); } catch { /* 무시 */ }
+  try { purged = await purgeOldNotifications(); } catch { /* 무시 */ }
   return Response.json({ created: reminders.length, purgedNotifications: purged });
 }
