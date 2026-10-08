@@ -125,7 +125,7 @@ function SchedulerStats() {
       // /api/schedules?unassigned=true = 미배정(status=unassigned)만
       const [all, un] = await Promise.all([
         fetchSchedules(),
-        fetch("/api/schedules?unassigned=true").then((r) => r.json()).catch(() => []),
+        fetch("/api/schedules?unassigned=true&lite=1").then((r) => r.json()).catch(() => []),
       ]);
       // 이중 계산 방지: 달력 카운트에서 unassigned 제외
       const assignedOnly = (Array.isArray(all) ? all : []).filter((s) => s.status !== "unassigned");

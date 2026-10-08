@@ -79,7 +79,8 @@ export async function deleteMember(id: string): Promise<void> {
 
 // Schedules
 export async function fetchSchedules(start?: string, end?: string): Promise<Schedule[]> {
-  const params = start && end ? `?start=${start}&end=${end}` : "";
+  // lite=1: 본문 뺀 가벼운 목록 (본문은 일정 열 때 fetchSchedule 로 받음)
+  const params = start && end ? `?start=${start}&end=${end}&lite=1` : "?lite=1";
   return safeJson(`${BASE}/api/schedules${params}`, []);
 }
 
@@ -87,7 +88,8 @@ export async function fetchSchedules(start?: string, end?: string): Promise<Sche
 // 덮어쓰지 않게 함. 정상 응답이면 [] 도 그대로(진짜 빈 결과). 폰에서 신호 끊길 때
 // 일정이 통째로 사라졌다 돌아오던 버그의 근본 방지.
 export async function fetchSchedulesOrNull(start?: string, end?: string): Promise<Schedule[] | null> {
-  const params = start && end ? `?start=${start}&end=${end}` : "";
+  // lite=1: 본문 뺀 가벼운 목록 (본문은 일정 열 때 fetchSchedule 로 받음)
+  const params = start && end ? `?start=${start}&end=${end}&lite=1` : "?lite=1";
   try {
     const res = await safeFetch(`${BASE}/api/schedules${params}`);
     return await res.json();
@@ -196,13 +198,13 @@ export async function reorderSchedulesApi(items: Array<{ id: string; sortOrder: 
 }
 
 export async function fetchUnassignedSchedules(): Promise<Schedule[]> {
-  return safeJson(`${BASE}/api/schedules?unassigned=true`, []);
+  return safeJson(`${BASE}/api/schedules?unassigned=true&lite=1`, []);
 }
 
 // 배경 리로드 전용: 실패 시 null (기존 미배정 목록 유지). fetchSchedulesOrNull 과 동일 취지.
 export async function fetchUnassignedSchedulesOrNull(): Promise<Schedule[] | null> {
   try {
-    const res = await safeFetch(`${BASE}/api/schedules?unassigned=true`);
+    const res = await safeFetch(`${BASE}/api/schedules?unassigned=true&lite=1`);
     return await res.json();
   } catch {
     return null;

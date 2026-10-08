@@ -185,8 +185,14 @@ export async function reorderSchedules(items: Array<{ id: string; sortOrder: num
 }
 
 // ===== Schedules =====
-export async function getSchedules(): Promise<Schedule[]> {
-  const cols = await listColumns();
+// lite=true(새 버전 앱)일 때만 본문 제외. 기본값은 본문 포함 — 앱을 재시작 안 해 옛 화면 코드가 도는
+// 폰은 "본문 따로 받기" 기능이 없어서, 본문 없는 목록을 주면 빈칸으로 보이고 그대로 저장될 위험이 있음.
+async function columnsFor(lite: boolean): Promise<string> {
+  return lite ? listColumns() : "*";
+}
+
+export async function getSchedules(lite = false): Promise<Schedule[]> {
+  const cols = await columnsFor(lite);
   const rows = await fetchAllPaged(
     (c) => supabase.from("schedules").select(cols, countOpt(c)).neq("status", "deleted"),
     [["date", true]],
@@ -210,8 +216,8 @@ export async function getSchedule(id: string): Promise<Schedule | undefined> {
   return data ? rowToSchedule(data) : undefined;
 }
 
-export async function getSchedulesByRange(start: string, end: string): Promise<Schedule[]> {
-  const cols = await listColumns();
+export async function getSchedulesByRange(start: string, end: string, lite = false): Promise<Schedule[]> {
+  const cols = await columnsFor(lite);
   // 배정된 일정만 (unassigned, deleted 제외)
   const rows = await fetchAllPaged(
     (c) => supabase.from("schedules").select(cols, countOpt(c))
@@ -222,8 +228,8 @@ export async function getSchedulesByRange(start: string, end: string): Promise<S
   return rows.map(rowToSchedule);
 }
 
-export async function getUnassignedSchedules(): Promise<Schedule[]> {
-  const cols = await listColumns();
+export async function getUnassignedSchedules(lite = false): Promise<Schedule[]> {
+  const cols = await columnsFor(lite);
   // 자동 페이지네이션
   // status='unassigned' 뿐 아니라 member_name='미배정' 도 포함한다.
   // (담당=미배정 인데 status 가 confirmed 로 남은 "고아" 일정이 배정탭에서 누락되던 버그 방지)

@@ -10,6 +10,8 @@ export async function GET(req: NextRequest) {
   const query = searchParams.get("q");
 
   const deleted = searchParams.get("deleted");
+  // 새 버전 앱만 lite=1 을 보냄 → 본문 뺀 가벼운 목록. 없으면(옛 버전) 본문 포함 목록.
+  const lite = searchParams.get("lite") === "1";
 
   if (query) {
     const includeDeleted = searchParams.get("includeDeleted") === "true";
@@ -29,12 +31,12 @@ export async function GET(req: NextRequest) {
     return Response.json(await getDeletedSchedules());
   }
   if (unassigned === "true") {
-    return Response.json(await getUnassignedSchedules());
+    return Response.json(await getUnassignedSchedules(lite));
   }
   if (start && end) {
-    return Response.json(await getSchedulesByRange(start, end));
+    return Response.json(await getSchedulesByRange(start, end, lite));
   }
-  return Response.json(await getSchedules());
+  return Response.json(await getSchedules(lite));
 }
 
 export async function POST(req: NextRequest) {
