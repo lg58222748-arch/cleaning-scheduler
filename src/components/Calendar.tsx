@@ -3,6 +3,8 @@
 import { useState, useMemo, useCallback, useRef, memo } from "react";
 import { Schedule, Member } from "@/types";
 import { compareScheduleOrder } from "@/lib/scheduleOrder";
+import { getDayInfo } from "@/lib/koreanCalendar";
+import { SonEomneunBadge, HolidayLabel } from "@/components/DayMarks";
 import {
   format,
   startOfMonth,
@@ -36,13 +38,15 @@ interface DayCellProps {
   isCurrentMonth: boolean;
   isTodayDay: boolean;
   dayOfWeek: number;
+  holiday: string | null;
+  sonEomneun: boolean;
   daySchedules: Schedule[];
   isSnapping: boolean;
   onSelectDate: (d: Date) => void;
   onScheduleClick?: (s: Schedule) => void;
 }
 const DayCell = memo(function DayCell({
-  day, isSelected, isCurrentMonth, isTodayDay, dayOfWeek, daySchedules, isSnapping, onSelectDate, onScheduleClick,
+  day, isSelected, isCurrentMonth, isTodayDay, dayOfWeek, holiday, sonEomneun, daySchedules, isSnapping, onSelectDate, onScheduleClick,
 }: DayCellProps) {
   return (
     <button
@@ -51,14 +55,16 @@ const DayCell = memo(function DayCell({
         isSelected ? "bg-blue-50 ring-2 ring-blue-400 ring-inset" : "active:bg-gray-50"
       } ${!isCurrentMonth ? "opacity-40" : ""}`}
     >
+      {sonEomneun && <SonEomneunBadge />}
       <span className={`inline-flex items-center justify-center w-5 h-5 text-xs rounded-full ${
         isTodayDay ? "bg-blue-500 text-white font-bold"
-          : dayOfWeek === 0 ? "text-red-500"
+          : dayOfWeek === 0 || holiday ? "text-red-500"
           : dayOfWeek === 6 ? "text-blue-500"
           : "text-gray-700"
       }`}>
         {format(day, "d")}
       </span>
+      {holiday && <HolidayLabel name={holiday} />}
       <div className="overflow-hidden flex-1 w-full relative">
         {daySchedules.slice(0, 2).map((s) => {
           const fullName = s.title;
@@ -213,6 +219,13 @@ export default memo(function Calendar({
     return result;
   }, [currentMonth]);
 
+  // 공휴일·손없는날 — 달이 바뀔 때만 계산 (드래그 중 리렌더에선 재사용)
+  const dayInfos = useMemo(() => {
+    const map = new Map<string, ReturnType<typeof getDayInfo>>();
+    for (const d of weeks.flat()) { const key = format(d, "yyyy-MM-dd"); map.set(key, getDayInfo(key)); }
+    return map;
+  }, [weeks]);
+
   const scheduleMap = useMemo(() => {
     const map = new Map<string, Schedule[]>();
     // 같은 일정(id)이 두 번 들어와도 한 번만 그린다 — 중복 키는 React 가 칸을 꼬이게 그려
@@ -289,6 +302,7 @@ export default memo(function Calendar({
             {week.map((d) => {
               const dateStr = format(d, "yyyy-MM-dd");
               const daySchedules = scheduleMap.get(dateStr) || EMPTY_SCHEDULES;
+              const info = dayInfos.get(dateStr);
               return (
                 <DayCell
                   key={dateStr}
@@ -297,6 +311,8 @@ export default memo(function Calendar({
                   isCurrentMonth={isSameMonth(d, currentMonth)}
                   isTodayDay={isToday(d)}
                   dayOfWeek={d.getDay()}
+                  holiday={info?.holiday ?? null}
+                  sonEomneun={info?.sonEomneun ?? false}
                   daySchedules={daySchedules}
                   isSnapping={isSnapping}
                   onSelectDate={onSelectDate}

@@ -6,6 +6,8 @@ import { Member, Schedule, SwapRequest, Notification as AppNotification, User, U
 type Notification = AppNotification;
 import Calendar from "@/components/Calendar";
 import LoginPage from "@/components/LoginPage";
+import { DayInfoLine } from "@/components/DayMarks";
+import { getDayInfo } from "@/lib/koreanCalendar";
 
 // 동적 로딩 - 필요할 때만 로드
 const ScheduleDetail = dynamic(() => import("@/components/ScheduleDetail"), { ssr: false });
@@ -1930,9 +1932,12 @@ export default function Home() {
           <div className="bg-white rounded-3xl shadow-2xl w-full max-w-[380px] animate-[modalIn_0.15s_ease-out]">
             {/* 날짜 헤더 */}
             <div className="px-5 pt-5 pb-3 flex items-center justify-between">
-              <div className="flex items-baseline gap-2">
-                <span className="text-3xl font-bold text-gray-900">{format(selectedDate, "d")}</span>
-                <span className="text-sm text-gray-500">{format(selectedDate, "EEEE", { locale: ko })}</span>
+              <div>
+                <div className="flex items-baseline gap-2">
+                  <span className="text-3xl font-bold text-gray-900">{format(selectedDate, "d")}</span>
+                  <span className="text-sm text-gray-500">{format(selectedDate, "EEEE", { locale: ko })}</span>
+                </div>
+                <DayInfoLine info={getDayInfo(format(selectedDate, "yyyy-MM-dd"))} />
               </div>
               <div className="flex items-center gap-2">
                 {daySchedules.length >= 2 && !swapMode && (
