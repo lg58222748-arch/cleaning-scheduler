@@ -509,6 +509,13 @@ export default function ScheduleDetail({
     const ampm = h < 12 ? "오전" : "오후";
     return `${ampm} ${h % 12 || 12}:${m}`;
   }
+  // 댓글 시각 — 오늘 쓴 건 시간만, 그 전 건 날짜도 (펼쳐서 여러 날 댓글을 볼 때 구분되게)
+  function formatCommentTime(dateStr: string): string {
+    const d = new Date(dateStr);
+    const now = new Date();
+    const sameDay = d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate();
+    return sameDay ? formatTime(dateStr) : `${d.getMonth() + 1}/${d.getDate()} ${formatTime(dateStr)}`;
+  }
 
   const statusLabel = schedule.status === "confirmed" ? "확정" : schedule.status === "pending" ? "대기" : "교환요청";
   const statusClass = schedule.status === "confirmed" ? "bg-green-100 text-green-700" : schedule.status === "pending" ? "bg-yellow-100 text-yellow-700" : "bg-orange-100 text-orange-700";
@@ -976,28 +983,35 @@ export default function ScheduleDetail({
       {/* 하단 고정 - 정보탭에서만 표시 */}
       {activeTab === "info" && (
       <div className="border-t border-gray-200 bg-white safe-area-bottom">
-        {/* 댓글 */}
+        {/* 댓글 — 접힘: 최근 2개(작은 칸) / 펼침: 전체(큰 칸, 스크롤) */}
         {comments.length > 0 && (
-          <div className="px-4 pt-2 max-h-[80px] overflow-y-auto border-b border-gray-100">
-            <div className="space-y-1.5 pb-1.5">
-              {(showAllComments ? [...comments].reverse() : [...comments].reverse().slice(0, 2)).map((c) => (
-                <div key={c.id} className="flex items-start gap-1.5">
-                  <div className="w-5 h-5 bg-gray-200 rounded-full flex items-center justify-center text-xs font-bold text-gray-600 shrink-0 mt-0.5">{c.authorName[0]}</div>
-                  <div className="flex-1 min-w-0">
-                    <span className="text-xs font-medium text-gray-700">{c.authorName}</span>
-                    <span className="text-xs text-gray-400 ml-1">{formatTime(c.createdAt)}</span>
-                    <p className="text-xs text-gray-600 leading-tight">{c.content}</p>
+          <div className="border-b border-gray-100">
+            <button
+              onClick={() => setShowAllComments((v) => !v)}
+              className="w-full flex items-center justify-between px-4 pt-1.5 pb-1 active:bg-gray-50"
+            >
+              <span className="text-[11px] font-medium text-gray-500">댓글 {comments.length}개</span>
+              <span className="flex items-center gap-0.5 text-[11px] font-bold text-blue-500">
+                {showAllComments ? "접기" : "펼치기"}
+                <svg className={`w-3 h-3 transition-transform ${showAllComments ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" /></svg>
+              </span>
+            </button>
+            <div className={`px-4 overflow-y-auto ${showAllComments ? "max-h-[45vh]" : "max-h-[80px]"}`}>
+              <div className="space-y-1.5 pb-1.5">
+                {(showAllComments ? [...comments].reverse() : [...comments].reverse().slice(0, 2)).map((c) => (
+                  <div key={c.id} className="flex items-start gap-1.5">
+                    <div className="w-5 h-5 bg-gray-200 rounded-full flex items-center justify-center text-xs font-bold text-gray-600 shrink-0 mt-0.5">{c.authorName[0]}</div>
+                    <div className="flex-1 min-w-0">
+                      <span className="text-xs font-medium text-gray-700">{c.authorName}</span>
+                      <span className="text-xs text-gray-400 ml-1">{formatCommentTime(c.createdAt)}</span>
+                      <p className="text-xs text-gray-600 leading-tight break-words">{c.content}</p>
+                    </div>
+                    <button onClick={() => handleDeleteComment(c.id)} className="p-0.5 text-gray-300 active:text-red-500 shrink-0">
+                      <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                    </button>
                   </div>
-                  <button onClick={() => handleDeleteComment(c.id)} className="p-0.5 text-gray-300 active:text-red-500 shrink-0">
-                    <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-                  </button>
-                </div>
-              ))}
-              {comments.length > 2 && !showAllComments && (
-                <button onClick={() => setShowAllComments(true)} className="text-xs text-blue-500 font-medium mt-1 active:text-blue-700">
-                  +{comments.length - 2}개 이전 댓글 더보기
-                </button>
-              )}
+                ))}
+              </div>
             </div>
           </div>
         )}
