@@ -4,7 +4,7 @@ import { useState, useMemo, useRef, useCallback, memo } from "react";
 import { Schedule, Member } from "@/types";
 import { compareScheduleOrder } from "@/lib/scheduleOrder";
 import { getDayInfo } from "@/lib/koreanCalendar";
-import { SonEomneunBadge, HolidayLabel, DayInfoLine } from "@/components/DayMarks";
+import { DayHeader, DayInfoLine } from "@/components/DayMarks";
 import { assignScheduleApi, softDeleteSchedule, fetchDeletedSchedules, restoreScheduleApi, emptyTrashApi } from "@/lib/api";
 import { showConfirm } from "@/lib/dialog";
 import {
@@ -109,6 +109,11 @@ function AssignTab({ members, schedules, onAssigned, onDeleted, onOpenDetail, on
     for (const d of weeks.flat()) { const key = format(d, "yyyy-MM-dd"); map.set(key, getDayInfo(key)); }
     return map;
   }, [weeks]);
+  // 공휴일 있는 주 — 폰에서 그 주 칸들의 일정 시작 높이를 맞추는 데 씀
+  const weekHasHoliday = useMemo(
+    () => weeks.map((w) => w.some((d) => !!dayInfos.get(format(d, "yyyy-MM-dd"))?.holiday)),
+    [weeks, dayInfos],
+  );
 
   // 날짜별 미배정 맵
   const scheduleMap = useMemo(() => {
@@ -217,16 +222,18 @@ function AssignTab({ members, schedules, onAssigned, onDeleted, onOpenDetail, on
                       isSelected ? "bg-orange-50 ring-2 ring-orange-400 ring-inset" : "active:bg-gray-50"
                     } ${!isCurrentMonth ? "opacity-40" : ""}`}
                   >
-                    {info?.sonEomneun && <SonEomneunBadge />}
-                    <span className={`inline-flex items-center justify-center w-5 h-5 text-xs rounded-full ${
-                      isToday(d) ? "bg-orange-500 text-white font-bold"
-                        : dayOfWeek === 0 || info?.holiday ? "text-red-500"
-                        : dayOfWeek === 6 ? "text-blue-500"
-                        : "text-gray-700"
-                    }`}>
-                      {format(d, "d")}
-                    </span>
-                    {info?.holiday && <HolidayLabel name={info.holiday} />}
+                    <DayHeader
+                      label={format(d, "d")}
+                      numberClass={
+                        isToday(d) ? "bg-orange-500 text-white font-bold"
+                          : dayOfWeek === 0 || info?.holiday ? "text-red-500"
+                          : dayOfWeek === 6 ? "text-blue-500"
+                          : "text-gray-700"
+                      }
+                      holiday={info?.holiday ?? null}
+                      sonEomneun={info?.sonEomneun ?? false}
+                      reserveLine={weekHasHoliday[wi]}
+                    />
                     <div className="overflow-hidden flex-1 w-full relative">
                       {dayScheds.slice(0, 2).map((s) => {
                         const fullName = s.title;

@@ -4,7 +4,7 @@ import { useState, useMemo, useCallback, useRef, memo } from "react";
 import { Schedule, Member } from "@/types";
 import { compareScheduleOrder } from "@/lib/scheduleOrder";
 import { getDayInfo } from "@/lib/koreanCalendar";
-import { SonEomneunBadge, HolidayLabel } from "@/components/DayMarks";
+import { DayHeader } from "@/components/DayMarks";
 import {
   format,
   startOfMonth,
@@ -40,13 +40,14 @@ interface DayCellProps {
   dayOfWeek: number;
   holiday: string | null;
   sonEomneun: boolean;
+  reserveHolidayLine: boolean;
   daySchedules: Schedule[];
   isSnapping: boolean;
   onSelectDate: (d: Date) => void;
   onScheduleClick?: (s: Schedule) => void;
 }
 const DayCell = memo(function DayCell({
-  day, isSelected, isCurrentMonth, isTodayDay, dayOfWeek, holiday, sonEomneun, daySchedules, isSnapping, onSelectDate, onScheduleClick,
+  day, isSelected, isCurrentMonth, isTodayDay, dayOfWeek, holiday, sonEomneun, reserveHolidayLine, daySchedules, isSnapping, onSelectDate, onScheduleClick,
 }: DayCellProps) {
   return (
     <button
@@ -55,16 +56,18 @@ const DayCell = memo(function DayCell({
         isSelected ? "bg-blue-50 ring-2 ring-blue-400 ring-inset" : "active:bg-gray-50"
       } ${!isCurrentMonth ? "opacity-40" : ""}`}
     >
-      {sonEomneun && <SonEomneunBadge />}
-      <span className={`inline-flex items-center justify-center w-5 h-5 text-xs rounded-full ${
-        isTodayDay ? "bg-blue-500 text-white font-bold"
-          : dayOfWeek === 0 || holiday ? "text-red-500"
-          : dayOfWeek === 6 ? "text-blue-500"
-          : "text-gray-700"
-      }`}>
-        {format(day, "d")}
-      </span>
-      {holiday && <HolidayLabel name={holiday} />}
+      <DayHeader
+        label={format(day, "d")}
+        numberClass={
+          isTodayDay ? "bg-blue-500 text-white font-bold"
+            : dayOfWeek === 0 || holiday ? "text-red-500"
+            : dayOfWeek === 6 ? "text-blue-500"
+            : "text-gray-700"
+        }
+        holiday={holiday}
+        sonEomneun={sonEomneun}
+        reserveLine={reserveHolidayLine}
+      />
       <div className="overflow-hidden flex-1 w-full relative">
         {daySchedules.slice(0, 2).map((s) => {
           const fullName = s.title;
@@ -225,6 +228,11 @@ export default memo(function Calendar({
     for (const d of weeks.flat()) { const key = format(d, "yyyy-MM-dd"); map.set(key, getDayInfo(key)); }
     return map;
   }, [weeks]);
+  // 공휴일 있는 주 — 폰에서 그 주 칸들의 일정 시작 높이를 맞추는 데 씀
+  const weekHasHoliday = useMemo(
+    () => weeks.map((w) => w.some((d) => !!dayInfos.get(format(d, "yyyy-MM-dd"))?.holiday)),
+    [weeks, dayInfos],
+  );
 
   const scheduleMap = useMemo(() => {
     const map = new Map<string, Schedule[]>();
@@ -313,6 +321,7 @@ export default memo(function Calendar({
                   dayOfWeek={d.getDay()}
                   holiday={info?.holiday ?? null}
                   sonEomneun={info?.sonEomneun ?? false}
+                  reserveHolidayLine={weekHasHoliday[wi]}
                   daySchedules={daySchedules}
                   isSnapping={isSnapping}
                   onSelectDate={onSelectDate}
