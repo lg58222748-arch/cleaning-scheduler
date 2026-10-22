@@ -33,7 +33,9 @@ export async function POST(req: NextRequest) {
     const titleShort = (schedule.title || "").slice(0, 40);
     scheduleLabel = [dateShort, memberName, titleShort].filter(Boolean).join(" ");
   }
-  const snippet = `${body.content.slice(0, 30)}${body.content.length > 30 ? "..." : ""}`;
+  // 알림 미리보기는 한 줄로 (여러 줄 댓글의 줄바꿈·연속 공백은 공백 하나로)
+  const flat = String(body.content).replace(/\s+/g, " ").trim();
+  const snippet = `${flat.slice(0, 30)}${flat.length > 30 ? "..." : ""}`;
   const message = scheduleLabel
     ? `${scheduleLabel} · ${body.authorName}님: ${snippet}`
     : `${body.authorName}님이 댓글을 남겼습니다: ${snippet}`;

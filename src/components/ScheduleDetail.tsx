@@ -432,6 +432,15 @@ export default function ScheduleDetail({
     setComments(data);
   }
 
+  // 댓글 입력칸 — 여러 줄 입력·붙여넣기 시 줄바꿈 유지, 내용만큼 늘어남(최대 4줄 정도 후 스크롤)
+  const commentInputRef = useRef<HTMLTextAreaElement>(null);
+  function fitCommentInput(el: HTMLTextAreaElement | null) {
+    if (!el) return;
+    el.style.height = "auto";
+    // scrollHeight 는 테두리를 빼고 재므로 테두리 두께를 더해야 한 줄일 때 스크롤바가 안 생김
+    el.style.height = `${Math.min(el.scrollHeight + el.offsetHeight - el.clientHeight, 110)}px`;
+  }
+
   function handleAddComment() {
     if (!newComment.trim()) return;
     // 낙관적: 즉시 표시
@@ -445,6 +454,7 @@ export default function ScheduleDetail({
     setComments((prev) => [...prev, tempComment]);
     const text = newComment.trim();
     setNewComment("");
+    requestAnimationFrame(() => fitCommentInput(commentInputRef.current));
     // API 백그라운드
     createComment(schedule.id, authorName, text);
   }
@@ -1004,7 +1014,8 @@ export default function ScheduleDetail({
                     <div className="flex-1 min-w-0">
                       <span className="text-xs font-medium text-gray-700">{c.authorName}</span>
                       <span className="text-xs text-gray-400 ml-1">{formatCommentTime(c.createdAt)}</span>
-                      <p className="text-xs text-gray-600 leading-tight break-words">{c.content}</p>
+                      {/* 입력한 줄바꿈·띄어쓰기 그대로, 줄은 단어(띄어쓰기) 단위로 넘김 */}
+                      <p className="text-xs text-gray-600 leading-snug whitespace-pre-wrap break-keep [overflow-wrap:anywhere]">{c.content}</p>
                     </div>
                     <button onClick={() => handleDeleteComment(c.id)} className="p-0.5 text-gray-300 active:text-red-500 shrink-0">
                       <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
@@ -1016,8 +1027,22 @@ export default function ScheduleDetail({
           </div>
         )}
         {/* 댓글 입력 */}
-        <div className="flex items-center gap-2 px-4 py-2">
-          <input value={newComment} onChange={(e) => setNewComment(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handleAddComment()} placeholder="댓글 입력..." className="flex-1 px-3 py-1.5 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-400" />
+        <div className="flex items-end gap-2 px-4 py-2">
+          <textarea
+            ref={commentInputRef}
+            rows={1}
+            value={newComment}
+            onChange={(e) => { setNewComment(e.target.value); fitCommentInput(e.target); }}
+            onKeyDown={(e) => {
+              // PC: Enter 등록 · Shift+Enter 줄바꿈 / 폰: Enter 는 줄바꿈(등록 버튼으로 등록). 한글 조합 중 Enter 는 무시.
+              if (e.key !== "Enter" || e.shiftKey || e.nativeEvent.isComposing) return;
+              if (window.matchMedia("(pointer: coarse)").matches) return;
+              e.preventDefault();
+              handleAddComment();
+            }}
+            placeholder="댓글 입력..."
+            className="flex-1 px-3 py-1.5 border border-gray-200 rounded-lg text-sm leading-snug outline-none focus:ring-2 focus:ring-blue-400 resize-none overflow-y-auto"
+          />
           <button onClick={handleAddComment} disabled={loading || !newComment.trim()} className="px-3 py-1.5 bg-blue-500 text-white rounded-lg text-xs font-medium active:bg-blue-600 disabled:opacity-50 shrink-0">등록</button>
         </div>
         {mode === "assign" && canAssignMember && (

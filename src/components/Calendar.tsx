@@ -28,6 +28,7 @@ interface CalendarProps {
   onSelectDate: (date: Date) => void;
   onScheduleClick?: (schedule: Schedule) => void;
   onMonthChange: (date: Date) => void;
+  loading?: boolean; // 보는 달 일정을 아직 받는 중 (그 달 데이터가 하나도 없을 때만)
 }
 
 // 개별 day cell 을 memo 컴포넌트로 분리 → 해당 날짜 schedules 가 바뀌지 않으면 리렌더 안 됨.
@@ -96,6 +97,7 @@ export default memo(function Calendar({
   onSelectDate,
   onScheduleClick,
   onMonthChange,
+  loading = false,
 }: CalendarProps) {
   const [currentMonth, setCurrentMonth] = useState(selectedDate);
   const [dragX, setDragX] = useState(0);
@@ -271,7 +273,7 @@ export default memo(function Calendar({
           </svg>
         </button>
         <h2
-          className="text-base font-bold text-gray-800 will-change-transform"
+          className="relative text-base font-bold text-gray-800 will-change-transform"
           style={{
             transform: `translateX(${dragX * 0.5}px)`,
             opacity,
@@ -279,6 +281,12 @@ export default memo(function Calendar({
           }}
         >
           {format(currentMonth, "yyyy년 M월", { locale: ko })}
+          {loading && (
+            <span
+              className="absolute left-full top-1/2 -translate-y-1/2 ml-2 w-3.5 h-3.5 rounded-full border-2 border-blue-200 border-t-blue-500 animate-spin"
+              aria-label="일정 불러오는 중"
+            />
+          )}
         </h2>
         <button onClick={handleNext} className="p-1.5 active:bg-gray-100 rounded-lg">
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

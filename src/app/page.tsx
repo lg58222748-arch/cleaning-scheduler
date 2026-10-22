@@ -67,6 +67,16 @@ function scheduleRange(d: Date) {
   };
 }
 
+// 받아온 기간의 일정만 새것으로 바꾸고, 그 밖의 달(이미 봤던 달)은 그대로 둔다.
+// → 달을 오가도 봤던 달은 바로 보이고, 받는 동안 빈 달력으로 바뀌지 않는다.
+//   기간 안에서 사라진 일정은 지워지고, 다른 날짜로 옮겨진 일정은 id 기준으로 한 번만 남는다.
+function mergeScheduleRange(prev: Schedule[], list: Schedule[], start: string, end: string): Schedule[] {
+  const freshIds = new Set(list.map((s) => s.id));
+  const kept = prev.filter((s) => (s.date < start || s.date > end) && !freshIds.has(s.id));
+  if (kept.length === 0) return list;
+  return [...kept, ...list].sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+}
+
 // 화면에 보이는 값이 같은지 비교 — 같으면 상태를 안 바꿔서 달력이 다시 그려지며 깜빡이지 않게 한다.
 // (본문 note 는 목록에 없으므로 비교에서 제외)
 function scheduleSig(s: Schedule): string {
@@ -275,24 +285,43 @@ export default function Home() {
   // 월 이동 race 방어: 마지막으로 시작된 fetch 의 seq 만 setSchedules 허용.
   // 예) 4월→5월→4월 빠르게 클릭하면 먼저 쏜 4월 응답이 5월 응답을 덮어써 깜빡이는 현상 방지.
   const loadSeqRef = useRef(0);
+  // 지금 받는 중인 달 ("yyyy-MM") — 그 달 일정이 아직 하나도 없으면 달력 제목 옆에 로딩 표시
+  const [monthFetching, setMonthFetching] = useState<string | null>(null);
+  // loadData 재시도용 (자기 자신을 부를 때 사용)
+  const loadDataRef = useRef<((monthDate?: Date, fullRefresh?: boolean, attempt?: number) => Promise<void>) | null>(null);
 
-  const loadData = useCallback(async (monthDate?: Date, fullRefresh = false) => {
+  const loadData = useCallback(async (monthDate?: Date, fullRefresh = false, attempt = 0) => {
     const seq = ++loadSeqRef.current;
     // 우선순위: 명시적 monthDate > 현재 보고 있는 달력 월 > selectedDate
     const d = monthDate || viewingMonthRef.current || selectedDateRef.current;
     // 다음 reload 들도 동일 월 기준으로 찾게 ref 업데이트
     viewingMonthRef.current = d;
     const { start, end } = scheduleRange(d);
-    // 일정은 "가장 최근 요청"의 응답만, 배정·수정 직후 보호 구간이 아닐 때만 반영
-    const canApplySchedules = () => seq === loadSeqRef.current && Date.now() >= scheduleReloadSuppressRef.current;
+    setMonthFetching(format(d, "yyyy-MM"));
     const saveCache = (key: string, value: unknown) => {
       setTimeout(() => { try { localStorage.setItem(key, JSON.stringify(value)); } catch { /* 용량 초과 등 무시 */ } }, 0);
     };
+    // 받은 결과를 지금 못 쓰면(배정·수정 직후 보호 구간 / 통신 실패) 버리지 않고 잠시 뒤 다시 받는다.
+    // 예전엔 그냥 버려서, 수정 직후 달을 넘기면 그 달이 빈 달력으로 남는 일이 있었음.
+    const retry = (ms: number, nextAttempt: number) => {
+      setTimeout(() => { if (seq === loadSeqRef.current) loadDataRef.current?.(d, false, nextAttempt); }, ms);
+    };
 
-    // 일정 — 실패(null)면 기존 화면·캐시 그대로 유지. 내용이 같으면 상태를 안 바꿔 깜빡임 방지.
+    // 일정 — "가장 최근 요청"의 응답만 반영. 받은 기간만 교체(다른 달은 유지), 내용이 같으면 상태를 안 바꿔 깜빡임 방지.
     const schedTask = fetchSchedulesOrNull(start, end).then((list) => {
-      if (!list || !canApplySchedules()) return;
-      setSchedules((prev) => (sameScheduleList(prev, list) ? prev : list));
+      if (seq !== loadSeqRef.current) return; // 더 최근 요청이 있음 — 그쪽이 처리
+      if (!list) {
+        if (attempt < 2) retry(3000, attempt + 1);
+        else setMonthFetching(null); // 기존 화면·캐시 그대로 유지
+        return;
+      }
+      const wait = scheduleReloadSuppressRef.current - Date.now();
+      if (wait > 0) { retry(wait + 300, attempt); return; }
+      setSchedules((prev) => {
+        const next = mergeScheduleRange(prev, list, start, end);
+        return sameScheduleList(prev, next) ? prev : next;
+      });
+      setMonthFetching(null);
       if (fullRefresh) saveCache("cached_schedules", list);
     });
     if (!fullRefresh) { await schedTask.catch(() => {}); return; }
@@ -329,6 +358,7 @@ export default function Home() {
       }),
     ]);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { loadDataRef.current = loadData; }, [loadData]);
 
   // 필터 상태: 로그인한 사용자별로 localStorage 분리
   useEffect(() => {
@@ -503,14 +533,8 @@ export default function Home() {
     function reloadSchedules() {
       // 일정 액션(반환/배정/생성/수정/삭제) 중엔 억제 - 낙관적 업데이트가 stale fetch 에 덮이는 것 방지
       if (Date.now() < scheduleReloadSuppressRef.current) return;
-      // 현재 보고 있는 달력 월 기준 (loadData 와 같은 범위)
-      const { start, end } = scheduleRange(viewingMonthRef.current || selectedDateRef.current);
-      const seq = ++loadSeqRef.current;
-      fetchSchedulesOrNull(start, end).then((list) => {
-        // 실패(null)·더 최근 요청 있음·보호 구간이면 기존 유지. 내용 같으면 상태 안 바꿈(깜빡임 방지)
-        if (!list || seq !== loadSeqRef.current || Date.now() < scheduleReloadSuppressRef.current) return;
-        setSchedules((prev) => (sameScheduleList(prev, list) ? prev : list));
-      });
+      // 현재 보고 있는 달력 월 기준 — 받는 규칙(최근 요청만·기간만 교체·실패 시 재시도)은 loadData 와 동일
+      loadData();
       fetchUnassignedSchedulesOrNull().then((list) => {
         if (!list || Date.now() < scheduleReloadSuppressRef.current) return;
         setUnassignedSchedules((prev) => (sameScheduleList(prev, list) ? prev : list));
@@ -1549,6 +1573,7 @@ export default function Home() {
             onSelectDate={handleCalendarSelectDate}
             onScheduleClick={handleCalendarScheduleClick}
             onMonthChange={handleCalendarMonthChange}
+            loading={monthFetching !== null && !schedules.some((s) => s.date.startsWith(monthFetching))}
           />
         </div>
 
