@@ -367,6 +367,7 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
 
   // 전역 상태 (파싱 중/저장 중은 동시에 하나만)
   const [saving, setSaving] = useState(false);
+  const [depositMenuOpen, setDepositMenuOpen] = useState(false); // 예약금 안내 드롭다운 (법인/일반)
   const [globalCopied, setGlobalCopied] = useState<Set<string>>(new Set()); // Step 3 템플릿 복사 상태
 
   // 안내 양식 카테고리 — 제목 기반 자동 분류 (저장된 category 없을 때 마이그레이션용)
@@ -962,12 +963,26 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
     }
   }
 
-  async function handleCopy(text: string, label: string) {
-    if (copiedHas(label)) { copiedToggle(label, false); return; }
+  async function writeClipboard(text: string) {
     try { await navigator.clipboard.writeText(text); } catch {
       const ta = document.createElement("textarea"); ta.value = text; document.body.appendChild(ta); ta.select(); document.execCommand("copy"); document.body.removeChild(ta);
     }
+  }
+
+  async function handleCopy(text: string, label: string) {
+    if (copiedHas(label)) { copiedToggle(label, false); return; }
+    await writeClipboard(text);
     copiedToggle(label, true);
+  }
+
+  // 예약금 안내 드롭다운 — 고른 계좌 문구를 복사하고, 버튼에는 마지막에 복사한 쪽만 표시
+  async function copyDeposit(kind: "corp" | "personal") {
+    setDepositMenuOpen(false);
+    await writeClipboard(getDepositText(kind));
+    const next = new Set(activeForm.copied);
+    next.delete(kind === "corp" ? "dep" : "depCorp");
+    next.add(kind === "corp" ? "depCorp" : "dep");
+    updateForm({ copied: next });
   }
 
   // "1. 양식 복사" 전용 - 같은 인덱스의 확정 세션 customerText 에 자동 기입
@@ -1292,20 +1307,37 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
           </div>
 
           {/* 버튼 */}
-          <button onClick={handleCopyFormAndFill}
-            className="w-full py-2 rounded-lg text-xs font-bold text-white" style={{ background: "#1a6b3c" }}>
-            {copied.has("form") ? "✅ 복사됨 + 파싱 기입" : "1. 양식 복사"}
-          </button>
-          {/* 예약금 안내 — 일반(개인 계좌) / 법인(회사 계좌) 중 골라서 복사 */}
           <div className="flex gap-2">
-            <button onClick={() => handleCopy(getDepositText("personal"), "dep")}
-              className="flex-1 py-2 rounded-lg text-xs font-bold border border-green-700 text-green-700">
-              {copied.has("dep") ? "✅ 일반 복사됨" : "2. 예약금 안내 · 일반"}
+            <button onClick={handleCopyFormAndFill}
+              className="flex-1 py-2 rounded-lg text-xs font-bold text-white" style={{ background: "#1a6b3c" }}>
+              {copied.has("form") ? "✅ 복사됨 + 파싱 기입" : "1. 양식 복사"}
             </button>
-            <button onClick={() => handleCopy(getDepositText("corp"), "depCorp")}
-              className="flex-1 py-2 rounded-lg text-xs font-bold border border-green-700 text-green-700">
-              {copied.has("depCorp") ? "✅ 법인 복사됨" : "2. 예약금 안내 · 법인"}
-            </button>
+            {/* 예약금 안내 — 드롭다운에서 법인 / 일반 계좌를 골라 복사 */}
+            <div className="relative flex-1">
+              <button onClick={() => setDepositMenuOpen((v) => !v)}
+                className="w-full py-2 rounded-lg text-xs font-bold border border-green-700 text-green-700 flex items-center justify-center gap-1">
+                {copied.has("depCorp") ? "✅ 법인 복사됨" : copied.has("dep") ? "✅ 일반 복사됨" : "2. 예약금 안내"}
+                <svg className={`w-3 h-3 transition-transform ${depositMenuOpen ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" /></svg>
+              </button>
+              {depositMenuOpen && (
+                <>
+                  {/* 바깥 누르면 닫기 */}
+                  <div className="fixed inset-0 z-40" onClick={() => setDepositMenuOpen(false)} />
+                  <div className="absolute right-0 top-full mt-1 z-50 w-full min-w-[170px] bg-white border border-green-200 rounded-lg shadow-lg overflow-hidden">
+                    {([
+                      ["corp", "법인", "우리은행 · 주식회사 새집느낌", "depCorp"],
+                      ["personal", "일반", "카카오뱅크 · 권선우", "dep"],
+                    ] as const).map(([kind, name, account, label]) => (
+                      <button key={kind} onClick={() => copyDeposit(kind)}
+                        className="w-full px-3 py-2 text-left border-b last:border-b-0 border-green-100 active:bg-green-50 hover:bg-green-50">
+                        <div className="text-xs font-bold text-green-800">{name}{copied.has(label) ? " ✅" : ""}</div>
+                        <div className="text-[10px] text-gray-500">{account}</div>
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
           </div>
 
           <button onClick={goToParseStep}
