@@ -438,9 +438,11 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
   const [dragOverTplId, setDragOverTplId] = useState<string | null>(null);
   const [selectedTplId, setSelectedTplId] = useState<string | null>(null); // PC 미리보기 선택
 
+  // 양식 발송(STEP 1) 버튼들의 복사 표시는 양식 세션에 저장 — 양식 복사 / 예약금 안내(일반·법인)
+  const isFormCopyLabel = (label: string) => label === "form" || label === "dep" || label === "depCorp";
   // 렌더/복사 체크에 사용할 통합 copied (읽기 전용)
   const copied: { has: (label: string) => boolean } = { has: (label: string) => {
-    if (label === "form" || label === "dep") return activeForm.copied.has(label);
+    if (isFormCopyLabel(label)) return activeForm.copied.has(label);
     if (label.startsWith("tpl")) return globalCopied.has(label);
     return activeConfirm.copied.has(label);
   } };
@@ -558,10 +560,11 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
     return text;
   }
 
-  // 예약금 안내 텍스트
-  function getDepositText() {
+  // 예약금 안내 텍스트 — 일반(개인 계좌) / 법인(주식회사 새집느낌) 계좌만 다르고 나머지 문구는 같음
+  function getDepositText(kind: "personal" | "corp") {
     const totalDeposit = services.reduce((sum, s) => sum + (parseInt(s.deposit) || 0), 0);
-    return `우리은행1005 504 852384 주식회사 새집느낌 여기로 \n\n예약금 ${totalDeposit > 0 ? totalDeposit.toLocaleString() : ""}원\n\n보내주시면 예약 확정 도와드리겠습니다 :)\n\n예약자 성함으로 입금부탁드립니다, 예약자 성함이 아닌 경우 입금자명 따로 기재부탁드립니다,\n\n-----------------------------\n\n번거롭고 바쁘시겠지만 양해 부탁드립니다^^\n\n주소 누락방지를 위해서 1~5번만 한번 더 체크 하고있습니다.\n성함 주소 연락처만 한번더 체크해서 작성해주시면 빠르게 예약 확정 도와드리겠습니다!`;
+    const account = kind === "personal" ? "카카오뱅크 3333303874794 권선우" : "우리은행1005 504 852384 주식회사 새집느낌";
+    return `${account} 여기로 \n\n예약금 ${totalDeposit > 0 ? totalDeposit.toLocaleString() : ""}원\n\n보내주시면 예약 확정 도와드리겠습니다 :)\n\n예약자 성함으로 입금부탁드립니다, 예약자 성함이 아닌 경우 입금자명 따로 기재부탁드립니다,\n\n-----------------------------\n\n번거롭고 바쁘시겠지만 양해 부탁드립니다^^\n\n주소 누락방지를 위해서 1~5번만 한번 더 체크 하고있습니다.\n성함 주소 연락처만 한번더 체크해서 작성해주시면 빠르게 예약 확정 도와드리겠습니다!`;
   }
 
   const [parsing, setParsing] = useState(false);
@@ -941,12 +944,12 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
 
   // 라벨 접두사로 어느 세션의 copied 에 저장할지 결정
   function copiedHas(label: string) {
-    if (label === "form" || label === "dep") return activeForm.copied.has(label);
+    if (isFormCopyLabel(label)) return activeForm.copied.has(label);
     if (label.startsWith("tpl")) return globalCopied.has(label);
     return activeConfirm.copied.has(label); // post*, 그 외
   }
   function copiedToggle(label: string, add: boolean) {
-    if (label === "form" || label === "dep") {
+    if (isFormCopyLabel(label)) {
       const next = new Set(activeForm.copied);
       if (add) next.add(label); else next.delete(label);
       updateForm({ copied: next });
@@ -1289,14 +1292,19 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
           </div>
 
           {/* 버튼 */}
+          <button onClick={handleCopyFormAndFill}
+            className="w-full py-2 rounded-lg text-xs font-bold text-white" style={{ background: "#1a6b3c" }}>
+            {copied.has("form") ? "✅ 복사됨 + 파싱 기입" : "1. 양식 복사"}
+          </button>
+          {/* 예약금 안내 — 일반(개인 계좌) / 법인(회사 계좌) 중 골라서 복사 */}
           <div className="flex gap-2">
-            <button onClick={handleCopyFormAndFill}
-              className="flex-1 py-2 rounded-lg text-xs font-bold text-white" style={{ background: "#1a6b3c" }}>
-              {copied.has("form") ? "✅ 복사됨 + 파싱 기입" : "1. 양식 복사"}
-            </button>
-            <button onClick={() => handleCopy(getDepositText(), "dep")}
+            <button onClick={() => handleCopy(getDepositText("personal"), "dep")}
               className="flex-1 py-2 rounded-lg text-xs font-bold border border-green-700 text-green-700">
-              {copied.has("dep") ? "✅" : "2. 예약금 안내"}
+              {copied.has("dep") ? "✅ 일반 복사됨" : "2. 예약금 안내 · 일반"}
+            </button>
+            <button onClick={() => handleCopy(getDepositText("corp"), "depCorp")}
+              className="flex-1 py-2 rounded-lg text-xs font-bold border border-green-700 text-green-700">
+              {copied.has("depCorp") ? "✅ 법인 복사됨" : "2. 예약금 안내 · 법인"}
             </button>
           </div>
 
