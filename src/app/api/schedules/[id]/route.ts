@@ -32,6 +32,12 @@ export async function PUT(
   if (schedule.memberName && schedule.memberName !== "미배정") targets.add(schedule.memberName);
   if (beforeMemberName && beforeMemberName !== "미배정" && beforeMemberName !== schedule.memberName) targets.add(beforeMemberName);
 
+  // 예약금 계좌(법인/일반)만 바꾼 건 내부 기록이라 담당 팀장에게 "일정 변경" 알림을 보내지 않음
+  const changedKeys = Object.keys(body || {}).filter((k) => body[k] !== undefined);
+  if (changedKeys.length > 0 && changedKeys.every((k) => k === "depositAccount")) {
+    return Response.json(schedule);
+  }
+
   // 응답을 먼저 내려보내기 위해 알림은 await 하지 않음 — 클라이언트는 DB update 완료된 schedule 을 즉시 받음
   // (알림 실패해도 PUT 성공. 백그라운드로 진행)
   addNotification(

@@ -83,7 +83,23 @@ export async function PATCH(req: NextRequest) {
   if (typeof body.totalAmount === "number" && Number.isFinite(body.totalAmount)) update.total_amount = Math.max(0, Math.round(body.totalAmount));
   if (typeof body.extraCharge === "number" && Number.isFinite(body.extraCharge)) update.extra_charge = Math.max(0, Math.round(body.extraCharge));
 
+  // 예약금 받은 계좌 (schedules.deposit_account) — CRM 세무조회에서 법인/일반 수정
+  let depositSaved = false;
+  if ("depositAccount" in body) {
+    const v = body.depositAccount === "corp" || body.depositAccount === "personal" ? body.depositAccount : null;
+    const res = await supaFetch(
+      `schedules?id=eq.${encodeURIComponent(scheduleId)}`,
+      { method: "PATCH", body: JSON.stringify({ deposit_account: v }) }
+    );
+    if (!res.ok) {
+      const text = await res.text().then((t) => t.slice(0, 200));
+      return Response.json({ error: "db_error", message: text }, { status: 502 });
+    }
+    depositSaved = true;
+  }
+
   if (Object.keys(update).length === 0) {
+    if (depositSaved) return Response.json({ ok: true }); // 계좌만 바꾼 경우 — 정산 행은 건드리지 않음
     return Response.json({ error: "no_fields_to_update" }, { status: 400 });
   }
 

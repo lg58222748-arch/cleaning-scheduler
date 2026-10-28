@@ -118,6 +118,8 @@ export async function POST(req: NextRequest) {
       endTime: body.endTime || "18:00",
       googleEventId: body.googleEventId,
       note: body.note || "",
+      // 영업탭에서 고른 예약금 계좌 (법인/일반)
+      depositAccount: body.depositAccount === "corp" || body.depositAccount === "personal" ? body.depositAccount : undefined,
     });
     if (!schedule) return Response.json({ error: "duplicate or failed" }, { status: 200 });
     return Response.json(schedule, { status: 201 });

@@ -40,7 +40,7 @@ function rowToMember(r: Record<string, unknown>): Member {
   return { id: String(r.id), name: String(r.name), color: String(r.color), phone: String(r.phone || ""), availableDays: (r.available_days as number[]) || [1,2,3,4,5], active: Boolean(r.active), linkedUsername: r.linked_username ? String(r.linked_username) : undefined };
 }
 function rowToSchedule(r: Record<string, unknown>): Schedule {
-  return { id: String(r.id), memberId: String(r.member_id || ""), memberName: String(r.member_name || "미배정"), title: String(r.title), location: String(r.location || ""), date: String(r.date), startTime: String(r.start_time), endTime: String(r.end_time), status: String(r.status) as Schedule["status"], assignedTo: r.assigned_to ? String(r.assigned_to) : undefined, assignedToName: r.assigned_to_name ? String(r.assigned_to_name) : undefined, googleEventId: r.google_event_id ? String(r.google_event_id) : undefined, note: "note" in r ? sanitizeNote(r.note as string | null | undefined) : undefined, color: r.color ? String(r.color) : undefined, assignedAt: r.assigned_at ? String(r.assigned_at) : undefined, createdAt: r.created_at ? String(r.created_at) : undefined, deletedAt: r.deleted_at ? String(r.deleted_at) : undefined, sortOrder: r.sort_order == null ? undefined : Number(r.sort_order) };
+  return { id: String(r.id), memberId: String(r.member_id || ""), memberName: String(r.member_name || "미배정"), title: String(r.title), location: String(r.location || ""), date: String(r.date), startTime: String(r.start_time), endTime: String(r.end_time), status: String(r.status) as Schedule["status"], assignedTo: r.assigned_to ? String(r.assigned_to) : undefined, assignedToName: r.assigned_to_name ? String(r.assigned_to_name) : undefined, googleEventId: r.google_event_id ? String(r.google_event_id) : undefined, note: "note" in r ? sanitizeNote(r.note as string | null | undefined) : undefined, color: r.color ? String(r.color) : undefined, assignedAt: r.assigned_at ? String(r.assigned_at) : undefined, createdAt: r.created_at ? String(r.created_at) : undefined, deletedAt: r.deleted_at ? String(r.deleted_at) : undefined, sortOrder: r.sort_order == null ? undefined : Number(r.sort_order), depositAccount: r.deposit_account === "corp" || r.deposit_account === "personal" ? r.deposit_account : undefined };
 }
 function rowToSwapRequest(r: Record<string, unknown>): SwapRequest {
   return { id: String(r.id), fromScheduleId: String(r.from_schedule_id), toScheduleId: String(r.to_schedule_id), fromMemberId: String(r.from_member_id), toMemberId: String(r.to_member_id), status: String(r.status) as SwapRequest["status"], createdAt: String(r.created_at) };
@@ -294,6 +294,14 @@ export async function addSchedule(input: Omit<Schedule, "id" | "status">): Promi
   return { schedule: rowToSchedule(data) };
 }
 
+// 예약금 받은 계좌(법인/일반) 저장 — 다른 저장을 절대 막지 않도록 항상 따로 저장한다.
+// deposit_account 컬럼이 아직 없으면(DB 설정 전) false 를 돌려주고 나머지는 그대로 진행.
+export async function setDepositAccount(id: string, value: "corp" | "personal" | null): Promise<boolean> {
+  const { error } = await supabase.from("schedules").update({ deposit_account: value }).eq("id", id);
+  if (error) console.warn("[depositAccount] 저장 안 됨:", error.message);
+  return !error;
+}
+
 // 같은 탭에서 동시 insert 되는 TOCTOU 방어 — key 는 googleEventId 또는 title|date
 const pendingInserts = new Set<string>();
 
@@ -315,7 +323,12 @@ export async function addUnassignedSchedule(input: Omit<Schedule, "id" | "status
       member_id: "", member_name: "미배정", title: input.title, location: input.location || "", date: input.date, start_time: input.startTime, end_time: input.endTime, status: "unassigned", google_event_id: input.googleEventId || null, note: sanitizeNote(input.note),
     }).select().single();
     if (error || !data) return null;
-    return rowToSchedule(data);
+    const created = rowToSchedule(data);
+    // 영업탭에서 고른 예약금 계좌 — 일정 저장과 별도로 기록 (실패해도 일정은 이미 저장됨)
+    if (input.depositAccount === "corp" || input.depositAccount === "personal") {
+      if (await setDepositAccount(created.id, input.depositAccount)) created.depositAccount = input.depositAccount;
+    }
+    return created;
   } finally {
     pendingInserts.delete(key);
   }
@@ -404,6 +417,11 @@ export async function unassignSchedule(scheduleId: string): Promise<Schedule | n
 }
 
 export async function updateSchedule(id: string, input: Partial<Schedule>): Promise<Schedule | null> {
+  // 예약금 계좌는 따로 저장 — 컬럼이 아직 없어도 제목·본문 등 나머지 저장은 그대로 되게
+  if (input.depositAccount !== undefined) {
+    const v = input.depositAccount === "corp" || input.depositAccount === "personal" ? input.depositAccount : null;
+    await setDepositAccount(id, v);
+  }
   const update: Record<string, unknown> = {};
   if (input.memberId !== undefined) update.member_id = input.memberId;
   if (input.memberName !== undefined) update.member_name = input.memberName;

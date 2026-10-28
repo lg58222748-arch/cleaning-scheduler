@@ -75,6 +75,7 @@ interface ConfirmSession {
   postDone: number[];
   copied: Set<string>;
   saved: boolean; // 캘린더 저장 완료 여부 — true 면 버튼 회색 + "저장 완료" 표시
+  depositAccount?: "corp" | "personal"; // 양식 발송의 예약금 안내에서 고른 계좌 — 캘린더 저장 때 일정에 기록 (CRM 세무조회용)
 }
 
 // 상담사 특이사항 본문 전체(여러 줄) 추출 — "11)상담사 특이사항" 또는 "상담사 특이사항" 뒤부터
@@ -994,13 +995,17 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
   // "STEP 2 · 파싱으로 이동" 버튼 - 확정 세션 생성/재사용 후 step 2 이동
   function goToParseStep() {
     const formText = activeForm.formText || getFormText();
+    // 예약금 안내에서 고른 계좌를 확정 세션으로 넘김 (아래에서 양식 세션 복사 표시가 초기화되기 전에 읽음)
+    const depositAccount: ConfirmSession["depositAccount"] =
+      activeForm.copied.has("depCorp") ? "corp" : activeForm.copied.has("dep") ? "personal" : undefined;
+    const carry = depositAccount ? { depositAccount } : {};
     // 파싱된 실제 고객 데이터가 있는 경우에만 "사용된" 세션으로 판단
     const isCurrentEmpty = !activeConfirm.parsedName && !activeConfirm.parsedAddr && !activeConfirm.parsedPhone && !activeConfirm.confirmed;
     if (isCurrentEmpty) {
-      updateConfirm({ customerText: formText });
+      updateConfirm({ customerText: formText, ...carry });
     } else {
       const newSession = makeConfirmSession(`확정${confirmSessions.length + 1}`);
-      setConfirmSessions(prev => renumberConfirm([...prev, { ...newSession, customerText: formText }]));
+      setConfirmSessions(prev => renumberConfirm([...prev, { ...newSession, customerText: formText, ...carry }]));
       setActiveConfirmId(newSession.id);
     }
     // 양식발송 현재 세션 내용 초기화 (예약확정 탭은 그대로 유지)
@@ -1111,6 +1116,7 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
         startTime: sched.time === "오전" ? "07:00" : sched.time === "오후" ? "13:00" : "09:00",
         endTime: sched.time === "오전" ? "12:00" : sched.time === "오후" ? "18:00" : "18:00",
         note: `원래제목: ${calOriginal}\n${confirmMsg}`,
+        depositAccount: activeConfirm.depositAccount, // 예약금 안내에서 고른 계좌 (CRM 세무조회 표시용)
       });
       // 중복/실패로 저장 안 된 건 사용자에게 알림 (이전엔 조용히 넘어가서 "저장했는데 안 보임" 발생)
       if (!created || !(created as { id?: string }).id) failedSaves.push(`${sched.date} ${svc.name}`);

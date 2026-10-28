@@ -23,6 +23,23 @@ async function supaGet<T>(path: string): Promise<T> {
   return res.json() as Promise<T>;
 }
 
+// deposit_account(예약금 받은 계좌) 컬럼이 있는지 — DB 설정 전이면 빼고 조회해야 전체 조회가 안 깨짐.
+// 있으면 계속 사용, 없으면 1분 뒤 다시 확인.
+let depositColumnOk: boolean | null = null;
+let depositCheckedAt = 0;
+async function hasDepositAccountColumn(): Promise<boolean> {
+  if (depositColumnOk === true) return true;
+  if (depositColumnOk === false && Date.now() - depositCheckedAt < 60_000) return false;
+  depositCheckedAt = Date.now();
+  try {
+    await supaGet<unknown[]>("schedules?select=deposit_account&limit=1");
+    depositColumnOk = true;
+  } catch {
+    depositColumnOk = false;
+  }
+  return depositColumnOk;
+}
+
 // Supabase REST 는 max-rows(기본 1000) 제한이 강제 적용됨 — limit 파라미터로 우회 불가.
 // Range 헤더로 페이지네이션해서 모든 행 수집. 무한루프 방지 안전장치 30회(=30,000행) 상한.
 async function supaGetAll<T>(path: string, pageSize = 1000): Promise<T[]> {
@@ -82,12 +99,13 @@ export async function GET(req: NextRequest) {
     return Response.json({ error: "server_misconfigured" }, { status: 500 });
   }
 
-  // 공통 select
-  const selectCols = "id,title,date,start_time,end_time,member_name,note,status";
+  // 공통 select — deposit_account(예약금 받은 계좌)는 DB 설정 후에만 있으므로 없으면 빼고 다시 조회
+  const baseCols = "id,title,date,start_time,end_time,member_name,note,status";
+  const selectCols = (await hasDepositAccountColumn()) ? baseCols + ",deposit_account" : baseCols;
 
   type ScheduleRow = {
     id: string; title: string; date: string; start_time: string; end_time: string;
-    member_name: string; note: string; status: string;
+    member_name: string; note: string; status: string; deposit_account?: string | null;
   };
 
   // 1) 날짜 범위의 confirmed/pending + 미배정 전체 (날짜 필터 제외)
@@ -176,6 +194,8 @@ export async function GET(req: NextRequest) {
         scheduleNote: sch.note || "",
         memberName: sch.member_name || "",
         scheduleStatus: sch.status || "",
+        // 예약금 받은 계좌 — "corp"(법인) / "personal"(일반) / ""(기록 없음)
+        depositAccount: sch.deposit_account === "corp" || sch.deposit_account === "personal" ? sch.deposit_account : "",
         settlement: st
           ? {
               id: st.id,
