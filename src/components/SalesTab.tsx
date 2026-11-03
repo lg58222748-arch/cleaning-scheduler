@@ -19,6 +19,7 @@ interface ServiceEntry {
   name: string;
   quote: string;
   deposit: string;
+  discount?: string; // 할인 금액 — 견적금액과 예약금에서 같이 빠지고 잔금은 그대로 (양식 발송에서만 사용)
 }
 
 interface ParsedSchedule {
@@ -475,7 +476,7 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
     return null;
   }
 
-  function updateService(name: string, field: "quote" | "deposit", value: string) {
+  function updateService(name: string, field: "quote" | "deposit" | "discount", value: string) {
     setServices((prev) => prev.map((s) => {
       if (s.name !== name) return s;
       if (field === "quote") {
@@ -498,8 +499,19 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
     updateForm({ region: nextRegion, services: recalculated });
   }
 
+  // 할인: 견적금액과 예약금에서 같은 금액을 빼서 잔금은 그대로.
+  // 예) 견적 418,000 · 예약금 120,000 에 3만원 할인 → 견적 388,000 · 예약금 90,000 · 잔금 298,000
+  function getDiscount(s: ServiceEntry) {
+    return Math.max(0, parseInt(s.discount || "") || 0);
+  }
+  function getQuoteAfterDiscount(s: ServiceEntry) {
+    return Math.max(0, (parseInt(s.quote) || 0) - getDiscount(s));
+  }
+  function getDepositAfterDiscount(s: ServiceEntry) {
+    return Math.max(0, (parseInt(s.deposit) || 0) - getDiscount(s));
+  }
   function getBalance(s: ServiceEntry) {
-    return (parseInt(s.quote) || 0) - (parseInt(s.deposit) || 0);
+    return getQuoteAfterDiscount(s) - getDepositAfterDiscount(s);
   }
 
   // 서비스명에 따른 날짜 라벨
@@ -539,15 +551,17 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
     text += `7)평수 : ${pyeong ? pyeong + "평" : ""}${buildType && buildType !== "선택" ? " " + buildType : ""}${pyeongNote ? " " + pyeongNote : ""}\n`;
 
     services.forEach((s, i) => {
+      // 할인이 있으면 할인 뒤 금액을 먼저 적음 — 예약확정 파싱·CRM 이 "콜론 뒤 첫 숫자"를 금액으로 읽기 때문
+      const disc = getDiscount(s);
       text += `► ${s.name}\n`;
-      text += `8)견적금액(공급가액) : ${s.quote ? parseInt(s.quote).toLocaleString() + "원" : ""}\n`;
-      text += `9)예 약 금 : ${s.deposit ? parseInt(s.deposit).toLocaleString() + "원" : ""}\n`;
+      text += `8)견적금액(공급가액) : ${s.quote ? getQuoteAfterDiscount(s).toLocaleString() + "원" + (disc > 0 ? ` (${disc.toLocaleString()}원 할인 적용)` : "") : ""}\n`;
+      text += `9)예 약 금 : ${s.deposit ? getDepositAfterDiscount(s).toLocaleString() + "원" : ""}\n`;
       text += `10)잔 금 : ${getBalance(s) > 0 ? getBalance(s).toLocaleString() + "원" : ""}\n`;
     });
 
     if (services.length > 1) {
-      const totalQuote = services.reduce((sum, s) => sum + (parseInt(s.quote) || 0), 0);
-      const totalDeposit = services.reduce((sum, s) => sum + (parseInt(s.deposit) || 0), 0);
+      const totalQuote = services.reduce((sum, s) => sum + getQuoteAfterDiscount(s), 0);
+      const totalDeposit = services.reduce((sum, s) => sum + getDepositAfterDiscount(s), 0);
       const totalBalance = totalQuote - totalDeposit;
       text += `────────────\n`;
       text += `총 견적금액 : ${totalQuote > 0 ? totalQuote.toLocaleString() + "원" : ""}\n`;
@@ -564,7 +578,7 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
 
   // 예약금 안내 텍스트 — 일반(개인 계좌) / 법인(주식회사 새집느낌) 계좌만 다르고 나머지 문구는 같음
   function getDepositText(kind: "personal" | "corp") {
-    const totalDeposit = services.reduce((sum, s) => sum + (parseInt(s.deposit) || 0), 0);
+    const totalDeposit = services.reduce((sum, s) => sum + getDepositAfterDiscount(s), 0); // 할인 뒤 예약금
     const account = kind === "personal" ? "토스뱅크 1000-0166-6971 권선우" : "우리은행1005 504 852384 주식회사 새집느낌";
     return `${account} 여기로 \n\n예약금 ${totalDeposit > 0 ? totalDeposit.toLocaleString() : ""}원\n\n보내주시면 예약 확정 도와드리겠습니다 :)\n\n예약자 성함으로 입금부탁드립니다, 예약자 성함이 아닌 경우 입금자명 따로 기재부탁드립니다,\n\n-----------------------------\n\n번거롭고 바쁘시겠지만 양해 부탁드립니다^^\n\n주소 누락방지를 위해서 1~5번만 한번 더 체크 하고있습니다.\n성함 주소 연락처만 한번더 체크해서 작성해주시면 빠르게 예약 확정 도와드리겠습니다!`;
   }
@@ -1251,17 +1265,29 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
                     <label className="text-xs text-gray-400 block">견적금액</label>
                     <input value={s.quote} onChange={(e) => updateService(s.name, "quote", e.target.value)} placeholder="예) 418000원" type="tel"
                       style={{ fontSize: "12px" }} className="w-full px-2 py-1.5 border border-gray-200 rounded outline-none focus:border-green-500" />
+                    {getDiscount(s) > 0 && (
+                      <div className="text-[11px] text-orange-600 font-bold mt-0.5">할인가 {getQuoteAfterDiscount(s).toLocaleString()}원</div>
+                    )}
                   </div>
                   <div className="flex-1">
-                    <label className="text-xs text-gray-400 block">예약금 <span className="text-green-600">(자동계산·수정가능)</span></label>
+                    <label className="text-xs text-gray-400 block whitespace-nowrap">예약금 <span className="text-green-600">(자동·수정)</span></label>
                     <input value={s.deposit} onChange={(e) => updateService(s.name, "deposit", e.target.value)} placeholder="견적금액 입력 시 자동계산" type="tel"
                       style={{ fontSize: "12px" }} className="w-full px-2 py-1.5 border border-gray-200 rounded outline-none focus:border-green-500" />
+                    {getDiscount(s) > 0 && (
+                      <div className="text-[11px] text-orange-600 font-bold mt-0.5">할인 후 {getDepositAfterDiscount(s).toLocaleString()}원</div>
+                    )}
                   </div>
                   <div className="flex-1">
                     <label className="text-xs text-gray-400 block">잔금 (자동)</label>
                     <div className="px-2 py-1.5 bg-gray-50 rounded text-xs text-blue-700 font-bold">
                       {getBalance(s) > 0 ? getBalance(s).toLocaleString() : "0"}
                     </div>
+                  </div>
+                  {/* 할인 — 견적금액·예약금에서 같은 금액을 빼서 잔금은 그대로 */}
+                  <div className="flex-1">
+                    <label className="text-xs text-gray-400 block whitespace-nowrap">할인 <span className="text-orange-500">(예약금 차감)</span></label>
+                    <input value={s.discount || ""} onChange={(e) => updateService(s.name, "discount", e.target.value.replace(/[^\d]/g, ""))} placeholder="예) 30000" type="tel"
+                      style={{ fontSize: "12px" }} className="w-full px-2 py-1.5 border border-gray-200 rounded outline-none focus:border-orange-400" />
                   </div>
                 </div>
               </div>
