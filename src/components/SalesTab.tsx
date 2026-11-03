@@ -20,6 +20,7 @@ interface ServiceEntry {
   quote: string;
   deposit: string;
   discount?: string; // 할인 금액 — 견적금액과 예약금에서 같이 빠지고 잔금은 그대로 (양식 발송에서만 사용)
+  appliedDiscount?: string; // 파싱한 양식의 "(N원 할인 적용)" 금액 — 견적·예약금엔 이미 빠져 있음 (최종 확정 양식에 다시 적는 용도)
 }
 
 interface ParsedSchedule {
@@ -68,6 +69,7 @@ interface ConfirmSession {
   parsedQuote: string;
   parsedDeposit: string;
   parsedBalance: string;
+  parsedDiscount: string; // ► 블록 없는 양식의 할인 금액 (parsedQuote 와 짝 — 이미 빠진 금액, 표시용)
   parsedSalesNote: string;
   calendarNote: string;
   schedules: ParsedSchedule[];
@@ -269,7 +271,7 @@ function makeConfirmSession(name: string): ConfirmSession {
     id: "c-" + Date.now() + "-" + Math.random().toString(36).slice(2, 6), name,
     services: [], customerText: "",
     parsedName: "", parsedPhone: "", parsedAddr: "", parsedWishDate: "",
-    parsedPyeong: "", parsedPyeongExtra: "", parsedNote: "", parsedQuote: "", parsedDeposit: "", parsedBalance: "", parsedSalesNote: "",
+    parsedPyeong: "", parsedPyeongExtra: "", parsedNote: "", parsedQuote: "", parsedDeposit: "", parsedBalance: "", parsedDiscount: "", parsedSalesNote: "",
     calendarNote: "", schedules: [], confirmMsg: "", confirmed: false, postDone: [], copied: new Set(), saved: false,
   };
 }
@@ -513,6 +515,10 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
   function getBalance(s: ServiceEntry) {
     return getQuoteAfterDiscount(s) - getDepositAfterDiscount(s);
   }
+  // 견적금액 뒤에 붙는 할인 표시 — 양식 발송·최종 확정 양식이 같은 문구를 씀 (파싱은 discountAfterAmount 가 다시 읽음)
+  function discountNote(amount: number) {
+    return amount > 0 ? ` (${amount.toLocaleString()}원 할인 적용)` : "";
+  }
 
   // 서비스명에 따른 날짜 라벨
   function getDateLabel(svcNames: string[]): string {
@@ -554,7 +560,7 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
       // 할인이 있으면 할인 뒤 금액을 먼저 적음 — 예약확정 파싱·CRM 이 "콜론 뒤 첫 숫자"를 금액으로 읽기 때문
       const disc = getDiscount(s);
       text += `► ${s.name}\n`;
-      text += `8)견적금액(공급가액) : ${s.quote ? getQuoteAfterDiscount(s).toLocaleString() + "원" + (disc > 0 ? ` (${disc.toLocaleString()}원 할인 적용)` : "") : ""}\n`;
+      text += `8)견적금액(공급가액) : ${s.quote ? getQuoteAfterDiscount(s).toLocaleString() + "원" + discountNote(disc) : ""}\n`;
       text += `9)예 약 금 : ${s.deposit ? getDepositAfterDiscount(s).toLocaleString() + "원" : ""}\n`;
       text += `10)잔 금 : ${getBalance(s) > 0 ? getBalance(s).toLocaleString() + "원" : ""}\n`;
     });
@@ -597,8 +603,14 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
     return String(num);
   }
 
+  // 견적금액 줄에서 금액 "뒤" 텍스트의 "(30,000원 할인 적용)" → "30000". 금액 뒤만 보므로 견적금액을 할인으로 읽지 않음.
+  function discountAfterAmount(rest: string): string {
+    const m = rest.match(/([\d,]+)\s*(만원|원)?\s*할인/);
+    return m ? parsePriceString(m[1], m[2]) : "";
+  }
+
   // 양식(서비스 종류·평수·► 항목·견적/예약금/잔금) 에서 서비스/평수/top-level 금액 추출 — 번호(6/7 등) 위치 무관
-  function extractFormData(text: string): { services: ServiceEntry[]; pyeong: string; pyeongExtra: string; topQuote: string; topDeposit: string; topBalance: string } {
+  function extractFormData(text: string): { services: ServiceEntry[]; pyeong: string; pyeongExtra: string; topQuote: string; topDeposit: string; topBalance: string; topDiscount: string } {
     const lines = text.split("\n").map((l) => l.trim()).filter(Boolean);
     let svcFromText = "", pyeongFromText = "";
     for (const line of lines) {
@@ -609,7 +621,7 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
     if (svcFromText) {
       const svcNames = svcFromText.split(/[,，\s]+/).filter(Boolean);
       services = svcNames.map((n) => {
-        let quote = "", deposit = "";
+        let quote = "", deposit = "", appliedDiscount = "";
         let inSvc = false;
         for (const line of lines) {
           if (line.includes(`► ${n}`)) { inSvc = true; continue; }
@@ -617,11 +629,12 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
           // ──── 구분선 또는 "총" 시작 (총 견적금액/예약금/잔금) 이면 마지막 서비스 블록 종료
           if (inSvc && (/^[─━\-=_\s]{3,}$/.test(line) || line.startsWith("총"))) break;
           if (inSvc) {
-            const qm = line.match(/견적금액.*[:：]\s*([\d,]+)/); if (qm) quote = qm[1].replace(/,/g, "");
+            const qm = line.match(/견적금액.*[:：]\s*([\d,]+)/);
+            if (qm) { quote = qm[1].replace(/,/g, ""); appliedDiscount = discountAfterAmount(line.slice((qm.index ?? 0) + qm[0].length)); }
             const dm = line.match(/예\s*약\s*금.*[:：]\s*([\d,]+)/); if (dm) deposit = dm[1].replace(/,/g, "");
           }
         }
-        return { name: n, quote, deposit };
+        return { name: n, quote, deposit, appliedDiscount };
       });
     }
     // Top-level 견적/예약금/잔금 — ► 서비스 블록 없이 번호만 있는 경우 지원 (박금진 케이스)
@@ -629,12 +642,12 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
     // "총 견적금액/예약금/잔금" 라인은 합계라서 top-level 값으로 쓰면 안 됨 (건너뜀)
     // [중요] 콜론(:) 필수 — 고객 특이사항에 '잔금시 010 ...' 같은 텍스트가 있어도
     // '10)잔 금 : 218,000원' 만 매칭되게. 콜론 없는 '잔금시' 는 매칭 안 됨.
-    let topQuote = "", topDeposit = "", topBalance = "";
+    let topQuote = "", topDeposit = "", topBalance = "", topDiscount = "";
     for (const line of lines) {
       if (line.startsWith("총")) continue;
       if (!topQuote) {
         const m = line.match(/(?:^\d+[.)]\s*)?견적금액[^\d:：]*[:：][^\d]*([\d,]+)\s*(만원|원)?/);
-        if (m) topQuote = parsePriceString(m[1], m[2]);
+        if (m) { topQuote = parsePriceString(m[1], m[2]); topDiscount = discountAfterAmount(line.slice((m.index ?? 0) + m[0].length)); }
       }
       if (!topDeposit) {
         const m = line.match(/(?:^\d+[.)]\s*)?예\s*약\s*금[^\d:：]*[:：][^\d]*([\d,]+)\s*(만원|원)?/);
@@ -655,7 +668,7 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
       pyeong = pyeongNumMatch ? pyeongNumMatch[1] : pyeongFromText;
       pyeongExtra = pyeongNumMatch ? (pyeongNumMatch[2] || "").trim() : "";
     }
-    return { services, pyeong, pyeongExtra, topQuote, topDeposit, topBalance };
+    return { services, pyeong, pyeongExtra, topQuote, topDeposit, topBalance, topDiscount };
   }
 
   // AI 파싱 - Claude API 우선, 실패시 regex fallback
@@ -770,10 +783,11 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
           parsedQuote: formData.topQuote || "",
           parsedDeposit: formData.topDeposit || "",
           parsedBalance: formData.topBalance || "",
+          parsedDiscount: formData.topDiscount || "",
           services: confirmServices,
           schedules: confirmServices.map((s) => ({ service: s.name, date: wishDateToISO(rWish), time: "선택" })),
         });
-        generateConfirmMsg(rName, rAddr, rPhone, rWish, rNote, confirmServices, formData.pyeong, undefined, formData.pyeongExtra, rSalesNote, formData.topQuote, formData.topDeposit, formData.topBalance);
+        generateConfirmMsg(rName, rAddr, rPhone, rWish, rNote, confirmServices, formData.pyeong, undefined, formData.pyeongExtra, rSalesNote, formData.topQuote, formData.topDeposit, formData.topBalance, formData.topDiscount);
         finishSuccess();
         return;
       }
@@ -872,16 +886,17 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
       parsedQuote: formData.topQuote || "",
       parsedDeposit: formData.topDeposit || "",
       parsedBalance: formData.topBalance || "",
+      parsedDiscount: formData.topDiscount || "",
       services: svcList,
       schedules: svcList.map((s) => ({ service: s.name, date: wishDateToISO(wish), time: "선택" })),
     });
 
     // 확정 메시지 생성
-    generateConfirmMsg(name, addr, phone, wish, note, svcList, pyeongToUse, undefined, formData.pyeongExtra, salesNote, formData.topQuote, formData.topDeposit, formData.topBalance);
+    generateConfirmMsg(name, addr, phone, wish, note, svcList, pyeongToUse, undefined, formData.pyeongExtra, salesNote, formData.topQuote, formData.topDeposit, formData.topBalance, formData.topDiscount);
     return { ok: true, missing };
   }
 
-  function generateConfirmMsg(name?: string, addr?: string, phone?: string, _wish?: string, note?: string, overrideServices?: ServiceEntry[], overridePyeong?: string, overrideSchedules?: ParsedSchedule[], overridePyeongExtra?: string, overrideSalesNote?: string, overrideTopQuote?: string, overrideTopDeposit?: string, overrideTopBalance?: string) {
+  function generateConfirmMsg(name?: string, addr?: string, phone?: string, _wish?: string, note?: string, overrideServices?: ServiceEntry[], overridePyeong?: string, overrideSchedules?: ParsedSchedule[], overridePyeongExtra?: string, overrideSalesNote?: string, overrideTopQuote?: string, overrideTopDeposit?: string, overrideTopBalance?: string, overrideTopDiscount?: string) {
     const n = name || parsedName;
     const svcs = overrideServices || activeConfirm.services;
     const schedsRaw = overrideSchedules || activeConfirm.schedules;
@@ -891,6 +906,7 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
     const topQ = overrideTopQuote !== undefined ? overrideTopQuote : activeConfirm.parsedQuote;
     const topD = overrideTopDeposit !== undefined ? overrideTopDeposit : activeConfirm.parsedDeposit;
     const topB = overrideTopBalance !== undefined ? overrideTopBalance : activeConfirm.parsedBalance;
+    const topDisc = overrideTopDiscount !== undefined ? overrideTopDiscount : (activeConfirm.parsedDiscount || "");
     const svcList = svcs.map((s) => s.name).join(", ");
     const timeDesc: Record<string, string> = {
       "오전": " 오전(7~9시 사이 방문)",
@@ -926,7 +942,9 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
       const useBalance = (svcs.length === 1 && topB)
         ? parseInt(topB) || 0
         : (s.quote && s.deposit ? getBalance(s) : (qNum > 0 && dNum > 0 ? qNum - dNum : 0));
-      msg += `8)견적금액(공급가액) : ${qNum > 0 ? qNum.toLocaleString() + "원" : ""}\n`;
+      // 양식에 있던 "(N원 할인 적용)" 그대로 다시 적음 — 금액은 이미 할인 뒤 값이라 빼지 않음
+      const useDiscount = parseInt((s.quote ? s.appliedDiscount : (svcs.length === 1 ? topDisc : "")) || "") || 0;
+      msg += `8)견적금액(공급가액) : ${qNum > 0 ? qNum.toLocaleString() + "원" + discountNote(useDiscount) : ""}\n`;
       msg += `9)예 약 금 : ${dNum > 0 ? dNum.toLocaleString() + "원" : ""}\n`;
       msg += `10)잔 금 : ${useBalance > 0 ? useBalance.toLocaleString() + "원" : ""}\n`;
     });
@@ -936,7 +954,7 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
       const qNum = parseInt(topQ) || 0;
       const dNum = parseInt(topD) || 0;
       const bNum = parseInt(topB) || (qNum && dNum ? qNum - dNum : 0);
-      msg += `8)견적금액(공급가액) : ${qNum > 0 ? qNum.toLocaleString() + "원" : ""}\n`;
+      msg += `8)견적금액(공급가액) : ${qNum > 0 ? qNum.toLocaleString() + "원" + discountNote(parseInt(topDisc) || 0) : ""}\n`;
       msg += `9)예 약 금 : ${dNum > 0 ? dNum.toLocaleString() + "원" : ""}\n`;
       msg += `10)잔 금 : ${bNum > 0 ? bNum.toLocaleString() + "원" : ""}\n`;
     }
@@ -1041,7 +1059,7 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
     // 첫 번째 추가 & top-level 금액이 있으면 (박금진 케이스) 기본 견적/예약금으로 사용
     const isFirst = activeConfirm.services.length === 0;
     const newSvc: ServiceEntry = isFirst
-      ? { name: "선택", quote: activeConfirm.parsedQuote || "", deposit: activeConfirm.parsedDeposit || "" }
+      ? { name: "선택", quote: activeConfirm.parsedQuote || "", deposit: activeConfirm.parsedDeposit || "", appliedDiscount: activeConfirm.parsedDiscount || "" }
       : { name: "선택", quote: "", deposit: "" };
     const newSchedules = [...schedules, newSched];
     const newServices = [...activeConfirm.services, newSvc];
