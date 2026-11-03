@@ -579,7 +579,7 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
   // 예약금 안내 텍스트 — 일반(개인 계좌) / 법인(주식회사 새집느낌) 계좌만 다르고 나머지 문구는 같음
   function getDepositText(kind: "personal" | "corp") {
     const totalDeposit = services.reduce((sum, s) => sum + getDepositAfterDiscount(s), 0); // 할인 뒤 예약금
-    const account = kind === "personal" ? "토스뱅크 1000-0166-6971 권선우" : "우리은행1005 504 852384 주식회사 새집느낌";
+    const account = kind === "personal" ? "카카오뱅크 33333 038 74794 권선우" : "우리은행1005 504 852384 주식회사 새집느낌";
     return `${account} 여기로 \n\n예약금 ${totalDeposit > 0 ? totalDeposit.toLocaleString() : ""}원\n\n보내주시면 예약 확정 도와드리겠습니다 :)\n\n예약자 성함으로 입금부탁드립니다, 예약자 성함이 아닌 경우 입금자명 따로 기재부탁드립니다,\n\n-----------------------------\n\n번거롭고 바쁘시겠지만 양해 부탁드립니다^^\n\n주소 누락방지를 위해서 1~5번만 한번 더 체크 하고있습니다.\n성함 주소 연락처만 한번더 체크해서 작성해주시면 빠르게 예약 확정 도와드리겠습니다!`;
   }
 
@@ -1358,7 +1358,7 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
                   <div className="absolute right-0 top-full mt-1 z-50 w-full min-w-[170px] bg-white border border-green-200 rounded-lg shadow-lg overflow-hidden">
                     {([
                       ["corp", "법인", "우리은행 · 주식회사 새집느낌", "depCorp"],
-                      ["personal", "일반", "토스뱅크 · 권선우", "dep"],
+                      ["personal", "일반", "카카오뱅크 · 권선우", "dep"],
                     ] as const).map(([kind, name, account, label]) => (
                       <button key={kind} onClick={() => copyDeposit(kind)}
                         className="w-full px-3 py-2 text-left border-b last:border-b-0 border-green-100 active:bg-green-50 hover:bg-green-50">
