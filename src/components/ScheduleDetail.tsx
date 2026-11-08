@@ -153,7 +153,9 @@ export default function ScheduleDetail({
   const [loading, setLoading] = useState(false);
   const [preloadChecklist, setPreloadChecklist] = useState(false);
   const [preloadSettlement, setPreloadSettlement] = useState(false);
-  const [showAllComments, setShowAllComments] = useState(false);
+  // 댓글 전체 화면(큰 글씨) — 뒤로가기·스와이프 처리에서 바로 확인하려고 ref 도 같이 둠
+  const [showCommentsSheet, setShowCommentsSheet] = useState(false);
+  const commentsSheetOpenRef = useRef(false);
 
   // 인라인 편집 상태
   const [editingNote, setEditingNote] = useState(false);
@@ -375,6 +377,11 @@ export default function ScheduleDetail({
 
   useEffect(() => {
     const handler = (): boolean => {
+      // 댓글 전체 화면이 열려 있으면 그것만 닫기
+      if (commentsSheetOpenRef.current) {
+        closeCommentsSheet();
+        return true;
+      }
       if (tabHistoryRef.current.length > 0) {
         const prevTab = tabHistoryRef.current.pop()!;
         setActiveTab(prevTab);
@@ -384,7 +391,7 @@ export default function ScheduleDetail({
     };
     onRegisterBackHandler?.(handler);
     return () => onRegisterBackHandler?.(null);
-  }, [onRegisterBackHandler]);
+  }, [onRegisterBackHandler]); // eslint-disable-line react-hooks/exhaustive-deps -- closeCommentsSheet 는 ref·setter 만 써서 처음 것으로 충분
 
   // 시간대 (제목 앞에 [오전] 등)
   const TIME_SLOTS = ["오전", "오후", "시무", "사이"] as const;
@@ -434,6 +441,8 @@ export default function ScheduleDetail({
 
   // 댓글 입력칸 — 여러 줄 입력·붙여넣기 시 줄바꿈 유지, 내용만큼 늘어남(최대 4줄 정도 후 스크롤)
   const commentInputRef = useRef<HTMLTextAreaElement>(null);
+  const sheetInputRef = useRef<HTMLTextAreaElement>(null); // 댓글 전체 화면의 입력칸
+  const sheetListRef = useRef<HTMLDivElement>(null); // 댓글 전체 화면의 목록(스크롤)
   function fitCommentInput(el: HTMLTextAreaElement | null) {
     if (!el) return;
     el.style.height = "auto";
@@ -454,15 +463,46 @@ export default function ScheduleDetail({
     setComments((prev) => [...prev, tempComment]);
     const text = newComment.trim();
     setNewComment("");
-    requestAnimationFrame(() => fitCommentInput(commentInputRef.current));
+    requestAnimationFrame(() => {
+      fitCommentInput(commentInputRef.current);
+      fitCommentInput(sheetInputRef.current);
+      sheetListRef.current?.scrollTo({ top: 0 }); // 전체 화면은 최신 댓글이 맨 위 — 방금 쓴 댓글이 바로 보이게
+    });
     // API 백그라운드
     createComment(schedule.id, authorName, text);
+  }
+
+  // PC: Enter 등록 · Shift+Enter 줄바꿈 / 폰: Enter 는 줄바꿈(등록 버튼으로 등록). 한글 조합 중 Enter 는 무시.
+  function handleCommentKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
+    if (e.key !== "Enter" || e.shiftKey || e.nativeEvent.isComposing) return;
+    if (window.matchMedia("(pointer: coarse)").matches) return;
+    e.preventDefault();
+    handleAddComment();
   }
 
   function handleDeleteComment(id: string) {
     // 즉시 UI 제거
     setComments((prev) => prev.filter((c) => c.id !== id));
     deleteCommentApi(id);
+  }
+
+  // 댓글 전체 화면 — 입력칸은 아래 바와 같은 내용을 같이 씀(어느 쪽에서 써도 이어짐)
+  function openCommentsSheet() {
+    commentsSheetOpenRef.current = true;
+    setShowCommentsSheet(true);
+    requestAnimationFrame(() => fitCommentInput(sheetInputRef.current));
+  }
+  function closeCommentsSheet() {
+    commentsSheetOpenRef.current = false;
+    setShowCommentsSheet(false);
+    requestAnimationFrame(() => fitCommentInput(commentInputRef.current));
+  }
+  // 전체 화면은 삭제 버튼이 커서 잘못 누르기 쉬움 → 한 번 더 확인
+  function confirmDeleteComment(c: Comment) {
+    const preview = c.content.length > 40 ? c.content.slice(0, 40) + "…" : c.content;
+    showConfirm(`이 댓글을 삭제할까요?\n\n"${preview}"`).then((ok) => {
+      if (ok) handleDeleteComment(c.id);
+    });
   }
 
   // 인라인 저장
@@ -554,6 +594,11 @@ export default function ScheduleDetail({
       mc.on("swiperight", (ev) => {
         // 선택 상자(배정 팀장 등)·입력칸을 손가락으로 끌다가 옆으로 움직임이 섞인 건 닫기로 보지 않음
         if (isEditingControl(ev.target as HTMLElement | null)) return;
+        // 댓글 전체 화면이 열려 있으면 그것만 닫기 (상세창은 그대로)
+        if (commentsSheetOpenRef.current) {
+          closeCommentsSheet();
+          return;
+        }
         if (tabHistoryRef.current.length > 0) {
           const prev = tabHistoryRef.current.pop()!;
           setActiveTab(prev);
@@ -993,36 +1038,31 @@ export default function ScheduleDetail({
       {/* 하단 고정 - 정보탭에서만 표시 */}
       {activeTab === "info" && (
       <div className="border-t border-gray-200 bg-white safe-area-bottom">
-        {/* 댓글 — 접힘: 최근 2개(작은 칸) / 펼침: 전체(큰 칸, 스크롤) */}
+        {/* 댓글 미리보기 — 최근 2개를 큰 글씨로(각 2줄까지). 누르면 전체 댓글 화면 */}
         {comments.length > 0 && (
-          <div className="border-b border-gray-100">
-            <button
-              onClick={() => setShowAllComments((v) => !v)}
-              className="w-full flex items-center justify-between px-4 pt-1.5 pb-1 active:bg-gray-50"
-            >
-              <span className="text-[11px] font-medium text-gray-500">댓글 {comments.length}개</span>
-              <span className="flex items-center gap-0.5 text-[11px] font-bold text-blue-500">
-                {showAllComments ? "접기" : "펼치기"}
-                <svg className={`w-3 h-3 transition-transform ${showAllComments ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" /></svg>
+          <div
+            role="button"
+            tabIndex={0}
+            onClick={openCommentsSheet}
+            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openCommentsSheet(); } }}
+            className="border-b border-gray-100 px-4 pt-2 pb-2 cursor-pointer active:bg-gray-50"
+          >
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-[13px] font-semibold text-gray-600">댓글 {comments.length}개</span>
+              <span className="flex items-center gap-0.5 text-[13px] font-bold text-blue-500">
+                전체보기
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" /></svg>
               </span>
-            </button>
-            <div className={`px-4 overflow-y-auto ${showAllComments ? "max-h-[45vh]" : "max-h-[80px]"}`}>
-              <div className="space-y-1.5 pb-1.5">
-                {(showAllComments ? [...comments].reverse() : [...comments].reverse().slice(0, 2)).map((c) => (
-                  <div key={c.id} className="flex items-start gap-1.5">
-                    <div className="w-5 h-5 bg-gray-200 rounded-full flex items-center justify-center text-xs font-bold text-gray-600 shrink-0 mt-0.5">{c.authorName[0]}</div>
-                    <div className="flex-1 min-w-0">
-                      <span className="text-xs font-medium text-gray-700">{c.authorName}</span>
-                      <span className="text-xs text-gray-400 ml-1">{formatCommentTime(c.createdAt)}</span>
-                      {/* 입력한 줄바꿈·띄어쓰기 그대로, 줄은 단어(띄어쓰기) 단위로 넘김 */}
-                      <p className="text-xs text-gray-600 leading-snug whitespace-pre-wrap break-keep [overflow-wrap:anywhere]">{c.content}</p>
-                    </div>
-                    <button onClick={() => handleDeleteComment(c.id)} className="p-0.5 text-gray-300 active:text-red-500 shrink-0">
-                      <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-                    </button>
-                  </div>
-                ))}
-              </div>
+            </div>
+            <div className="space-y-1">
+              {[...comments].reverse().slice(0, 2).map((c) => (
+                // 이름·시각·내용을 한 흐름으로, 길면 2줄에서 … 처리 (전체는 눌러서 보기)
+                <p key={c.id} className="text-sm leading-snug text-gray-700 line-clamp-2 whitespace-pre-wrap break-keep [overflow-wrap:anywhere]">
+                  <span className="font-bold text-gray-900">{c.authorName}</span>
+                  <span className="text-xs text-gray-400 ml-1.5 mr-1.5">{formatCommentTime(c.createdAt)}</span>
+                  {c.content}
+                </p>
+              ))}
             </div>
           </div>
         )}
@@ -1033,13 +1073,7 @@ export default function ScheduleDetail({
             rows={1}
             value={newComment}
             onChange={(e) => { setNewComment(e.target.value); fitCommentInput(e.target); }}
-            onKeyDown={(e) => {
-              // PC: Enter 등록 · Shift+Enter 줄바꿈 / 폰: Enter 는 줄바꿈(등록 버튼으로 등록). 한글 조합 중 Enter 는 무시.
-              if (e.key !== "Enter" || e.shiftKey || e.nativeEvent.isComposing) return;
-              if (window.matchMedia("(pointer: coarse)").matches) return;
-              e.preventDefault();
-              handleAddComment();
-            }}
+            onKeyDown={handleCommentKeyDown}
             placeholder="댓글 입력..."
             className="flex-1 px-3 py-1.5 border border-gray-200 rounded-lg text-sm leading-snug outline-none focus:ring-2 focus:ring-blue-400 resize-none overflow-y-auto"
           />
@@ -1332,6 +1366,60 @@ export default function ScheduleDetail({
                 onClose();
                 setTimeout(() => onUnassign?.(schedule.id, returnReason.trim() || "사유 없음"), 50);
               }} className="flex-1 py-2.5 bg-orange-500 text-white rounded-xl text-xs font-bold active:bg-orange-600">반환</button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* 댓글 전체 화면 — 큰 글씨로 전체 댓글(최신이 위) + 입력칸. ‹ · 뒤로가기 · 오른쪽 스와이프로 닫기 */}
+      {showCommentsSheet && (
+        <div
+          className="fixed inset-0 z-[70] md:flex md:items-center md:justify-center md:bg-black/30"
+          style={{ paddingTop: "var(--safe-top)", paddingBottom: "var(--safe-bottom)" }}
+          onClick={(e) => { if (e.target === e.currentTarget) closeCommentsSheet(); }}
+        >
+          <div className="h-full w-full md:h-[85vh] md:w-[480px] md:rounded-2xl md:shadow-2xl bg-white flex flex-col overflow-hidden">
+            <div className="px-4 py-1.5 border-b border-gray-100 flex items-center justify-between">
+              <button onClick={closeCommentsSheet} className="p-1.5 active:bg-gray-100 rounded-lg" aria-label="댓글 닫기">
+                <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
+              </button>
+              <h3 className="text-base font-bold text-gray-800">댓글 {comments.length}개</h3>
+              <div className="w-8" />
+            </div>
+            <div ref={sheetListRef} className="flex-1 overflow-y-auto px-4 py-3">
+              {comments.length === 0 ? (
+                <p className="py-12 text-center text-sm text-gray-400">댓글이 없습니다</p>
+              ) : (
+                <div className="space-y-5">
+                  {[...comments].reverse().map((c) => (
+                    <div key={c.id} className="flex items-start gap-2.5">
+                      <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center text-sm font-bold text-gray-600 shrink-0">{c.authorName[0]}</div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-baseline gap-1.5 flex-wrap">
+                          <span className="text-sm font-bold text-gray-900">{c.authorName}</span>
+                          <span className="text-xs text-gray-400">{formatCommentTime(c.createdAt)}</span>
+                        </div>
+                        {/* 입력한 줄바꿈·띄어쓰기 그대로, 줄은 단어(띄어쓰기) 단위로 넘김 */}
+                        <p className="mt-0.5 text-base leading-relaxed text-gray-800 whitespace-pre-wrap break-keep [overflow-wrap:anywhere]">{c.content}</p>
+                      </div>
+                      <button onClick={() => confirmDeleteComment(c)} className="shrink-0 px-2 py-1 -mr-2 text-xs text-gray-400 rounded-md active:bg-red-50 active:text-red-500">삭제</button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div className="border-t border-gray-200 flex items-end gap-2 px-4 py-2">
+              <textarea
+                ref={sheetInputRef}
+                rows={1}
+                value={newComment}
+                onChange={(e) => { setNewComment(e.target.value); fitCommentInput(e.target); }}
+                onKeyDown={handleCommentKeyDown}
+                placeholder="댓글 입력..."
+                className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-base leading-snug outline-none focus:ring-2 focus:ring-blue-400 resize-none overflow-y-auto"
+              />
+              <button onClick={handleAddComment} disabled={loading || !newComment.trim()} className="px-4 py-2 bg-blue-500 text-white rounded-lg text-sm font-bold active:bg-blue-600 disabled:opacity-50 shrink-0">등록</button>
             </div>
           </div>
         </div>
