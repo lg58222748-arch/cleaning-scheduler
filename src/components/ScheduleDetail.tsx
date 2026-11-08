@@ -971,8 +971,8 @@ export default function ScheduleDetail({
                       value={noteText}
                       readOnly={!noteLoaded}
                       onChange={(e) => { if (!noteLoaded) return; setNoteText(e.target.value); setNoteChanged(true); }}
-                      // 본문 글씨 16px (14px 도 작아서 잘 안 보인다는 현장 의견 반영)
-                      style={{ fontSize: "16px" }}
+                      // 본문 글씨 15px — 14px 은 작아서 잘 안 보인다는 현장 의견, 16px 은 너무 크다는 의견 사이
+                      style={{ fontSize: "15px" }}
                       className={"w-full leading-relaxed bg-transparent outline-none resize-none min-h-[60px] " + (noteLoaded ? "text-gray-700" : "text-gray-400")}
                       placeholder={noteLoaded ? "내용을 입력하세요..." : noteLoadFailed ? "본문을 불러오지 못했습니다" : "본문 불러오는 중..."}
                     />
