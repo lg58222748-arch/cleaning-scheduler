@@ -1032,7 +1032,8 @@ export default function ScheduleDetail({
               <span className="text-[13px] font-semibold text-gray-600">댓글 {comments.length}개</span>
               <span className="flex items-center gap-0.5 text-[13px] font-bold text-blue-500">
                 접기
-                <svg className="w-3.5 h-3.5 rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" /></svg>
+                {/* 칸이 아래로 줄어드니 아래 화살표 */}
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" /></svg>
               </span>
             </button>
             <div ref={commentListRef} className="min-h-0 overflow-y-auto overscroll-contain px-4 pb-2.5">
@@ -1066,7 +1067,8 @@ export default function ScheduleDetail({
               <span className="text-[13px] font-semibold text-gray-600">댓글 {comments.length}개</span>
               <span className="flex items-center gap-0.5 text-[13px] font-bold text-blue-500">
                 펼치기
-                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" /></svg>
+                {/* 아래 칸이 위로 커지니 위 화살표 */}
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 15l7-7 7 7" /></svg>
               </span>
             </div>
             <div className="space-y-1">
