@@ -373,6 +373,13 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
   const [saving, setSaving] = useState(false);
   const [depositMenuOpen, setDepositMenuOpen] = useState(false); // 예약금 안내 드롭다운 (법인/일반)
   const [globalCopied, setGlobalCopied] = useState<Set<string>>(new Set()); // Step 3 템플릿 복사 상태
+  // 양식 발송 '초기화' 직전 내용 — 10초 동안 같은 자리 '되돌리기' 로 그대로 복구 (실수로 눌렀을 때 대비)
+  const [resetUndo, setResetUndo] = useState<FormSession | null>(null);
+  useEffect(() => {
+    if (!resetUndo) return;
+    const t = setTimeout(() => setResetUndo(null), 10000);
+    return () => clearTimeout(t);
+  }, [resetUndo]);
 
   // 안내 양식 카테고리 — 제목 기반 자동 분류 (저장된 category 없을 때 마이그레이션용)
   const inferCategory = (title: string): TemplateCategory => {
@@ -1045,6 +1052,21 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
     setStep(2);
   }
 
+  // 양식 발송 '초기화' 버튼 — 서비스·평수·타입·구조·지역·금액·할인·상담사 특이사항·양식 미리보기·복사 표시까지
+  // 화면을 처음 연 상태 그대로 (예약확정 탭은 건드리지 않음)
+  function resetWholeForm() {
+    const formId = activeForm.id;
+    setResetUndo(activeForm);
+    setDepositMenuOpen(false);
+    setFormSessions(prev => prev.map(s => s.id === formId ? { ...makeFormSession(s.name), id: s.id } : s));
+  }
+  function undoResetWholeForm() {
+    const snapshot = resetUndo;
+    if (!snapshot) return;
+    setFormSessions(prev => prev.map(s => s.id === snapshot.id ? snapshot : s));
+    setResetUndo(null);
+  }
+
   // 영업탭 예약확정에서는 "최종 확정 예약 양식" 만 복사하면 캘린더 저장 활성화.
   // 사전 고지사항/예약·변경·취소/확인/인터넷할인 안내 4종은 입금이 확인된 후
   // 배정탭의 해당 일정 → 입금확인 버튼을 누를 때 팝업으로 띄워서 복사하도록 이동.
@@ -1163,6 +1185,10 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
     setTimeout(() => setConfirmedToast(false), 2000);
     onCreated();
   }
+
+  // 양식 발송 화면이 처음 상태인지 — 지울 게 없으면 '초기화' 버튼 흐리게
+  const formIsBlank = services.length === 0 && !pyeong && buildType === "선택" && !pyeongNote && !salesNote
+    && !activeForm.formText && activeForm.copied.size === 0 && activeForm.region === "default";
 
   return (
     <div className="h-full flex flex-col bg-white">
@@ -1324,28 +1350,49 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
 
         {/* 오른쪽: 미리보기 (PC) */}
         <div className="space-y-4 mt-4 md:mt-0 md:flex-1 md:sticky md:top-0 md:self-start">
-          {/* 캘린더 제목 미리보기 */}
-          {services.length > 0 && (
-            <div>
-              <label className="text-xs font-bold text-gray-500 mb-1 block">캘린더 저장 제목 미리보기</label>
-              <div className="flex flex-wrap gap-1.5">
-                {services.map((s, i) => (
-                  <span key={s.name} className="text-xs px-2 py-1 bg-green-100 text-green-800 rounded-lg font-medium">
-                    {getCalTitle(s.name, i)}
-                  </span>
-                ))}
-              </div>
+          {/* 캘린더 제목 미리보기 + 오른쪽 '초기화' (입력한 내용 전부 지움 → 10초 동안 같은 자리 '되돌리기') */}
+          <div>
+            <div className="flex items-center justify-between gap-2 mb-1">
+              <label className="text-xs font-bold text-gray-500">캘린더 저장 제목 미리보기</label>
+              {resetUndo && formIsBlank ? (
+                <button
+                  type="button"
+                  onClick={undoResetWholeForm}
+                  className="shrink-0 px-2.5 py-1 rounded-md border border-blue-300 bg-blue-50 text-[11px] font-bold text-blue-600 active:bg-blue-100"
+                  title="방금 지운 내용 다시 불러오기"
+                >↶ 되돌리기</button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={resetWholeForm}
+                  disabled={formIsBlank}
+                  className="shrink-0 px-2.5 py-1 rounded-md border border-red-200 bg-white text-[11px] font-bold text-red-500 active:bg-red-50 disabled:border-gray-200 disabled:text-gray-300"
+                  title="입력한 내용을 모두 지우고 처음 상태로"
+                >↺ 초기화</button>
+              )}
             </div>
-          )}
+            <div className="flex flex-wrap gap-1.5">
+              {services.length > 0 ? services.map((s, i) => (
+                <span key={s.name} className="text-xs px-2 py-1 bg-green-100 text-green-800 rounded-lg font-medium">
+                  {getCalTitle(s.name, i)}
+                </span>
+              )) : (
+                <span className="text-xs px-2 py-1 bg-gray-50 text-gray-400 rounded-lg">서비스를 선택하면 표시됩니다</span>
+              )}
+            </div>
+          </div>
           {/* 미리보기 */}
           <div className="bg-green-50 border border-green-200 rounded-xl p-2">
-            <div className="flex items-center justify-between mb-1">
+            <div className="flex items-center justify-between mb-1 min-h-[22px]">
               <div className="text-xs font-bold text-green-700">양식 미리보기</div>
-              <button
-                onClick={() => setFormText(getFormText())}
-                className="text-[10px] px-1.5 py-0.5 rounded border border-green-400 text-green-700 active:bg-green-100"
-                title="자동 생성 텍스트로 초기화"
-              >↺ 초기화</button>
+              {/* 미리보기 글을 직접 고쳤을 때만 보임 — 고친 글을 버리고 위 입력값으로 만든 양식으로 돌아감 (입력값은 그대로) */}
+              {activeForm.formText && activeForm.formText !== getFormText() && (
+                <button
+                  onClick={() => setFormText("")}
+                  className="text-[10px] px-1.5 py-0.5 rounded border border-green-400 text-green-700 active:bg-green-100"
+                  title="직접 고친 글 대신 입력한 내용으로 만든 양식으로"
+                >↺ 자동 양식으로</button>
+              )}
             </div>
             <textarea
               value={activeForm.formText || getFormText()}
