@@ -7,6 +7,7 @@ import { getDayInfo } from "@/lib/koreanCalendar";
 import { DayHeader, DayInfoLine } from "@/components/DayMarks";
 import { assignScheduleApi, softDeleteSchedule, fetchDeletedSchedules, restoreScheduleApi, emptyTrashApi } from "@/lib/api";
 import { showConfirm } from "@/lib/dialog";
+import { registrantFromTitle } from "@/lib/registrant";
 import {
   format,
   startOfMonth,
@@ -306,6 +307,8 @@ function AssignTab({ members, schedules, onAssigned, onDeleted, onOpenDetail, on
               )}
               {daySchedules.map((s) => {
                 const titleDisplay = s.title;
+                // 등록한 실장 — 제목이 길어 잘리면 안 보여서 아래 줄에 따로 (목록엔 본문이 없어 제목에서 읽음)
+                const registrant = registrantFromTitle(s.title);
                 return (
                   <div key={s.id}>
                     <div
@@ -321,7 +324,10 @@ function AssignTab({ members, schedules, onAssigned, onDeleted, onOpenDetail, on
                         <span className="text-lg">📅</span>
                         <div className="flex-1 min-w-0">
                           <div className="text-sm font-bold text-gray-900 truncate">{titleDisplay}</div>
-                          <div className="text-xs text-gray-600 mt-0.5">{s.title.match(/^\[(.+?)\]/)?.[1] || "하루 종일"}</div>
+                          <div className="text-xs text-gray-600 mt-0.5 truncate">
+                            {s.title.match(/^\[(.+?)\]/)?.[1] || "하루 종일"}
+                            {registrant && <> · 등록 <span className="font-semibold text-gray-800">{registrant}</span></>}
+                          </div>
                         </div>
                         <svg className="w-4 h-4 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />

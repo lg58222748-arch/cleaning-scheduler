@@ -5,6 +5,7 @@ import { Schedule, Member, Comment } from "@/types";
 import { fetchComments, createComment, deleteCommentApi, updateSchedule as apiUpdateSchedule, fetchSchedule } from "@/lib/api";
 import { showConfirm, showAlert } from "@/lib/dialog";
 import { POST_PAYMENT_MESSAGES } from "@/lib/customerMessages";
+import { registrantName } from "@/lib/registrant";
 import ScheduleChecklist from "./ScheduleChecklist";
 import ScheduleSettlement from "./ScheduleSettlement";
 
@@ -419,19 +420,9 @@ export default function ScheduleDetail({
     return `${k.getUTCMonth() + 1}월 ${k.getUTCDate()}일 (${"일월화수목금토"[k.getUTCDay()]}) ${h < 12 ? "오전" : "오후"} ${h12}:${String(k.getUTCMinutes()).padStart(2, "0")}`;
   })();
 
-  // 등록한 실장 이름 — 영업탭 '캘린더 저장' 때 본문 첫 줄("원래제목: [오전] U고객/지역/실장 [1/2]/서비스")과
-  // 제목("u실장/미입금/고객" → 입금확인 뒤 "[오전] U고객/지역/실장 [1/2]/서비스")에 실장 이름이 들어감.
-  // DB 칸을 새로 만들지 않고 여기서 읽음 → 예전 일정도 바로 보임. 제목은 나중에 바뀔 수 있어 '원래제목'을 먼저 봄.
+  // 등록한 실장 이름 — 본문 '원래제목' 먼저, 없으면 제목에서 (src/lib/registrant.ts).
   // 영업탭을 거치지 않은 일정(직접 추가·휴무 등)은 이름 없음 → 시각만 표시.
-  const registrantName = (() => {
-    const slotName = (s: string) => s.match(/\/([^/\n]+?)\s*\[\d+\/\d+\]/)?.[1].trim() || "";
-    const firstLine = noteText.trimStart().split("\n")[0];
-    if (/^원래제목\s*[:：]/.test(firstLine)) {
-      const fromNote = slotName(firstLine);
-      if (fromNote) return fromNote;
-    }
-    return slotName(schedule.title) || schedule.title.match(/^u([^/\n]+)\/미입금\//)?.[1].trim() || "";
-  })();
+  const registrant = registrantName(schedule.title, noteText);
 
   const SCHEDULE_COLORS = [
     { name: "살몬", value: "#FDDCCC" },
@@ -875,15 +866,15 @@ export default function ScheduleDetail({
                 </div>
 
                 {/* 등록 — 일정을 등록(캘린더 저장)한 실장 이름 · 시각 */}
-                {(registrantName || createdAtLabel) && (
+                {(registrant || createdAtLabel) && (
                   <div className="flex items-center gap-3 text-xs text-gray-700">
                     <svg className="w-5 h-5 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                     </svg>
                     <span>
                       등록:{" "}
-                      {registrantName && <span className="font-semibold text-gray-900">{registrantName}</span>}
-                      {registrantName && createdAtLabel && <span className="text-gray-400"> · </span>}
+                      {registrant && <span className="font-semibold text-gray-900">{registrant}</span>}
+                      {registrant && createdAtLabel && <span className="text-gray-400"> · </span>}
                       {createdAtLabel && <span className="font-medium">{createdAtLabel}</span>}
                     </span>
                   </div>
