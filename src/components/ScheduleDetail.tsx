@@ -407,6 +407,18 @@ export default function ScheduleDetail({
     });
   })();
 
+  // 등록 시각 — 일정이 처음 저장된 때 (영업 실장이 캘린더 저장 → 배정탭으로 넘긴 시각). 기록 없는 예전 건은 빈 문자열.
+  // 요일까지 넣으면 폰/브라우저마다 "PM 3:12" 처럼 섞여 나와서 한국 시간으로 직접 조립 (한국은 서머타임 없음)
+  const createdAtLabel = (() => {
+    if (!schedule.createdAt) return "";
+    const t = new Date(schedule.createdAt).getTime();
+    if (isNaN(t)) return "";
+    const k = new Date(t + 9 * 3600e3);
+    const h = k.getUTCHours();
+    const h12 = h % 12 === 0 ? 12 : h % 12;
+    return `${k.getUTCMonth() + 1}월 ${k.getUTCDate()}일 (${"일월화수목금토"[k.getUTCDay()]}) ${h < 12 ? "오전" : "오후"} ${h12}:${String(k.getUTCMinutes()).padStart(2, "0")}`;
+  })();
+
   const SCHEDULE_COLORS = [
     { name: "살몬", value: "#FDDCCC" },
     { name: "하늘", value: "#DBEAFE" },
@@ -847,6 +859,16 @@ export default function ScheduleDetail({
                     </span>
                   )}
                 </div>
+
+                {/* 등록 시각 — 실장이 일정을 등록(캘린더 저장)한 시각 */}
+                {createdAtLabel && (
+                  <div className="flex items-center gap-3 text-xs text-gray-700">
+                    <svg className="w-5 h-5 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                    </svg>
+                    <span>등록: <span className="font-medium">{createdAtLabel}</span></span>
+                  </div>
+                )}
 
                 {/* 위치 */}
                 {schedule.location && (
