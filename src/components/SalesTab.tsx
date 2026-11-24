@@ -118,9 +118,31 @@ function extractCustomerNote(text: string): string {
   return trimmed;
 }
 
+// "2026-11-30" → "월" (형식이 아니면 "") — 폰 시간대와 상관없게 UTC 로 계산
+function weekdayOf(iso: string): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || "");
+  if (!m) return "";
+  const d = new Date(Date.UTC(+m[1], +m[2] - 1, +m[3]));
+  return isNaN(d.getTime()) ? "" : "일월화수목금토"[d.getUTCDay()];
+}
+
+// 날짜 고르는 칸 옆 요일 — 일요일 빨강·토요일 파랑 (배정탭 달력과 같은 색)
+function WeekdayChip({ iso }: { iso: string }) {
+  const dow = weekdayOf(iso);
+  if (!dow) return null;
+  const color = dow === "일" ? "text-red-500" : dow === "토" ? "text-blue-500" : "text-gray-700";
+  return <span className={`self-center shrink-0 text-xs font-bold ${color}`}>{dow}요일</span>;
+}
+
 function wishDateToISO(wish: string): string {
   if (!wish) return "";
   if (/^\d{4}-\d{2}-\d{2}$/.test(wish)) return wish;
+  // 확정 양식을 다시 붙여넣으면 "2026-11-30(월) 오전(7~9시 사이 방문)" 처럼 뒤에 요일·시간대가 붙어 있음 → 앞의 날짜만
+  const full = wish.trim().match(/^(\d{4})-(\d{1,2})-(\d{1,2})(?!\d)/);
+  if (full) {
+    const mo = parseInt(full[2], 10), d = parseInt(full[3], 10);
+    if (mo >= 1 && mo <= 12 && d >= 1 && d <= 31) return `${full[1]}-${String(mo).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+  }
   const m = wish.match(/(\d{1,2})[월\/\-]\s*(\d{1,2})/);
   if (!m) return "";
   const month = parseInt(m[1], 10);
@@ -925,7 +947,8 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
     const schedLines = schedsArr.filter(s => s.date).map(s => {
       const lbl = getDateLabel([s.service || ""]);
       const timeStr = s.time && s.time !== "선택" ? timeDesc[s.time] || ` ${s.time}` : "";
-      return `4)${lbl} : ${s.date}${timeStr}`;
+      const dow = weekdayOf(s.date); // 날짜 옆 요일 — "2026-11-30(월) 오전(7~9시 사이 방문)"
+      return `4)${lbl} : ${s.date}${dow ? `(${dow})` : ""}${timeStr}`;
     });
     const dateBlock = schedLines.length > 0 ? schedLines.join("\n") : `4)${fallbackLabel} : ${_wish || parsedWishDate}`;
     let msg = `안녕하세요 ${n}님 😊\n예약이 확정되었습니다!\n\n`;
@@ -1554,7 +1577,8 @@ export default function SalesTab({ userName, onCreated, isAdmin = false, canEdit
                       <input type="date" value={sched.date} onChange={(e) => {
                         const updated = [...schedules]; updated[i] = { ...sched, date: e.target.value }; setSchedules(updated);
                         generateConfirmMsg(undefined, undefined, undefined, undefined, undefined, undefined, undefined, updated);
-                      }} style={{ fontSize: "12px" }} className="flex-1 px-3 py-2 border border-gray-200 rounded-lg outline-none focus:border-green-500" />
+                      }} style={{ fontSize: "12px" }} className="flex-1 min-w-0 px-3 py-2 border border-gray-200 rounded-lg outline-none focus:border-green-500" />
+                      <WeekdayChip iso={sched.date} />
                       <select value={sched.time} onChange={(e) => {
                         const updated = [...schedules]; updated[i] = { ...sched, time: e.target.value }; setSchedules(updated);
                         generateConfirmMsg(undefined, undefined, undefined, undefined, undefined, undefined, undefined, updated);
