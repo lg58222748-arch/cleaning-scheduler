@@ -220,6 +220,16 @@ export async function assignScheduleApi(scheduleId: string, memberId: string, me
   return res.json();
 }
 
+// 이미 배정된 일정의 담당 바꾸기 (대표·관리자·일정관리자) — 예전·새 담당 둘 다 알림
+export async function reassignScheduleApi(scheduleId: string, memberId: string, memberName: string): Promise<Schedule> {
+  const res = await safeFetch(`${BASE}/api/schedules`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ action: "reassign", scheduleId, memberId, memberName }),
+  });
+  return res.json();
+}
+
 export async function unassignScheduleApi(scheduleId: string, returnedBy?: string, reason?: string): Promise<Schedule> {
   const res = await safeFetch(`${BASE}/api/schedules`, {
     method: "POST",

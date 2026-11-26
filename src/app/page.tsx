@@ -39,6 +39,7 @@ import {
   softDeleteSchedule,
   unassignScheduleApi,
   assignScheduleApi,
+  reassignScheduleApi,
   createSwapRequest,
   approveSwapRequest,
   rejectSwapRequest,
@@ -1983,6 +1984,23 @@ export default function Home() {
           onEdit={(s) => { setDetailSchedule(null); consumeHash(); handleEditSchedule(s); }}
           onDelete={(id) => { handleDeleteSchedule(id); setDetailSchedule(null); consumeHash(); }}
           onUnassign={(id, reason) => { setDetailSchedule(null); consumeHash(); handleUnassignSchedule(id, reason); }}
+          onReassign={(scheduleId, memberId, memberName) => {
+            // 담당 바꾸기 — 화면 먼저 바꾸고(상세창은 열린 채 새 담당 표시), 실패하면 원래대로
+            scheduleReloadSuppressRef.current = Date.now() + 4000;
+            const original = schedules.find((s) => s.id === scheduleId) || (detailSchedule?.id === scheduleId ? detailSchedule : undefined);
+            const patch = { memberId, memberName, assignedTo: memberId, assignedToName: memberName, assignedAt: new Date().toISOString() };
+            setSchedules((prev) => prev.map((s) => (s.id === scheduleId ? { ...s, ...patch } : s)));
+            setDetailSchedule((prev) => (prev && prev.id === scheduleId ? { ...prev, ...patch } : prev));
+            reassignScheduleApi(scheduleId, memberId, memberName).catch((err) => {
+              console.error("[reassign] 실패, 롤백:", err);
+              if (original) {
+                const back = { memberId: original.memberId, memberName: original.memberName, assignedTo: original.assignedTo, assignedToName: original.assignedToName, assignedAt: original.assignedAt };
+                setSchedules((prev) => prev.map((s) => (s.id === scheduleId ? { ...s, ...back } : s)));
+                setDetailSchedule((prev) => (prev && prev.id === scheduleId ? { ...prev, ...back } : prev));
+              }
+              showAlert("담당 변경 실패. 다시 시도해주세요.");
+            });
+          }}
           onAssign={(scheduleId, memberId, memberName) => {
             scheduleReloadSuppressRef.current = Date.now() + 4000;
             const target = unassignedSchedules.find((s) => s.id === scheduleId);

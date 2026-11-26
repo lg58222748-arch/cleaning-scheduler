@@ -406,6 +406,18 @@ export async function assignSchedule(scheduleId: string, memberId: string, membe
   return rowToSchedule(tsErr ? data : { ...data, assigned_at: nowIso });
 }
 
+// 담당 바꾸기 (이미 배정된 일정) — 배정과 같은 칸만 바꾸고 상태(완료 등)는 그대로 둔다.
+export async function reassignSchedule(scheduleId: string, memberId: string, memberName: string): Promise<Schedule | null> {
+  const { data } = await supabase.from("schedules").update({
+    assigned_to: memberId, assigned_to_name: memberName, member_id: memberId, member_name: memberName,
+  }).eq("id", scheduleId).select().single();
+  if (!data) return null;
+  // 새 담당 기준 배정 시각 (best-effort — assignSchedule 과 같음)
+  const nowIso = new Date().toISOString();
+  const { error: tsErr } = await supabase.from("schedules").update({ assigned_at: nowIso }).eq("id", scheduleId);
+  return rowToSchedule(tsErr ? data : { ...data, assigned_at: nowIso });
+}
+
 export async function unassignSchedule(scheduleId: string): Promise<Schedule | null> {
   const { data } = await supabase.from("schedules").update({
     assigned_to: null, assigned_to_name: null, member_id: "", member_name: "미배정", status: "unassigned",

@@ -23,6 +23,8 @@ interface ScheduleDetailProps {
   onDelete: (id: string) => void;
   onUnassign?: (id: string, reason: string) => void;
   onAssign?: (scheduleId: string, memberId: string, memberName: string) => void;
+  // 이미 배정된 일정의 담당 바꾸기 (달력 탭 상세, 대표·관리자·일정관리자) — 없으면 버튼 안 보임
+  onReassign?: (scheduleId: string, memberId: string, memberName: string) => void;
   onClose: () => void;
   onUpdated?: (patch?: Partial<Schedule>) => void;
 }
@@ -144,6 +146,7 @@ export default function ScheduleDetail({
   onDelete,
   onUnassign,
   onAssign,
+  onReassign,
   onClose,
   onUpdated,
 }: ScheduleDetailProps) {
@@ -156,6 +159,9 @@ export default function ScheduleDetail({
   const [preloadSettlement, setPreloadSettlement] = useState(false);
   // 댓글 펼치기 — 펼치면 아래 칸이 상세창 높이의 80% 까지 커지고 전체 댓글을 큰 글씨로 보여줌
   const [showAllComments, setShowAllComments] = useState(false);
+  // 담당 변경 (달력 탭 상세) — 펼치면 새 담당 고르는 칸이 나옴
+  const [reassignOpen, setReassignOpen] = useState(false);
+  const [reassignTo, setReassignTo] = useState("");
 
   // 인라인 편집 상태
   const [editingNote, setEditingNote] = useState(false);
@@ -423,6 +429,21 @@ export default function ScheduleDetail({
   // 등록한 실장 이름 — 본문 '원래제목' 먼저, 없으면 제목에서 (src/lib/registrant.ts).
   // 영업탭을 거치지 않은 일정(직접 추가·휴무 등)은 이름 없음 → 시각만 표시.
   const registrant = registrantName(schedule.title, noteText);
+  // 담당 변경 버튼 — 달력 탭에서 배정된 일정을 열었을 때, 대표·관리자·일정관리자만 (방금 만들어 저장 중인 일정 제외)
+  const canChangeMember = mode === "calendar" && canAssignMember && !!onReassign
+    && schedule.status !== "unassigned" && !schedule.id.startsWith("temp-");
+  const reassignCandidates = (allUsers || []).filter((u) => u.role === "field" && !!u.id && u.name !== schedule.memberName);
+  function confirmReassign() {
+    const u = reassignCandidates.find((x) => x.id === reassignTo);
+    if (!u?.id || !onReassign) return;
+    if (titleText.includes("/미입금")) {
+      showAlert("미입금 일정은 담당을 바꿀 수 없습니다.\n먼저 입금확인 해주세요.");
+      return;
+    }
+    onReassign(schedule.id, u.id, u.name);
+    setReassignOpen(false);
+    setReassignTo("");
+  }
 
   const SCHEDULE_COLORS = [
     { name: "살몬", value: "#FDDCCC" },
@@ -857,13 +878,51 @@ export default function ScheduleDetail({
                   <svg className="w-5 h-5 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                   </svg>
-                  <span>담당: <span className="font-medium">{schedule.memberName}</span></span>
+                  <span className="shrink-0">담당: <span className="font-medium">{schedule.memberName}</span></span>
                   {assignedAtLabel && (
-                    <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-blue-50 text-blue-600 whitespace-nowrap">
+                    <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-blue-50 text-blue-600 whitespace-nowrap truncate min-w-0">
                       🕐 {assignedAtLabel} 배정
                     </span>
                   )}
+                  {canChangeMember && !reassignOpen && (
+                    <button
+                      type="button"
+                      onClick={() => { setReassignTo(""); setReassignOpen(true); }}
+                      className="ml-auto shrink-0 text-[11px] font-bold px-2 py-0.5 rounded-full border border-blue-300 text-blue-600 active:bg-blue-50"
+                    >
+                      담당 변경
+                    </button>
+                  )}
                 </div>
+                {canChangeMember && reassignOpen && (
+                  <div className="flex items-center gap-2 pl-8">
+                    <select
+                      value={reassignTo}
+                      onChange={(e) => setReassignTo(e.target.value)}
+                      className="flex-1 min-w-0 px-2 py-1.5 border border-gray-300 rounded-lg text-xs outline-none bg-white focus:ring-2 focus:ring-blue-400"
+                    >
+                      <option value="">새 담당 선택</option>
+                      {reassignCandidates.map((u) => (
+                        <option key={u.id} value={u.id}>{u.name}</option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      onClick={confirmReassign}
+                      disabled={!reassignTo}
+                      className="shrink-0 px-3 py-1.5 rounded-lg bg-blue-500 text-white text-xs font-bold active:bg-blue-600 disabled:bg-gray-300"
+                    >
+                      변경
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setReassignOpen(false); setReassignTo(""); }}
+                      className="shrink-0 px-2 py-1.5 text-xs text-gray-500 active:text-gray-700"
+                    >
+                      취소
+                    </button>
+                  </div>
+                )}
 
                 {/* 등록 — 일정을 등록(캘린더 저장)한 실장 이름 · 시각 */}
                 {(registrant || createdAtLabel) && (

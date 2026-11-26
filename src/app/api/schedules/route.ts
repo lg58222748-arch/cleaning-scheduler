@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { reorderSchedules, getSchedulesCreatedSince, getSchedules, getSchedulesByRange, getUnassignedSchedules, searchSchedules, addSchedule, addUnassignedSchedule, assignSchedule, unassignSchedule, addNotification, deleteAllSchedules, softDeleteSchedule, getDeletedSchedules, restoreSchedule, emptyTrash } from "@/lib/store";
+import { reorderSchedules, getSchedulesCreatedSince, getSchedules, getSchedulesByRange, getUnassignedSchedules, searchSchedules, addSchedule, addUnassignedSchedule, assignSchedule, reassignSchedule, unassignSchedule, addNotification, deleteAllSchedules, softDeleteSchedule, getDeletedSchedules, restoreSchedule, emptyTrash } from "@/lib/store";
 import { supabase } from "@/lib/supabase";
 
 export async function GET(req: NextRequest) {
@@ -77,6 +77,28 @@ export async function POST(req: NextRequest) {
     const msg = `"${schedule.title}" 일정이 ${schedule.memberName}님에게 배정되었습니다.`;
     // 배정받은 본인 + 관리자(ceo/admin/scheduler)
     await addNotification("schedule_created", "일정 배정", msg, schedule.id, [schedule.memberName], ["ceo", "admin", "scheduler"]);
+    return Response.json(schedule);
+  }
+
+  // 담당 바꾸기 (대표·관리자·일정관리자, 일정 상세의 '담당 변경') — 예전 담당·새 담당 둘 다에게 알림.
+  // 반환→재배정을 한 번에. 완료 등 상태는 그대로 두고, 미배정이었다면 일반 배정과 똑같이 처리.
+  if (body.action === "reassign" && body.scheduleId && body.memberId && body.memberName) {
+    const { data: before } = await supabase.from("schedules").select("title,member_name,status").eq("id", body.scheduleId).maybeSingle();
+    if (!before || before.status === "deleted") return Response.json({ error: "Not found" }, { status: 404 });
+    if (before.title && String(before.title).includes("/미입금")) {
+      return Response.json({ error: "unpaid_block", message: "미입금 일정은 배정할 수 없습니다. 먼저 입금확인 후 배정해주세요." }, { status: 400 });
+    }
+    const oldName = before.member_name && before.member_name !== "미배정" ? String(before.member_name) : "";
+    const schedule = before.status === "unassigned"
+      ? await assignSchedule(body.scheduleId, body.memberId, body.memberName)
+      : await reassignSchedule(body.scheduleId, body.memberId, body.memberName);
+    if (!schedule) return Response.json({ error: "Not found" }, { status: 404 });
+    const changed = oldName && oldName !== schedule.memberName;
+    const msg = changed
+      ? `"${schedule.title}" 일정 담당이 ${oldName}님 → ${schedule.memberName}님으로 바뀌었습니다.`
+      : `"${schedule.title}" 일정이 ${schedule.memberName}님에게 배정되었습니다.`;
+    await addNotification(changed ? "schedule_updated" : "schedule_created", changed ? "담당 변경" : "일정 배정", msg, schedule.id,
+      changed ? [schedule.memberName, oldName] : [schedule.memberName], ["ceo", "admin", "scheduler"]);
     return Response.json(schedule);
   }
 
