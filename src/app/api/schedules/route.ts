@@ -39,6 +39,16 @@ export async function GET(req: NextRequest) {
   return Response.json(await getSchedules(lite));
 }
 
+// 이 이름이 '현장팀이 아닌 계정'(대표·관리자·일정관리자·영업)뿐인지 — 맞으면 일정 담당으로 쓰면 안 됨.
+// 같은 이름의 현장팀 계정이 하나라도 있거나, 계정 목록에 없는 이름(옛 팀원 등)·조회 실패면 false (막지 않음).
+async function isNonFieldOnly(name: unknown): Promise<boolean> {
+  const n = typeof name === "string" ? name.trim() : "";
+  if (!n || n === "미배정") return false;
+  const { data, error } = await supabase.from("users").select("role").eq("name", n).eq("status", "approved");
+  if (error || !data || data.length === 0) return false;
+  return data.every((u) => u.role !== "field");
+}
+
 export async function POST(req: NextRequest) {
   const body = await req.json();
 
@@ -85,6 +95,9 @@ export async function POST(req: NextRequest) {
   if (body.action === "reassign" && body.scheduleId && body.memberId && body.memberName) {
     const { data: before } = await supabase.from("schedules").select("title,member_name,status").eq("id", body.scheduleId).maybeSingle();
     if (!before || before.status === "deleted") return Response.json({ error: "Not found" }, { status: 404 });
+    if (await isNonFieldOnly(body.memberName)) {
+      return Response.json({ error: "not_field", message: "현장팀이 아닌 계정은 일정 담당이 될 수 없습니다." }, { status: 400 });
+    }
     if (before.title && String(before.title).includes("/미입금")) {
       return Response.json({ error: "unpaid_block", message: "미입금 일정은 배정할 수 없습니다. 먼저 입금확인 후 배정해주세요." }, { status: 400 });
     }
@@ -145,6 +158,15 @@ export async function POST(req: NextRequest) {
     });
     if (!schedule) return Response.json({ error: "duplicate or failed" }, { status: 200 });
     return Response.json(schedule, { status: 201 });
+  }
+
+  // 원칙: 일정 담당은 현장팀만 — 관리자·영업 등 현장팀이 아닌 계정이 담당이면 저장 안 함.
+  // (옛 버전 앱에서 관리자가 달력에 등록하면 담당이 '관리자'로 들어가, 그 팀장 달력에 안 보이던 문제 차단)
+  if (await isNonFieldOnly(body.memberName)) {
+    return Response.json({
+      error: "담당 오류",
+      detail: `${body.memberName}님은 현장팀이 아니라 일정 담당이 될 수 없어요.\n앱을 완전히 껐다 켠 뒤, 담당 팀장을 골라 다시 등록해주세요.`,
+    }, { status: 400 });
   }
 
   const result = await addSchedule({
