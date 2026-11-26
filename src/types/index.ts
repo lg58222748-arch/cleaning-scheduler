@@ -23,7 +23,7 @@ export interface Schedule {
   googleEventId?: string;
   note?: string;
   color?: string; // 일정 색상 (#FDDCCC, #DBEAFE, #D1FAE5, #E9D5FF, #FEF3C7)
-  assignedAt?: string; // 배정탭 → 달력으로 배정된 시각 (ISO). 미배정이면 없음
+  assignedAt?: string; // 배정탭 → 달력으로 배정된 시각 (ISO). 미배정인데 값이 있으면 = 반환된 일정 (반환 때 지우지 않음)
   createdAt?: string; // 일정이 등록(영업 파싱→배정으로 넘김)된 시각 (ISO). 과거 건은 없음
   deletedAt?: string; // 휴지통으로 삭제된 시각 (ISO). 기록 시작 전 삭제분은 없음
   sortOrder?: number; // 같은 날 일정 표시 순서 (직접 정한 경우만). 없으면 시간대·등록순

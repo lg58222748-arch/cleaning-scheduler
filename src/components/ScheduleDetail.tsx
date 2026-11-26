@@ -586,8 +586,18 @@ export default function ScheduleDetail({
     return sameDay ? formatTime(dateStr) : `${d.getMonth() + 1}/${d.getDate()} ${formatTime(dateStr)}`;
   }
 
-  const statusLabel = schedule.status === "confirmed" ? "확정" : schedule.status === "pending" ? "대기" : "교환요청";
-  const statusClass = schedule.status === "confirmed" ? "bg-green-100 text-green-700" : schedule.status === "pending" ? "bg-yellow-100 text-yellow-700" : "bg-orange-100 text-orange-700";
+  // 상태 표시 — 미배정은 반환된 적 있으면 '교환요청'(다른 팀장에게 다시 배정), 처음부터 미배정이면 '배정요청'.
+  // (반환돼도 배정 시각은 남겨두므로 '미배정 + 배정 시각 있음' = 반환된 일정 — store.ts unassignSchedule)
+  // 예전엔 확정·대기가 아니면 전부 '교환요청'으로 떠서 미배정·완료 일정도 교환요청으로 보였음.
+  const isUnassignedNow = schedule.status === "unassigned" || schedule.memberName === "미배정";
+  const [statusLabel, statusClass]: [string, string] = isUnassignedNow
+    ? (schedule.assignedAt ? ["교환요청", "bg-orange-100 text-orange-700"] : ["배정요청", "bg-blue-100 text-blue-700"])
+    : schedule.status === "confirmed" ? ["확정", "bg-green-100 text-green-700"]
+    : schedule.status === "pending" ? ["대기", "bg-yellow-100 text-yellow-700"]
+    : schedule.status === "swapRequested" ? ["교환요청", "bg-orange-100 text-orange-700"]
+    : schedule.status === "completed" ? ["완료", "bg-teal-100 text-teal-700"]
+    : schedule.status === "deleted" ? ["삭제됨", "bg-gray-100 text-gray-500"]
+    : [String(schedule.status || ""), "bg-gray-100 text-gray-600"];
 
   const dayNames = ["일", "월", "화", "수", "목", "금", "토"];
   const schedDate = new Date(localDate + "T00:00:00");

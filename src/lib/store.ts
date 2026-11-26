@@ -423,9 +423,14 @@ export async function unassignSchedule(scheduleId: string): Promise<Schedule | n
     assigned_to: null, assigned_to_name: null, member_id: "", member_name: "미배정", status: "unassigned",
   }).eq("id", scheduleId).select().single();
   if (!data) return null;
-  // 미배정으로 되돌리면 배정 시각도 초기화 (best-effort, 컬럼 없으면 무시)
-  await supabase.from("schedules").update({ assigned_at: null }).eq("id", scheduleId);
-  return rowToSchedule({ ...data, assigned_at: null });
+  // 반환 표시 — 배정 시각(assigned_at)은 지우지 않고 남겨둔다: '미배정 + 배정 시각 있음' = 반환된 일정 → 상세에 '교환요청'.
+  // (배정 시각이 없던 옛 일정이면 지금 시각을 넣어 표시. 다시 배정하면 새 시각으로 바뀜. 미배정일 땐 배정 시각 칩이 안 보임)
+  if (!data.assigned_at) {
+    const nowIso = new Date().toISOString();
+    const { error } = await supabase.from("schedules").update({ assigned_at: nowIso }).eq("id", scheduleId);
+    if (!error) return rowToSchedule({ ...data, assigned_at: nowIso });
+  }
+  return rowToSchedule(data);
 }
 
 export async function updateSchedule(id: string, input: Partial<Schedule>): Promise<Schedule | null> {
