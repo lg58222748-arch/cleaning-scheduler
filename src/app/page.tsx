@@ -1036,7 +1036,7 @@ export default function Home() {
   }
 
   // Schedules — 낙관적 업데이트
-  function handleSaveSchedule(data: Omit<Schedule, "id" | "status">) {
+  function handleSaveSchedule(data: Omit<Schedule, "id" | "status">, assignee?: { id: string; name: string }) {
     setShowScheduleForm(false);
     setEditingSchedule(null);
     consumeHash();
@@ -1056,7 +1056,16 @@ export default function Home() {
       // 달력탭에서 생성 → 현재 사용자 정보로 설정
       const tempId = "temp-" + Date.now();
       const linkedMember = members.find(m => m.linkedUsername === currentUser?.username);
-      const calData = {
+      // 관리자가 '담당'을 다른 사람(예: 포장이사)으로 고른 경우 — 배정탭에서 배정할 때와 같은 값(사용자 id·이름)으로 저장.
+      // 본인을 고르거나 담당 칸이 없는 경우(현장팀 등)는 예전 그대로 본인이 담당.
+      const pickedOther = assignee && assignee.id && assignee.id !== currentUser?.id ? assignee : null;
+      const calData = pickedOther ? {
+        ...data,
+        memberId: pickedOther.id,
+        memberName: pickedOther.name,
+        assignedTo: pickedOther.id,
+        assignedToName: pickedOther.name,
+      } : {
         ...data,
         memberId: linkedMember?.id || data.memberId || "",
         memberName: linkedMember?.name || currentUser?.name || "미배정",
@@ -1259,6 +1268,18 @@ export default function Home() {
       filterNames.has(s.memberName)
     );
   })();
+  // 달력 탭 '새 일정'의 담당 고르기 — 대표·관리자·스케줄러만 (현장팀은 예전처럼 본인 자동).
+  // 기본값: 팀원 필터로 한 명만 보고 있으면 그 사람(예: 포장이사), 아니면 본인(예전과 같음).
+  const fieldUsers = allUsers.filter((u) => u.role === "field" && u.id);
+  const newScheduleAssignees = activeTab === "calendar" && !editingSchedule && (role === "ceo" || role === "admin" || role === "scheduler")
+    ? [
+        { id: currentUser.id, name: currentUser.name, label: `${currentUser.name} (나)` },
+        ...fieldUsers.filter((u) => u.id !== currentUser.id).map((u) => ({ id: u.id, name: u.name, label: u.name })),
+      ]
+    : undefined;
+  const filteredFieldUsers = filterActive ? fieldUsers.filter((u) => selectedMemberIds.has(u.id)) : [];
+  const newScheduleDefaultAssignee = filteredFieldUsers.length === 1 ? filteredFieldUsers[0].id : currentUser.id;
+
   const dateStr = format(selectedDate, "yyyy-MM-dd");
   const daySchedules = calendarSchedules
     .filter((s) => s.date === dateStr)
@@ -1816,6 +1837,8 @@ export default function Home() {
           members={members}
           selectedDate={selectedDate}
           editingSchedule={editingSchedule}
+          assigneeOptions={newScheduleAssignees}
+          defaultAssigneeId={newScheduleDefaultAssignee}
           onSave={handleSaveSchedule}
           onCancel={() => { setShowScheduleForm(false); setEditingSchedule(null); consumeHash(); }}
         />

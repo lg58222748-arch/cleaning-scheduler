@@ -9,7 +9,11 @@ interface ScheduleFormProps {
   members: Member[];
   selectedDate: Date;
   editingSchedule: Schedule | null;
-  onSave: (data: Omit<Schedule, "id" | "status">) => void;
+  // 달력 탭에서 관리자가 새 일정을 만들 때만 넘김 — 담당을 직접 고른다.
+  // 안 넘기면(현장팀·수정·배정탭) 예전 그대로: 담당 칸 없음.
+  assigneeOptions?: { id: string; name: string; label: string }[];
+  defaultAssigneeId?: string;
+  onSave: (data: Omit<Schedule, "id" | "status">, assignee?: { id: string; name: string }) => void;
   onCancel: () => void;
 }
 
@@ -19,6 +23,8 @@ export default function ScheduleForm({
   members,
   selectedDate,
   editingSchedule,
+  assigneeOptions,
+  defaultAssigneeId,
   onSave,
   onCancel,
 }: ScheduleFormProps) {
@@ -31,6 +37,7 @@ export default function ScheduleForm({
   ];
 
   const [memberId, setMemberId] = useState("");
+  const [assigneeId, setAssigneeId] = useState(defaultAssigneeId || "");
   const [title, setTitle] = useState("");
   const [timeSlot, setTimeSlot] = useState<TimeSlot>("오전");
   const [date, setDate] = useState(format(selectedDate, "yyyy-MM-dd"));
@@ -93,6 +100,7 @@ export default function ScheduleForm({
 
     // 수정 시 담당자가 선택 목록에 없으면(목록 밖 팀장) 원래 담당자를 유지 — "미배정"으로 바뀌는 사고 방지
     const keepOriginalMember = !!editingSchedule && !member && memberId === editingSchedule.memberId;
+    const picked = !editingSchedule ? assigneeOptions?.find((o) => o.id === assigneeId) : undefined;
     onSave({
       memberId: keepOriginalMember ? editingSchedule!.memberId : (member?.id || ""),
       memberName: keepOriginalMember ? editingSchedule!.memberName : (member?.name || "미배정"),
@@ -104,7 +112,7 @@ export default function ScheduleForm({
       // 본문을 받기 전이면 본문 필드를 아예 보내지 않아 기존 예약 내용이 유지되게 함
       ...(noteLoaded ? { note } : {}),
       color,
-    });
+    }, picked ? { id: picked.id, name: picked.name } : undefined);
   }
 
   const activeMembers = members.filter((m) => m.active);
@@ -124,7 +132,23 @@ export default function ScheduleForm({
       </div>
       <div className="flex-1 overflow-y-auto">
         <form onSubmit={handleSubmit} className="p-5 space-y-4" id="scheduleForm">
-          {/* 담당 팀원 — 본인으로 자동 설정 (숨김) */}
+          {/* 담당 — 관리자가 달력 탭에서 새로 만들 때만 보임. 그 외(현장팀 등)는 본인으로 자동 설정 (숨김) */}
+          {!editingSchedule && assigneeOptions && assigneeOptions.length > 0 && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                담당 *
+              </label>
+              <select
+                value={assigneeId}
+                onChange={(e) => setAssigneeId(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-400 focus:border-transparent outline-none bg-white"
+              >
+                {assigneeOptions.map((o) => (
+                  <option key={o.id} value={o.id}>{o.label}</option>
+                ))}
+              </select>
+            </div>
+          )}
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
